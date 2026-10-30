@@ -1,3 +1,4 @@
+using Arma.Modules.Comms.Contracts;
 using Arma.Modules.Contacts.Contracts;
 using Arma.Modules.Giving.Domain;
 using Arma.Modules.Giving.Infrastructure;
@@ -118,6 +119,7 @@ public sealed class OnlineGivingService(
             return notification;
         }
 
+        var firstNotice = donation.Status == DonationStatus.Pending;
         var paid = donation.MarkPaid(notification.ProviderPaymentId, notification.PaidAmount);
         if (!paid.IsSuccess)
         {
@@ -125,8 +127,17 @@ public sealed class OnlineGivingService(
             return notification with { Success = false, FailureReason = paid.Error.Message };
         }
 
-        await donations.SaveWithTimelineAsync(donation, cancellationToken);
+        // Teşekkür e-postası yalnızca ilk başarılı bildirimde gönderilir; tekrar gelen bildirim yeni e-posta üretmez.
+        await donations.SaveWithTimelineAsync(donation, cancellationToken, firstNotice ? await ThankYouAsync(donation, cancellationToken) : null);
         return notification;
+    }
+
+    private async Task<SendTransactionalEmail> ThankYouAsync(Donation donation, CancellationToken cancellationToken)
+    {
+        var organization = await db.ReceiptSettings.Select(r => r.OrganizationName).FirstOrDefaultAsync(cancellationToken);
+        var signature = string.IsNullOrWhiteSpace(organization) ? "" : $"\n\n{organization}";
+        return new SendTransactionalEmail(donation.ContactId, "Bağışınız için teşekkür ederiz",
+            $"Sayın {{{{adsoyad}}}},\n\n{Money.Format(donation.Amount, donation.Currency)} tutarındaki bağışınız bize ulaştı. Desteğiniz için teşekkür ederiz.{signature}");
     }
 
     public Microsoft.AspNetCore.Http.IResult Acknowledge(PaymentNotification? notification, string successUrl, string failUrl) =>

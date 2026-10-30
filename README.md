@@ -7,7 +7,8 @@ Tamamlanan: çözüm iskeleti, `Arma.UI` bileşen kütüphanesi, PostgreSQL + ku
 (parola, zorunlu 2FA, roller ve izinler, API istemcileri), denetim izi, Kişiler modülü (kişi/kurum/hane kartı,
 adresler, etiketler, gruplar, ilişkiler, mükerrer bulma ve birleştirme, CSV içe/dışa aktarma), Aktiviteler modülü
 (not, arama, toplantı, görev, kişi zaman çizelgesi, Görevlerim), Bağışlar modülü (fonlar, sıralı makbuz,
-iade, kamuya açık bağış formu, iyzico ve PayTR), Wolverine ile modüller arası olaylar, testler ve
+iade, kamuya açık bağış formu, iyzico ve PayTR), İletişim modülü (e-posta, SMS, toplu ileti, şablonlar,
+ticari ileti izinleri, İYS bildirimi, abonelik iptali), Wolverine ile modüller arası olaylar, testler ve
 kurulum paketi.
 
 ## Teknoloji
@@ -36,6 +37,7 @@ src/
     Contacts/             Kişiler modülü (Domain, Application, Infrastructure, Web) + Contracts
     Activities/           Not, arama, toplantı, görev; kişi zaman çizelgesi; Contracts: zaman çizelgesi mesajı
     Giving/               Bağışlar, fonlar, makbuz, çevrim içi bağış formu ve ödeme kuruluşları
+    Comms/                E-posta (SMTP), SMS (Netgsm), toplu ileti, ileti izinleri ve İYS; Contracts: bilgilendirme e-postası
     Identity/             Kullanıcılar, roller, izinler, 2FA, API istemcileri (Identity + OpenIddict); Contracts: kullanıcı listesi
     Audit/                Denetim izi tablosu, arama ekranı; Contracts: kayıt geçmişi bileşeni
 tests/
@@ -120,6 +122,21 @@ cd deploy
 - Ödeme sonucu yalnızca imzası doğrulanmış (PayTR) veya kuruluştan sorgulanmış (iyzico) bildirimle
   tamamlanır; aynı bildirim tekrar gelirse sonuç değişmez.
 - Geliştirmede `Giving__Payments__Provider=test` sahte ödeme sayfasını açar; canlı ortamda kullanılamaz.
+
+## E-posta, SMS ve İYS
+
+- Sağlayıcılar `.env` ile seçilir: e-posta için `ARMA_EMAIL_PROVIDER=smtp` ve `SMTP_*`, SMS için
+  `ARMA_SMS_PROVIDER=netgsm` ve `NETGSM_*`. Parolalar veritabanına yazılmaz; Yönetim > E-posta ve SMS
+  ekranında durum görülür ve deneme gönderimi yapılır.
+- İletiler kalıcı kuyruğa alınır ve arka planda gönderilir; uygulama yeniden başlasa da kaybolmaz.
+  Gönderilen ileti kişinin zaman çizelgesine düşer.
+- Ticari ileti (tanıtım, kampanya, bağış çağrısı) yalnızca o kanaldan izni onaylı kişiye gider; izin gönderim
+  anında yeniden kontrol edilir. E-postaya abonelik iptal bağlantısı ve tek tık iptal başlığı (RFC 8058)
+  eklenir; bunun için `ARMA_PUBLIC_URL` tanımlı olmalıdır. Makbuz gibi bilgilendirme iletileri izinden bağımsızdır.
+- `IYS_ENABLED=true` iken her izin değişikliği (elle, form, abonelik iptali) İYS'ye bildirilir; başarısız
+  bildirimler ekrandan yeniden denenebilir.
+- Çevrim içi bağış tamamlanınca bağışçıya teşekkür e-postası gider.
+- Geliştirmede `Comms__Email__Provider=test` ve `Comms__Sms__Provider=test` iletileri yalnızca bellekte tutar.
 
 ## Denetim izi
 

@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Modules\Audit\Arma.Modules.Audit\Arma.Modules.Audit.csproj" />
     <ProjectReference Include="..\Modules\Contacts\Arma.Modules.Contacts\Arma.Modules.Contacts.csproj" />
     <ProjectReference Include="..\Modules\Giving\Arma.Modules.Giving\Arma.Modules.Giving.csproj" />
+    <ProjectReference Include="..\Modules\Comms\Arma.Modules.Comms\Arma.Modules.Comms.csproj" />
     <ProjectReference Include="..\Modules\Identity\Arma.Modules.Identity\Arma.Modules.Identity.csproj" />
   </ItemGroup>
 

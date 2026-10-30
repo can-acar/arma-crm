@@ -2,6 +2,7 @@ using System.Reflection;
 using Arma.Modules.Activities;
 using Arma.Modules.Audit;
 using Arma.Modules.Contacts;
+using Arma.Modules.Comms;
 using Arma.Modules.Giving;
 using Arma.Modules.Identity;
 using Arma.SharedKernel.Modules;
@@ -11,7 +12,7 @@ namespace Arma.Host;
 /// <summary>Bu kurulumda etkin olan modüller. Yeni modül buraya eklenir.</summary>
 public static class ArmaModules
 {
-    public static IReadOnlyList<IModule> All { get; } = [new IdentityModule(), new AuditModule(), new ContactsModule(), new ActivitiesModule(), new GivingModule()];
+    public static IReadOnlyList<IModule> All { get; } = [new IdentityModule(), new AuditModule(), new ContactsModule(), new ActivitiesModule(), new GivingModule(), new CommsModule()];
 
     public static Assembly[] ModuleAssemblies { get; } = All.Select(m => m.GetType().Assembly).Distinct().ToArray();
 
