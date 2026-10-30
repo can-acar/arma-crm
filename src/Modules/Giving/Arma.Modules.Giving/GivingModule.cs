@@ -28,6 +28,7 @@ public sealed class GivingModule : IModule, INavigationContributor
         services.AddScoped<DonationService>();
         services.AddScoped<FundService>();
         services.AddScoped<OnlineGivingService>();
+        services.AddScoped<Arma.SharedKernel.Privacy.IPersonalDataSource, GivingPersonalData>();
         services.AddSingleton<IContactPanel, DonationsPanel>();
         services.AddSingleton<INavigationContributor>(this);
         AddPayments(services, configuration);

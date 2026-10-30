@@ -8,7 +8,8 @@ Tamamlanan: çözüm iskeleti, `Arma.UI` bileşen kütüphanesi, PostgreSQL + ku
 adresler, etiketler, gruplar, ilişkiler, mükerrer bulma ve birleştirme, CSV içe/dışa aktarma), Aktiviteler modülü
 (not, arama, toplantı, görev, kişi zaman çizelgesi, Görevlerim), Bağışlar modülü (fonlar, sıralı makbuz,
 iade, kamuya açık bağış formu, iyzico ve PayTR), İletişim modülü (e-posta, SMS, toplu ileti, şablonlar,
-ticari ileti izinleri, İYS bildirimi, abonelik iptali), Wolverine ile modüller arası olaylar, testler ve
+ticari ileti izinleri, İYS bildirimi, abonelik iptali), KVKK modülü (sürümlü aydınlatma ve açık rıza metinleri,
+rıza kayıtları, ilgili kişi başvuruları, veri dışa aktarma, anonimleştirme, kişisel veri envanteri), Wolverine ile modüller arası olaylar, testler ve
 kurulum paketi.
 
 ## Teknoloji
@@ -37,6 +38,7 @@ src/
     Contacts/             Kişiler modülü (Domain, Application, Infrastructure, Web) + Contracts
     Activities/           Not, arama, toplantı, görev; kişi zaman çizelgesi; Contracts: zaman çizelgesi mesajı
     Giving/               Bağışlar, fonlar, makbuz, çevrim içi bağış formu ve ödeme kuruluşları
+    Privacy/              KVKK: aydınlatma metinleri, açık rıza, ilgili kişi başvuruları, anonimleştirme, veri envanteri
     Comms/                E-posta (SMTP), SMS (Netgsm), toplu ileti, ileti izinleri ve İYS; Contracts: bilgilendirme e-postası
     Identity/             Kullanıcılar, roller, izinler, 2FA, API istemcileri (Identity + OpenIddict); Contracts: kullanıcı listesi
     Audit/                Denetim izi tablosu, arama ekranı; Contracts: kayıt geçmişi bileşeni
@@ -137,6 +139,22 @@ cd deploy
   bildirimler ekrandan yeniden denenebilir.
 - Çevrim içi bağış tamamlanınca bağışçıya teşekkür e-postası gider.
 - Geliştirmede `Comms__Email__Provider=test` ve `Comms__Sms__Provider=test` iletileri yalnızca bellekte tutar.
+
+## KVKK
+
+- Aydınlatma ve açık rıza metinleri taslak olarak yazılır, yayımlanınca sürüm numarası alır ve `/kvkk/{adres}`
+  sayfasında görünür. Yayımlanmış sürüm ve rıza kayıtları değiştirilemez (veritabanı tetikleyicisi reddeder);
+  rıza, verildiği sürümle birlikte saklanır, metin değişince eski sürüme verilmiş rıza ekranda işaretlenir.
+- İlgili kişi başvuruları `/kvkk/basvuru` formundan veya elle kaydedilir; son gün başvuru tarihinden 30 gün
+  sonradır, süresi geçenler listede işaretlenir. Başvuru, verilen yanıt yazılmadan kapatılamaz.
+- Kişi kartındaki KVKK sekmesinden kişinin tüm modüllerdeki verisi tek JSON dosyasında indirilir ve kişi
+  anonimleştirilir. Anonimleştirme geri alınamaz: ad, iletişim, kimlik numarası, adres, etiket, ilişki, not ve
+  ileti içerikleri silinir; bağış tutarı ve makbuz Vergi Usul Kanunu gereği kalır. Kurum kayıtları anonimleştirilmez.
+- Kişi verisi tutan her modül `IPersonalDataSource` uygular: envanter satırları, dışa aktarma ve anonimleştirme
+  bu arayüzden toplanır. Yeni modül eklendiğinde başvuru akışı ve envanter kendiliğinden genişler.
+- Kişisel veri envanteri ekranı VERBİS kaydına başlangıç olarak CSV verir.
+- Denetim izi, işlem güvenliği ve ispat için anonimleştirmeden sonra da saklanır; anonimleştirmenin kendisi
+  denetim izine değer yazmadan kaydedilir.
 
 ## Denetim izi
 

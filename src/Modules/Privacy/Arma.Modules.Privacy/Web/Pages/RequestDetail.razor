@@ -1,0 +1,188 @@
+@page "/privacy/requests/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = PrivacyPermissions.Read)]
+@inject DataRequestService Requests
+@inject PersonalDataService PersonalData
+@inject IContactDirectory Directory
+@inject ICurrentUser CurrentUser
+
+<PageTitle>KVKK başvurusu · Arma CRM</PageTitle>
+
+@if (request is null)
+{
+    <p class="text-muted-foreground text-sm">Başvuru bulunamadı.</p>
+}
+else
+{
+    <div class="flex flex-col gap-6">
+        <div>
+            <a class="text-muted-foreground text-sm hover:underline" href="privacy/requests">KVKK başvuruları</a>
+            <h1 class="text-2xl font-semibold tracking-tight">@request.RequesterName</h1>
+            <p class="text-muted-foreground text-sm">@PrivacyLabels.Type(request.Type) · @PrivacyLabels.Channel(request.Channel) · @request.ReceivedOn.ToString("dd.MM.yyyy")</p>
+        </div>
+
+        <FormAlert Error="@error" />
+
+        <div class="grid gap-6 lg:grid-cols-3">
+            <Card Class="lg:col-span-2">
+                <CardHeader>
+                    <CardTitle>Başvuru</CardTitle>
+                    <CardDescription>@request.Email @request.Phone</CardDescription>
+                </CardHeader>
+                <CardContent Class="grid gap-4">
+                    <p class="text-sm whitespace-pre-wrap">@request.Description</p>
+                    @if (request.Response is not null)
+                    {
+                        <Separator />
+                        <div class="grid gap-1 text-sm">
+                            <div class="font-medium">@PrivacyLabels.Status(request.Status) · @PrivacyLabels.Date(request.ClosedAt!.Value)</div>
+                            <p class="whitespace-pre-wrap">@request.Response</p>
+                        </div>
+                    }
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>@PrivacyLabels.Status(request.Status)</CardTitle>
+                    <CardDescription>
+                        Son gün @request.DueOn.ToString("dd.MM.yyyy")
+                        @if (request.IsOverdue)
+                        {
+                            <Badge Variant="BadgeVariant.Destructive" Class="ml-2">Süre geçti</Badge>
+                        }
+                        else if (open)
+                        {
+                            <span> · @request.DaysLeft gün kaldı</span>
+                        }
+                    </CardDescription>
+                </CardHeader>
+                <CardContent Class="grid gap-4">
+                    <div class="grid gap-2">
+                        <Label>Kişi kaydı</Label>
+                        @if (open && canManage)
+                        {
+                            <ContactPicker Selected="contact" SelectedChanged="LinkAsync" Placeholder="Başvuranı ara" />
+                        }
+                        @if (contact is not null)
+                        {
+                            <a class="text-sm font-medium hover:underline" href="contacts/@contact.Id">@contact.DisplayName</a>
+                        }
+                        else if (!open || !canManage)
+                        {
+                            <span class="text-muted-foreground text-sm">Bağlı kişi yok</span>
+                        }
+                    </div>
+                    @if (open && canManage)
+                    {
+                        <label class="flex items-center gap-2 text-sm"><Checkbox Checked="request.IdentityVerified" CheckedChanged="VerifyAsync" /> Kimlik doğrulandı</label>
+                    }
+                    else
+                    {
+                        <span class="text-sm">Kimlik @(request.IdentityVerified ? "doğrulandı" : "doğrulanmadı")</span>
+                    }
+
+                    @if (contact is not null && request.IdentityVerified)
+                    {
+                        <div class="flex flex-wrap gap-2">
+                            @if (CurrentUser.HasPermission(PrivacyPermissions.Export))
+                            {
+                                <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" Href="@($"api/v1/privacy/contacts/{contact.Id}/export")" target="_blank">Verileri indir</Button>
+                            }
+                            @if (request.Type == RequestType.Erasure && open && CurrentUser.HasPermission(PrivacyPermissions.Erase) && anonymizedAt is null)
+                            {
+                                <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Destructive" OnClick="() => eraseOpen = true">Anonimleştir</Button>
+                            }
+                        </div>
+                    }
+                    @if (anonymizedAt is { } at)
+                    {
+                        <span class="text-muted-foreground text-sm">Kişi @PrivacyLabels.Date(at) tarihinde anonimleştirildi.</span>
+                    }
+                </CardContent>
+            </Card>
+        </div>
+
+        @if (open && canManage)
+        {
+            <Card>
+                <CardHeader>
+                    <CardTitle>Yanıt</CardTitle>
+                    <CardDescription>Başvurana gönderdiğiniz yanıtı buraya yazın; başvuru kapatılır ve yanıt kayıt olarak saklanır.</CardDescription>
+                </CardHeader>
+                <CardContent Class="grid gap-4">
+                    <Textarea @bind-Value="response" rows="6" maxlength="10000" aria-label="Yanıt" />
+                    <div class="flex gap-2">
+                        <Button OnClick="() => CloseAsync(true)">Yanıtlandı olarak kapat</Button>
+                        <Button Variant="ButtonVariant.Outline" OnClick="() => CloseAsync(false)">Reddet</Button>
+                    </div>
+                </CardContent>
+            </Card>
+        }
+    </div>
+
+    <Dialog @bind-Open="eraseOpen">
+        <DialogHeader>
+            <DialogTitle>@contact?.DisplayName anonimleştirilsin mi?</DialogTitle>
+            <DialogDescription>Kişiyi tanımlayan veri tüm modüllerden kalıcı olarak silinir; bağış ve makbuz kayıtları kanun gereği kalır. Geri alınamaz.</DialogDescription>
+        </DialogHeader>
+        <label class="flex items-center gap-2 text-sm"><Checkbox @bind-Checked="confirmed" /> Geri alınamayacağını anladım</label>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => eraseOpen = false">Vazgeç</Button>
+            <Button Variant="ButtonVariant.Destructive" Disabled="!confirmed" OnClick="AnonymizeAsync">Anonimleştir</Button>
+        </DialogFooter>
+    </Dialog>
+}
+
+@code {
+    private DataRequestView? request;
+    private ContactSummary? contact;
+    private DateTimeOffset? anonymizedAt;
+    private string? response, error;
+    private bool open, canManage, eraseOpen, confirmed;
+
+    [Parameter] public Guid Id { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        canManage = CurrentUser.HasPermission(PrivacyPermissions.Manage);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        request = await Requests.GetAsync(Id);
+        open = request?.Status is RequestStatus.New or RequestStatus.InProgress;
+        contact = request?.ContactId is { } id ? await Directory.FindAsync(id) : null;
+        anonymizedAt = contact is not null ? await PersonalData.AnonymizedAtAsync(contact.Id) : null;
+    }
+
+    private async Task LinkAsync(ContactSummary? selected)
+    {
+        var result = await Requests.UpdateAsync(Id, selected?.Id, request!.IdentityVerified);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+
+    private async Task VerifyAsync(bool verified)
+    {
+        var result = await Requests.UpdateAsync(Id, request!.ContactId, verified);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+
+    private async Task CloseAsync(bool completed)
+    {
+        var result = await Requests.CloseAsync(Id, completed, response);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+
+    private async Task AnonymizeAsync()
+    {
+        var result = await PersonalData.AnonymizeAsync(contact!.Id, Id);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        eraseOpen = false;
+        await LoadAsync();
+    }
+}

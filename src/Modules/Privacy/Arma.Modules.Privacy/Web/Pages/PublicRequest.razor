@@ -1,0 +1,113 @@
+@page "/kvkk/basvuru"
+@layout PublicLayout
+@attribute [AllowAnonymous]
+@inject DataRequestService Requests
+
+<PageTitle>KVKK başvurusu</PageTitle>
+
+<div class="mx-auto flex max-w-lg flex-col gap-6 p-6">
+    <div class="text-center">
+        <h1 class="text-2xl font-semibold tracking-tight">Kişisel veri başvurusu</h1>
+        <p class="text-muted-foreground text-sm">6698 sayılı Kanun'un 11. maddesindeki haklarınız için. Başvurunuz en geç 30 gün içinde yanıtlanır.</p>
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (submitted)
+            {
+                <Alert><AlertDescription>Başvurunuz alındı. Kimliğinizi doğruladıktan sonra en geç @dueOn.ToString("dd.MM.yyyy") tarihine kadar yanıt vereceğiz.</AlertDescription></Alert>
+            }
+            else
+            {
+                <EditForm Model="Input" FormName="kvkk-request" OnValidSubmit="SubmitAsync" method="post" class="grid gap-4">
+                    <DataAnnotationsValidator />
+                    <FormAlert Error="@error" />
+                    <ValidationSummary class="text-destructive text-sm" />
+                    <div class="grid gap-2">
+                        <Label For="type">Talebiniz</Label>
+                        <InputSelect id="type" @bind-Value="Input.Type" class="@Styles.Select">
+                            @foreach (var type in PrivacyLabels.Types)
+                            {
+                                <option value="@type">@PrivacyLabels.Type(type)</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="name">Ad soyad</Label>
+                        <InputText id="name" autocomplete="name" @bind-Value="Input.Name" class="@Styles.Input" required />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="email">E-posta</Label>
+                        <InputText id="email" type="email" autocomplete="email" @bind-Value="Input.Email" class="@Styles.Input" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="phone">Telefon</Label>
+                        <InputText id="phone" type="tel" autocomplete="tel" @bind-Value="Input.Phone" class="@Styles.Input" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="description">Açıklama</Label>
+                        <InputTextArea id="description" rows="5" @bind-Value="Input.Description" class="@Styles.Textarea" required />
+                    </div>
+
+                    @* Botların doldurduğu gizli alan; dolu gelirse istek sessizce yok sayılır. *@
+                    <div class="hidden" aria-hidden="true">
+                        <InputText id="website" tabindex="-1" autocomplete="off" @bind-Value="Input.Website" />
+                    </div>
+
+                    <p class="text-muted-foreground text-xs">Yanıt vermeden önce kimliğinizi doğrulamamız gerekir; kayıtlı e-posta adresinizden yazmanız veya kimliğinizi göstermeniz istenebilir.</p>
+                    <Button Type="submit" Class="w-full">Başvuruyu gönder</Button>
+                </EditForm>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private string? error;
+    private bool submitted;
+    private DateOnly dueOn;
+
+    [SupplyParameterFromForm] private RequestModel Input { get; set; } = default!;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task SubmitAsync()
+    {
+        dueOn = DateOnly.FromDateTime(DateTime.Today).AddDays(Domain.DataRequest.ResponseDays);
+        if (!string.IsNullOrEmpty(Input.Website))
+        {
+            submitted = true;
+            return;
+        }
+
+        var result = await Requests.CreateAsync(new CreateDataRequest(Input.Type, Domain.RequestChannel.Web, Input.Name, Input.Email, Input.Phone, Input.Description));
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        submitted = true;
+    }
+
+    private sealed class RequestModel
+    {
+        public Domain.RequestType Type { get; set; } = Domain.RequestType.Access;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Ad soyad gerekli.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string Name { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Geçerli bir e-posta girin.")]
+        public string? Email { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(32)]
+        public string? Phone { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Açıklama gerekli.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(5000)]
+        public string Description { get; set; } = "";
+
+        public string? Website { get; set; }
+    }
+}

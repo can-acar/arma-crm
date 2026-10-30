@@ -102,6 +102,10 @@ namespace Arma.Modules.Contacts.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("AnonymizedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("anonymized_at");
+
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date")
                         .HasColumnName("birth_date");
