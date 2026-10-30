@@ -334,6 +334,60 @@ namespace Arma.Modules.Contacts.Infrastructure.Migrations
                     b.ToTable("relationships", "contacts");
                 });
 
+            modelBuilder.Entity("Arma.Modules.Contacts.Domain.SavedSearch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Criteria")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("criteria");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name")
+                        .UseCollation("tr-TR-x-icu");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_saved_searches");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_saved_searches_tenant_id_name")
+                        .HasFilter("NOT is_deleted");
+
+                    b.ToTable("saved_searches", "contacts");
+                });
+
             modelBuilder.Entity("Arma.Modules.Contacts.Domain.Tag", b =>
                 {
                     b.Property<Guid>("Id")

@@ -11,7 +11,7 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
     public const string Schema = "contacts";
 
     /// <summary>Row Level Security uygulanan tablolar (migration'larda kullanılır).</summary>
-    public static readonly string[] TenantTables = ["contacts", "tags", "groups", "relationships"];
+    public static readonly string[] TenantTables = ["contacts", "tags", "groups", "relationships", "saved_searches"];
 
     private readonly Guid tenantId = tenant.TenantId;
 
@@ -24,6 +24,8 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
     public DbSet<Group> Groups => Set<Group>();
 
     public DbSet<Relationship> Relationships => Set<Relationship>();
+
+    public DbSet<SavedSearch> SavedSearches => Set<SavedSearch>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -90,6 +92,14 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
             entity.HasIndex(r => r.FromContactId);
             entity.HasIndex(r => r.ToContactId);
             entity.HasQueryFilter(r => r.TenantId == tenantId && !r.IsDeleted);
+        });
+
+        modelBuilder.Entity<SavedSearch>(entity =>
+        {
+            entity.Property(s => s.Name).HasMaxLength(120).UseCollation("tr-TR-x-icu");
+            entity.Property(s => s.Criteria).HasColumnType("jsonb");
+            entity.HasIndex(s => new { s.TenantId, s.Name }).IsUnique().HasFilter("NOT is_deleted");
+            entity.HasQueryFilter(s => s.TenantId == tenantId && !s.IsDeleted);
         });
     }
 }

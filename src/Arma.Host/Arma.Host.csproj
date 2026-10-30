@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Modules\Giving\Arma.Modules.Giving\Arma.Modules.Giving.csproj" />
     <ProjectReference Include="..\Modules\Comms\Arma.Modules.Comms\Arma.Modules.Comms.csproj" />
     <ProjectReference Include="..\Modules\Privacy\Arma.Modules.Privacy\Arma.Modules.Privacy.csproj" />
+    <ProjectReference Include="..\Modules\Forms\Arma.Modules.Forms\Arma.Modules.Forms.csproj" />
     <ProjectReference Include="..\Modules\Identity\Arma.Modules.Identity\Arma.Modules.Identity.csproj" />
   </ItemGroup>
 

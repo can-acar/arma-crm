@@ -21,6 +21,20 @@ public static class CommsEventHandler
     public static Task Handle(SendTransactionalEmail message, MessageService messages, CancellationToken cancellationToken) =>
         messages.QueueTransactionalAsync(message.ContactId, message.Subject, message.Body, cancellationToken);
 
+    public static Task Handle(RecordChannelConsent message, ConsentService consents, CancellationToken cancellationToken)
+    {
+        Domain.Channel? channel = message.Channel switch
+        {
+            "email" => Domain.Channel.Email,
+            "sms" => Domain.Channel.Sms,
+            "call" => Domain.Channel.Call,
+            _ => null,
+        };
+        return channel is { } c
+            ? consents.SetAsync(message.ContactId, c, message.Approved ? Domain.ConsentStatus.Approved : Domain.ConsentStatus.Rejected, message.Source, cancellationToken)
+            : Task.CompletedTask;
+    }
+
     public static Task Handle(ContactsMerged message, ConsentService consents, CancellationToken cancellationToken) =>
         consents.MoveContactAsync(message.DuplicateId, message.PrimaryId, cancellationToken);
 }

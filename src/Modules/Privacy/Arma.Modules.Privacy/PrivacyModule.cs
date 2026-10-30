@@ -26,10 +26,14 @@ public sealed class PrivacyModule : IModule, INavigationContributor
     {
         services.AddModuleDbContext<PrivacyDbContext>(configuration, PrivacyDbContext.Schema);
         services.AddScoped<NoticeService>();
+        services.AddScoped<Contracts.INoticeDirectory>(sp => sp.GetRequiredService<NoticeService>());
         services.AddScoped<ConsentRecordService>();
         services.AddScoped<DataRequestService>();
         services.AddScoped<PersonalDataService>();
         services.AddScoped<IPersonalDataSource, PrivacyPersonalData>();
+        services.AddScoped<PrivacyInsights>();
+        services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<PrivacyInsights>());
+        services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<PrivacyInsights>());
         services.AddSingleton<IContactPanel, PrivacyPanel>();
         services.AddSingleton<INavigationContributor>(this);
     }
