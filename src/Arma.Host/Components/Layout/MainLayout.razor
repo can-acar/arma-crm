@@ -1,0 +1,27 @@
+@inherits LayoutComponentBase
+
+<div class="flex min-h-svh">
+    <aside class="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-60 shrink-0 flex-col border-r md:flex">
+        <div class="flex h-14 items-center gap-2 px-4">
+            <span class="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md text-sm font-semibold">A</span>
+            <span class="font-semibold">Arma CRM</span>
+        </div>
+        <Separator />
+        <NavMenu />
+    </aside>
+
+    <div class="flex min-w-0 flex-1 flex-col">
+        <header class="flex h-14 items-center border-b px-6 md:hidden">
+            <span class="font-semibold">Arma CRM</span>
+        </header>
+        <main class="flex-1 p-6">
+            @Body
+        </main>
+    </div>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Beklenmeyen bir hata oluştu.
+    <a href="." class="reload">Yeniden yükle</a>
+    <span class="dismiss">🗙</span>
+</div>

@@ -1,0 +1,15 @@
+@inject IEnumerable<INavigationContributor> Contributors
+
+<nav class="flex flex-col gap-1 p-2">
+    <NavLink href="" Match="NavLinkMatch.All" class="@ItemClass" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">Pano</NavLink>
+    @foreach (var item in Items)
+    {
+        <NavLink href="@item.Href" class="@ItemClass" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">@item.Title</NavLink>
+    }
+</nav>
+
+@code {
+    private const string ItemClass = "flex h-8 items-center rounded-md px-2 text-sm font-medium hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
+
+    private IEnumerable<NavigationItem> Items => Contributors.SelectMany(c => c.GetNavigationItems()).OrderBy(i => i.Order);
+}

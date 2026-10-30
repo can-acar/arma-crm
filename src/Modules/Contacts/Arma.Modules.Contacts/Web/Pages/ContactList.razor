@@ -1,0 +1,107 @@
+@page "/contacts"
+@rendermode InteractiveServer
+@inject ContactService Contacts
+
+<PageTitle>Kişiler · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Kişiler</h1>
+            <p class="text-muted-foreground text-sm">Kişi ve kurum kayıtları</p>
+        </div>
+        <Button Href="contacts/new">Yeni kayıt</Button>
+    </div>
+
+    <Card>
+        <CardHeader>
+            <CardTitle>Kayıtlar</CardTitle>
+            <CardDescription>@(result?.Total ?? 0) kayıt</CardDescription>
+            <CardAction>
+                <Input Type="search" placeholder="Ad veya e-posta ara" Value="@search" ValueChanged="OnSearchChanged" Class="w-64" aria-label="Ara" />
+            </CardAction>
+        </CardHeader>
+        <CardContent>
+            @if (result is null)
+            {
+                <div class="flex flex-col gap-2">
+                    <Skeleton Class="h-8 w-full" />
+                    <Skeleton Class="h-8 w-full" />
+                    <Skeleton Class="h-8 w-full" />
+                </div>
+            }
+            else if (result.Items.Count == 0)
+            {
+                <p class="text-muted-foreground py-8 text-center text-sm">Kayıt bulunamadı.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Ad</TableHead>
+                            <TableHead>Tür</TableHead>
+                            <TableHead>E-posta</TableHead>
+                            <TableHead>Telefon</TableHead>
+                            <TableHead>Kimlik no</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var item in result.Items)
+                        {
+                            <TableRow @key="item.Id">
+                                <TableCell Class="font-medium">@item.DisplayName</TableCell>
+                                <TableCell>
+                                    <Badge Variant="@(item.Type == ContactType.Person ? BadgeVariant.Secondary : BadgeVariant.Outline)">@TypeLabel(item.Type)</Badge>
+                                </TableCell>
+                                <TableCell>@item.Email</TableCell>
+                                <TableCell>@item.Phone</TableCell>
+                                <TableCell Class="font-mono text-xs">@item.MaskedNationalId</TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+
+                <div class="flex items-center justify-end gap-2 pt-4">
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="@(currentPage <= 1)" OnClick="() => GoToAsync(currentPage - 1)">Önceki</Button>
+                    <span class="text-muted-foreground text-sm">Sayfa @currentPage / @PageCount</span>
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="@(currentPage >= PageCount)" OnClick="() => GoToAsync(currentPage + 1)">Sonraki</Button>
+                </div>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private const int PageSize = 25;
+
+    private PagedResult<ContactListItem>? result;
+    private string? search;
+    private int currentPage = 1;
+
+    private int PageCount => result is null ? 1 : Math.Max(1, (int)Math.Ceiling(result.Total / (double)PageSize));
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task OnSearchChanged(string? value)
+    {
+        search = value;
+        currentPage = 1;
+        return LoadAsync();
+    }
+
+    private Task GoToAsync(int target)
+    {
+        currentPage = target;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync() => result = await Contacts.ListAsync(search, currentPage, PageSize);
+
+    private static string TypeLabel(ContactType type) => type switch
+    {
+        ContactType.Organization => "Kurum",
+        ContactType.Household => "Hane",
+        _ => "Kişi",
+    };
+}

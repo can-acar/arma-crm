@@ -1,0 +1,14 @@
+@namespace Arma.UI
+@inherits ArmaComponentBase
+
+<div data-slot="separator" role="@(Decorative ? "none" : "separator")" aria-orientation="@OrientationValue" data-orientation="@OrientationValue"
+     class="@Cn("bg-border shrink-0 data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px", Class)"
+     @attributes="AdditionalAttributes"></div>
+
+@code {
+    [Parameter] public bool Vertical { get; set; }
+
+    [Parameter] public bool Decorative { get; set; } = true;
+
+    private string OrientationValue => Vertical ? "vertical" : "horizontal";
+}
