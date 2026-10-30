@@ -1,0 +1,50 @@
+@* Aidat tutarı, yöntemi ve tarihi; üye kaydı ve yenileme pencereleri kullanır. *@
+<div class="grid gap-3 rounded-md border p-3">
+    @if (Optional)
+    {
+        <label class="flex items-center gap-2 text-sm"><Checkbox Checked="Collect" CheckedChanged="CollectChanged" /> Aidat alındı</label>
+    }
+    @if (Collect || !Optional)
+    {
+        <div class="grid gap-3 sm:grid-cols-3">
+            <div class="grid gap-2">
+                <Label for="dues-amount">Tutar (TL)</Label>
+                <Input id="dues-amount" inputmode="decimal" Value="@Amount" ValueChanged="AmountChanged" placeholder="500,00" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="dues-method">Yöntem</Label>
+                <NativeSelect id="dues-method" Value="@Method.ToString()" ValueChanged="v => MethodChanged.InvokeAsync(Enum.Parse<DuesMethod>(v!))">
+                    @foreach (var option in MembershipLabels.Methods)
+                    {
+                        <option value="@option">@MembershipLabels.Method(option)</option>
+                    }
+                </NativeSelect>
+            </div>
+            <div class="grid gap-2">
+                <Label for="dues-date">Ödeme tarihi</Label>
+                <input id="dues-date" type="date" class="@Styles.Input" value="@PaidOn.ToString("yyyy-MM-dd")"
+                       @onchange="e => DateOnly.TryParse(e.Value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var d) ? PaidOnChanged.InvokeAsync(d) : Task.CompletedTask" />
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public bool Optional { get; set; } = true;
+
+    [Parameter] public bool Collect { get; set; }
+
+    [Parameter] public EventCallback<bool> CollectChanged { get; set; }
+
+    [Parameter] public string? Amount { get; set; }
+
+    [Parameter] public EventCallback<string?> AmountChanged { get; set; }
+
+    [Parameter] public DuesMethod Method { get; set; }
+
+    [Parameter] public EventCallback<DuesMethod> MethodChanged { get; set; }
+
+    [Parameter] public DateOnly PaidOn { get; set; }
+
+    [Parameter] public EventCallback<DateOnly> PaidOnChanged { get; set; }
+}

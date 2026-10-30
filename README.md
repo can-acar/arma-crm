@@ -169,6 +169,18 @@ cd deploy
   zaman çizelgesine yazılır. Gömülebilmesi için yalnızca `/f/` altındaki sayfalar çerçeve kısıtı başlığı
   (`X-Frame-Options`, `frame-ancestors`) taşımaz; bu sayfalarda antiforgery yerine gizli bot alanı kullanılır.
 
+## Üyelik
+
+- Üyelik türleri (asıl, fahri, öğrenci gibi) süre, dönem aidatı ve ek süreyle tanımlanır; süre 0 ise üyelik
+  ömür boyudur. Üye numarası kurum içinde sırayla verilir.
+- Durum tarihlerden hesaplanır: dönem içinde "Aktif", dönem bitip ek süre dolmadan "Aidat bekliyor", sonra
+  "Süresi doldu". Ek süre içinde yenilenen üyelik kesintisiz devam eder, sonra yenilenen bugünden başlar.
+- Aidat ödemeleri üyeliğe ve döneme bağlı tutulur; "Aidatlar" ekranı tarih aralığındaki tahsilatı toplar.
+  Üye kartı kredi kartı boyutunda yazdırılır, karekodu üyelik kaydını açar.
+- Dönemi yaklaşan üyelere yenileme hatırlatması e-postası gider (`Membership__ReminderDays`, varsayılan 30;
+  0 kapatır). Zamanlanmış işler `IScheduledJob` ile yazılır ve dakikada bir yoklanır; birden çok sunucu
+  çalışıyorsa yalnızca birinde `Arma__Jobs__Enabled=true` bırakın.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`
