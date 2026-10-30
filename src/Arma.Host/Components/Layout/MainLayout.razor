@@ -8,6 +8,15 @@
         </div>
         <Separator />
         <NavMenu />
+        <div class="mt-auto p-2">
+            <AuthorizeView>
+                <div class="text-muted-foreground truncate px-2 pb-2 text-xs">@context.User.Identity?.Name</div>
+                <form method="post" action="account/logout">
+                    <AntiforgeryToken />
+                    <Button Type="submit" Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" Class="w-full justify-start">Çıkış yap</Button>
+                </form>
+            </AuthorizeView>
+        </div>
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">

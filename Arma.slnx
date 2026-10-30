@@ -11,7 +11,11 @@
     <Project Path="src/Modules/Contacts/Arma.Modules.Contacts.Contracts/Arma.Modules.Contacts.Contracts.csproj" />
     <Project Path="src/Modules/Contacts/Arma.Modules.Contacts/Arma.Modules.Contacts.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Arma.Modules.Identity/Arma.Modules.Identity.csproj" />
+  </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Arma.Host.Tests/Arma.Host.Tests.csproj" />
     <Project Path="tests/Arma.Architecture.Tests/Arma.Architecture.Tests.csproj" />
     <Project Path="tests/Arma.Modules.Contacts.Tests/Arma.Modules.Contacts.Tests.csproj" />
     <Project Path="tests/Arma.UI.Tests/Arma.UI.Tests.csproj" />

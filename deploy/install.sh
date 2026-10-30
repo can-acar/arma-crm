@@ -14,4 +14,5 @@ fi
 
 docker compose build
 docker compose up -d
+echo "İlk kurulumda yönetici oluşturun: docker compose run --rm -it migrate create-admin <e-posta> \"<Ad Soyad>\""
 echo "Arma CRM çalışıyor: http://localhost:$(grep '^ARMA_PORT=' .env | cut -d= -f2)"

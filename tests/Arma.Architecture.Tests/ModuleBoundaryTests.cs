@@ -32,4 +32,9 @@ public class ModuleBoundaryTests
     public void Contacts_module_does_not_depend_on_host() =>
         Types.InAssembly(typeof(Arma.Modules.Contacts.ContactsModule).Assembly).ShouldNot().HaveDependencyOn("Arma.Host")
             .GetResult().IsSuccessful.ShouldBeTrue();
+
+    [Fact]
+    public void Identity_module_does_not_depend_on_host_or_other_modules() =>
+        Types.InAssembly(typeof(Arma.Modules.Identity.IdentityModule).Assembly).ShouldNot().HaveDependencyOnAny("Arma.Host", "Arma.Modules.Contacts")
+            .GetResult().IsSuccessful.ShouldBeTrue();
 }
