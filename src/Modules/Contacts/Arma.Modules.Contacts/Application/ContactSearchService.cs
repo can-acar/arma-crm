@@ -21,7 +21,7 @@ public sealed class ContactSearchService(
     ContactService contacts,
     ContactTransferService transfer,
     TaxonomyService taxonomy,
-    IEnumerable<IContactCriteriaProvider> providers)
+    IEnumerable<IContactCriteriaProvider> providers) : IContactSegments
 {
     private const string Group = "Kişi";
 
@@ -219,6 +219,21 @@ public sealed class ContactSearchService(
         }
 
         return null;
+    }
+
+    public async Task<IReadOnlyList<SegmentInfo>> SegmentsAsync(CancellationToken cancellationToken = default) =>
+        await db.SavedSearches.AsNoTracking().OrderBy(s => s.Name).Select(s => new SegmentInfo(s.Id, s.Name)).ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>?> MatchAsync(Guid segmentId, CancellationToken cancellationToken = default)
+    {
+        var search = await db.SavedSearches.AsNoTracking().FirstOrDefaultAsync(s => s.Id == segmentId, cancellationToken);
+        if (search is null)
+        {
+            return null;
+        }
+
+        var filter = await BuildFilterAsync(ToView(search).Criteria, cancellationToken);
+        return filter.IsSuccess ? await contacts.Filter(filter.Value!).Select(c => c.Id).ToListAsync(cancellationToken) : [];
     }
 
     private static SavedSearchView ToView(SavedSearch search) =>

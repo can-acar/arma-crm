@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using Arma.Modules.Activities.Contracts;
 using Arma.Modules.Comms.Domain;
 using Arma.Modules.Comms.Infrastructure;
@@ -70,7 +71,7 @@ public sealed class MessageService(
         db.Messages.Add(message);
         outbox.Enroll(db);
         await outbox.PublishAsync(new DeliverMessage(message.Id));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return message.Id;
     }
 
@@ -94,7 +95,7 @@ public sealed class MessageService(
 
         outbox.Enroll(db);
         await outbox.PublishAsync(new DeliverMessage(message.Id));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
     }
 
     /// <summary>
@@ -145,7 +146,7 @@ public sealed class MessageService(
                 message.SentAt!.Value, SourceModule, message.Id.ToString()));
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
     }
 
     internal static string? AddressOf(AudienceMember contact, Channel channel) =>

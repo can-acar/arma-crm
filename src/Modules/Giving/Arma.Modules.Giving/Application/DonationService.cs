@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using Arma.Modules.Activities.Contracts;
 using Arma.Modules.Contacts.Contracts;
 using Arma.Modules.Giving.Domain;
@@ -186,7 +187,7 @@ public sealed class DonationService(
         db.Donations.Remove(donation);
         outbox.Enroll(db);
         await outbox.PublishAsync(new RemoveTimelineEntry(SourceModule, donation.Id.ToString()));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return id;
     }
 
@@ -281,7 +282,7 @@ public sealed class DonationService(
             await outbox.PublishAsync(alsoPublish);
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
     }
 
     private async Task<string> TimelineSubjectAsync(Donation donation, CancellationToken cancellationToken)

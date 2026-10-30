@@ -48,6 +48,7 @@ public class ModuleBoundaryTests
         ["Arma.Modules.Contacts"] = typeof(Arma.Modules.Contacts.ContactsModule).Assembly,
         ["Arma.Modules.Events"] = typeof(Arma.Modules.Events.EventsModule).Assembly,
         ["Arma.Modules.Sales"] = typeof(Arma.Modules.Sales.SalesModule).Assembly,
+        ["Arma.Modules.Automation"] = typeof(Arma.Modules.Automation.AutomationModule).Assembly,
         ["Arma.Modules.Forms"] = typeof(Arma.Modules.Forms.FormsModule).Assembly,
         ["Arma.Modules.Giving"] = typeof(Arma.Modules.Giving.GivingModule).Assembly,
         ["Arma.Modules.Identity"] = typeof(Arma.Modules.Identity.IdentityModule).Assembly,

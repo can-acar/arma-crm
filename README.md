@@ -208,6 +208,17 @@ cd deploy
 - Fırsat ve teklif hareketleri kişinin zaman akışına düşer; gelişmiş aramada "açık fırsatı olan", "şu tarihten
   sonra satış kazanılan" ve "hiç fırsatı olmayan" ölçütleri vardır.
 
+## Otomasyon
+
+- Kurallar "şu olunca şunları yap" biçimindedir. Tetikleyici ya bir modülün kişinin zaman akışına düştüğü kayıttır
+  (bağış, üyelik, etkinlik, satış, form; isteğe bağlı olarak konusu belirli bir metni içerenler) ya da kişinin
+  Gelişmiş arama'da kaydedilmiş bir aramaya girmesidir (15 dakikada bir denetlenir).
+- İşlemler: etiket ekleme, gruba ekleme, görev açma (sorumlu ve süreyle) ve bilgilendirme e-postası
+  (`{{ad}}`, `{{soyad}}`, `{{adsoyad}}`, `{{eposta}}` alanlarıyla). Otomasyon e-postasında ticari ileti izni
+  aranmaz; kampanya içeriği için Toplu ileti kullanılmalıdır.
+- Bir kural aynı kişiye aynı olay için bir kez uygulanır. Kayıtlı arama kuralı açılırken aramaya zaten uyan kişiler
+  istenirse atlanır. Kural ekranında son 100 çalışma görünür.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`

@@ -14,4 +14,7 @@ public static class ActivityEventHandler
 
     public static Task Handle(RemoveTimelineEntry message, ActivityService service, CancellationToken cancellationToken) =>
         service.RemoveSourceAsync(message.SourceModule, message.SourceId, cancellationToken);
+
+    public static Task Handle(CreateFollowUpTask message, ActivityService service, CancellationToken cancellationToken) =>
+        service.CreateFollowUpAsync(message, cancellationToken);
 }

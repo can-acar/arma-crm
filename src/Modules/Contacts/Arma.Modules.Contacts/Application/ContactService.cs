@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using Arma.Modules.Contacts.Contracts;
 using Arma.Modules.Contacts.Domain;
 using Arma.Modules.Contacts.Infrastructure;
@@ -330,7 +331,7 @@ public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimePr
         // Olay, birleştirmeyle aynı işlemde kaydedilir; diğer modüller kendi verilerini asıl kayda taşır.
         outbox.Enroll(db);
         await outbox.PublishAsync(new ContactsMerged(primaryId, duplicateId));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         await audit.WriteAsync(AuditAction.Merged, nameof(Contact), primaryId.ToString(), $"{duplicate.DisplayName} ({duplicateId}) bu kayda birleştirildi", cancellationToken);
         return primaryId;
     }
