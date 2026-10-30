@@ -1,5 +1,6 @@
 using Arma.Host;
 using Arma.Host.Components;
+using Arma.Infrastructure.Messaging;
 using Arma.Infrastructure.Security;
 using Arma.SharedKernel.Tenancy;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -31,6 +32,8 @@ foreach (var module in ArmaModules.All)
 {
     module.AddServices(builder.Services, builder.Configuration);
 }
+
+builder.AddArmaMessaging(ArmaModules.ModuleAssemblies);
 
 builder.Services.AddLocalization();
 builder.Services.Configure<RequestLocalizationOptions>(options =>

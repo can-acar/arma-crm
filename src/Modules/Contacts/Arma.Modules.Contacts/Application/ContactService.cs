@@ -4,6 +4,7 @@ using Arma.Modules.Contacts.Infrastructure;
 using Arma.SharedKernel.Auditing;
 using Arma.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Wolverine.EntityFrameworkCore;
 
 namespace Arma.Modules.Contacts.Application;
 
@@ -59,7 +60,7 @@ public sealed record DuplicateCandidate(Guid Id, string DisplayName, string? Ema
 
 public sealed record CreateRelationshipRequest(Guid OtherContactId, RelationshipType Type, bool ThisIsFrom, string? Description, DateOnly? StartDate);
 
-public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimeProvider clock) : IContactDirectory
+public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimeProvider clock, IDbContextOutbox outbox) : IContactDirectory
 {
     public const int MaxPageSize = 100;
 
@@ -284,7 +285,10 @@ public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimePr
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        // Olay, birleştirmeyle aynı işlemde kaydedilir; diğer modüller kendi verilerini asıl kayda taşır.
+        outbox.Enroll(db);
+        await outbox.PublishAsync(new ContactsMerged(primaryId, duplicateId));
+        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
         await audit.WriteAsync(AuditAction.Merged, nameof(Contact), primaryId.ToString(), $"{duplicate.DisplayName} ({duplicateId}) bu kayda birleştirildi", cancellationToken);
         return primaryId;
     }

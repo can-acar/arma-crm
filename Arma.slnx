@@ -8,6 +8,10 @@
     <Project Path="src/Arma.UI/Arma.UI.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Activities/">
+    <Project Path="src/Modules/Activities/Arma.Modules.Activities.Contracts/Arma.Modules.Activities.Contracts.csproj" />
+    <Project Path="src/Modules/Activities/Arma.Modules.Activities/Arma.Modules.Activities.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Audit/">
     <Project Path="src/Modules/Audit/Arma.Modules.Audit.Contracts/Arma.Modules.Audit.Contracts.csproj" />
     <Project Path="src/Modules/Audit/Arma.Modules.Audit/Arma.Modules.Audit.csproj" />
@@ -17,6 +21,7 @@
     <Project Path="src/Modules/Contacts/Arma.Modules.Contacts/Arma.Modules.Contacts.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Arma.Modules.Identity.Contracts/Arma.Modules.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/Arma.Modules.Identity/Arma.Modules.Identity.csproj" />
   </Folder>
   <Folder Name="/tests/">
