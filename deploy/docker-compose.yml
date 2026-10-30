@@ -1,0 +1,49 @@
+# Arma CRM kurulum paketi (Linux sunucular için).
+# Kullanım: deploy/install.sh ya da .env dosyasını doldurup "docker compose up -d".
+name: arma
+
+x-arma-env: &arma-env
+  ConnectionStrings__arma: Host=postgres;Database=arma;Username=arma;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}
+  Arma__TenantId: ${ARMA_TENANT_ID:?ARMA_TENANT_ID gerekli}
+  ASPNETCORE_ENVIRONMENT: Production
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: arma
+      POSTGRES_USER: arma
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arma -d arma"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Veritabanı şemasını günceller ve çıkar. Her güncellemede uygulamadan önce çalışır.
+  migrate:
+    image: arma-crm:${ARMA_VERSION:-latest}
+    build:
+      context: ..
+    command: ["migrate"]
+    environment: *arma-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  arma:
+    image: arma-crm:${ARMA_VERSION:-latest}
+    restart: unless-stopped
+    environment: *arma-env
+    ports:
+      - "${ARMA_PORT:-8080}:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

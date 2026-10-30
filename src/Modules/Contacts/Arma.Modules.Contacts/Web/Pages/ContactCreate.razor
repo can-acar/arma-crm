@@ -1,0 +1,105 @@
+@page "/contacts/new"
+@rendermode InteractiveServer
+@inject ContactService Contacts
+@inject NavigationManager Navigation
+
+<PageTitle>Yeni kayıt · Arma CRM</PageTitle>
+
+<div class="mx-auto flex max-w-2xl flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Yeni kayıt</h1>
+        <p class="text-muted-foreground text-sm">Kişi veya kurum ekleyin</p>
+    </div>
+
+    <Card>
+        <CardHeader>
+            <div class="flex gap-2">
+                <Button Variant="@(isOrganization ? ButtonVariant.Ghost : ButtonVariant.Secondary)" Size="ButtonSize.Sm" OnClick="() => isOrganization = false">Kişi</Button>
+                <Button Variant="@(isOrganization ? ButtonVariant.Secondary : ButtonVariant.Ghost)" Size="ButtonSize.Sm" OnClick="() => isOrganization = true">Kurum</Button>
+            </div>
+        </CardHeader>
+        <CardContent>
+            <form class="grid gap-4 sm:grid-cols-2" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                @if (isOrganization)
+                {
+                    <div class="grid gap-2 sm:col-span-2">
+                        <Label For="name">Kurum adı</Label>
+                        <Input id="name" @bind-Value="name" required />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="vkn">Vergi kimlik no</Label>
+                        <Input id="vkn" @bind-Value="nationalId" inputmode="numeric" maxlength="10" />
+                    </div>
+                }
+                else
+                {
+                    <div class="grid gap-2">
+                        <Label For="first">Ad</Label>
+                        <Input id="first" @bind-Value="firstName" required />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="last">Soyad</Label>
+                        <Input id="last" @bind-Value="lastName" required />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="tckn">T.C. kimlik no</Label>
+                        <Input id="tckn" @bind-Value="nationalId" inputmode="numeric" maxlength="11" />
+                    </div>
+                }
+                <div class="grid gap-2">
+                    <Label For="email">E-posta</Label>
+                    <Input id="email" Type="email" @bind-Value="email" />
+                </div>
+                <div class="grid gap-2">
+                    <Label For="phone">Telefon</Label>
+                    <Input id="phone" Type="tel" @bind-Value="phone" />
+                </div>
+
+                @if (error is not null)
+                {
+                    <Alert Variant="AlertVariant.Destructive" Class="sm:col-span-2">
+                        <AlertTitle>Kaydedilemedi</AlertTitle>
+                        <AlertDescription>@error</AlertDescription>
+                    </Alert>
+                }
+
+                <div class="flex justify-end gap-2 sm:col-span-2">
+                    <Button Variant="ButtonVariant.Outline" Href="contacts">Vazgeç</Button>
+                    <Button Type="submit" Disabled="saving">Kaydet</Button>
+                </div>
+            </form>
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private bool isOrganization;
+    private bool saving;
+    private string? error;
+    private string? firstName;
+    private string? lastName;
+    private string? name;
+    private string? nationalId;
+    private string? email;
+    private string? phone;
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        error = null;
+
+        var result = isOrganization
+            ? await Contacts.CreateOrganizationAsync(new CreateOrganizationRequest(name ?? "", email, phone, nationalId))
+            : await Contacts.CreatePersonAsync(new CreatePersonRequest(firstName ?? "", lastName ?? "", email, phone, nationalId));
+
+        saving = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("contacts");
+        }
+        else
+        {
+            error = result.Error!.Message;
+        }
+    }
+}

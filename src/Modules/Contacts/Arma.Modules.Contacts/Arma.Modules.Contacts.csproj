@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Arma.SharedKernel\Arma.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\Arma.UI\Arma.UI.csproj" />
+    <ProjectReference Include="..\Arma.Modules.Contacts.Contracts\Arma.Modules.Contacts.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EFCore.NamingConventions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Arma.Modules.Contacts.Tests" />
+  </ItemGroup>
+
+</Project>

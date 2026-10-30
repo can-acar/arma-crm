@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Arma.AppHost/Arma.AppHost.csproj" />
+    <Project Path="src/Arma.Host/Arma.Host.csproj" />
+    <Project Path="src/Arma.ServiceDefaults/Arma.ServiceDefaults.csproj" />
+    <Project Path="src/Arma.SharedKernel/Arma.SharedKernel.csproj" />
+    <Project Path="src/Arma.UI/Arma.UI.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Contacts/">
+    <Project Path="src/Modules/Contacts/Arma.Modules.Contacts.Contracts/Arma.Modules.Contacts.Contracts.csproj" />
+    <Project Path="src/Modules/Contacts/Arma.Modules.Contacts/Arma.Modules.Contacts.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Arma.Architecture.Tests/Arma.Architecture.Tests.csproj" />
+    <Project Path="tests/Arma.Modules.Contacts.Tests/Arma.Modules.Contacts.Tests.csproj" />
+    <Project Path="tests/Arma.UI.Tests/Arma.UI.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+.tools/
+.git/
+deploy/.env
+**/wwwroot/app.css
