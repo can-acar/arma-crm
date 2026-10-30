@@ -15,7 +15,7 @@
     <CardContent>
         <EditForm Model="Input" FormName="setup" OnValidSubmit="CreateAsync" method="post" class="grid gap-4">
             <DataAnnotationsValidator />
-            <FormMessage Error="@error" />
+            <FormAlert Error="@error" />
             <div class="grid gap-2">
                 <Label For="name">Ad soyad</Label>
                 <InputText id="name" autocomplete="name" @bind-Value="Input.FullName" class="@Styles.Input" required />

@@ -32,6 +32,7 @@ public class ModuleBoundaryTests
 
     private static readonly Dictionary<string, Assembly> Modules = new()
     {
+        ["Arma.Modules.Audit"] = typeof(Arma.Modules.Audit.AuditModule).Assembly,
         ["Arma.Modules.Contacts"] = typeof(Arma.Modules.Contacts.ContactsModule).Assembly,
         ["Arma.Modules.Identity"] = typeof(Arma.Modules.Identity.IdentityModule).Assembly,
     };

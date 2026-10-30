@@ -1,4 +1,6 @@
-@* Sunucu tarafı formlarda hata veya bilgi mesajı. *@
+@namespace Arma.UI
+
+@* Form sonucunda hata ya da bilgi mesajı; ikisi de boşsa hiçbir şey çizmez. *@
 @if (!string.IsNullOrEmpty(Error))
 {
     <Alert Variant="AlertVariant.Destructive"><AlertDescription>@Error</AlertDescription></Alert>

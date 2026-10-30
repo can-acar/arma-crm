@@ -14,6 +14,7 @@
     <ProjectReference Include="..\Arma.SharedKernel\Arma.SharedKernel.csproj" />
     <ProjectReference Include="..\Arma.UI\Arma.UI.csproj" />
     <ProjectReference Include="..\Arma.Infrastructure\Arma.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Audit\Arma.Modules.Audit\Arma.Modules.Audit.csproj" />
     <ProjectReference Include="..\Modules\Contacts\Arma.Modules.Contacts\Arma.Modules.Contacts.csproj" />
     <ProjectReference Include="..\Modules\Identity\Arma.Modules.Identity\Arma.Modules.Identity.csproj" />
   </ItemGroup>
