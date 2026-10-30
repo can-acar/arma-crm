@@ -218,6 +218,20 @@ public sealed class ActivityService(ActivitiesDbContext db, IContactDirectory co
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    internal async Task RemoveSourceAsync(string sourceModule, string sourceId, CancellationToken cancellationToken)
+    {
+        var existing = await db.Activities.Include(a => a.Participants)
+            .FirstOrDefaultAsync(a => a.SourceModule == sourceModule && a.SourceId == sourceId, cancellationToken);
+        if (existing is null)
+        {
+            return;
+        }
+
+        db.Participants.RemoveRange(existing.Participants);
+        db.Activities.Remove(existing);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     /// <summary>Kişiler birleştirildiğinde mükerrer kaydın aktivitelerini asıl kayda taşır.</summary>
     internal async Task MoveContactAsync(Guid fromContactId, Guid toContactId, CancellationToken cancellationToken)
     {

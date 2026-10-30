@@ -38,6 +38,10 @@ public static class MessagingExtensions
                 options.Discovery.IncludeAssembly(assembly);
             }
 
+            // Bir olayı birden çok modül dinler (kişi birleştirme gibi); her modülün işleyicisi ayrı
+            // çalışır, biri hata verirse diğeri tekrar edilmez.
+            options.MultipleHandlerBehavior = MultipleHandlerBehavior.Separated;
+
             options.PersistMessagesWithPostgresql(connectionString, Schema);
             options.UseEntityFrameworkCoreTransactions();
             options.Policies.UseDurableLocalQueues();

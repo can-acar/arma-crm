@@ -12,6 +12,15 @@ x-arma-env: &arma-env
   ASPNETCORE_ENVIRONMENT: Production
   # Ekranda gösterilen ve formlarda girilen tarih-saatlerin saat dilimi.
   TZ: ${ARMA_TIMEZONE:-Europe/Istanbul}
+  # Çevrim içi bağış: none, iyzico veya paytr. Anahtarlar yalnızca .env dosyasında tutulur.
+  Giving__Payments__Provider: ${ARMA_PAYMENT_PROVIDER:-none}
+  Giving__Payments__Iyzico__ApiKey: ${IYZICO_API_KEY:-}
+  Giving__Payments__Iyzico__SecretKey: ${IYZICO_SECRET_KEY:-}
+  Giving__Payments__Iyzico__BaseUrl: ${IYZICO_BASE_URL:-https://api.iyzipay.com}
+  Giving__Payments__PayTR__MerchantId: ${PAYTR_MERCHANT_ID:-}
+  Giving__Payments__PayTR__MerchantKey: ${PAYTR_MERCHANT_KEY:-}
+  Giving__Payments__PayTR__MerchantSalt: ${PAYTR_MERCHANT_SALT:-}
+  Giving__Payments__PayTR__TestMode: ${PAYTR_TEST_MODE:-false}
 
 services:
   postgres:

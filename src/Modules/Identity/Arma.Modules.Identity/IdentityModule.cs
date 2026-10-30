@@ -150,9 +150,9 @@ public sealed class IdentityModule : IModule, INavigationContributor
         });
         await EnsureRoleAsync(roles, new ArmaRole(SystemRoles.Staff)
         {
-            Description = "Kişi kayıtlarını ve aktiviteleri görür, düzenler.",
+            Description = "Kişi, aktivite ve bağış kayıtlarını görür, düzenler.",
             IsSystem = true,
-        }, "contacts.read", "contacts.write", "activities.read", "activities.write");
+        }, "contacts.read", "contacts.write", "activities.read", "activities.write", "giving.read", "giving.write");
     }
 
     public IEnumerable<NavigationItem> GetNavigationItems() =>
