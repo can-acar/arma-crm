@@ -152,7 +152,7 @@ public sealed class IdentityModule : IModule, INavigationContributor
         {
             Description = "Kişi, aktivite ve bağış kayıtlarını görür, düzenler.",
             IsSystem = true,
-        }, "contacts.read", "contacts.write", "activities.read", "activities.write", "giving.read", "giving.write", "comms.read", "comms.send", "forms.read", "membership.read", "membership.write", "events.read", "events.write", "events.checkin", "sales.read", "sales.write");
+        }, "contacts.read", "contacts.write", "activities.read", "activities.write", "giving.read", "giving.write", "comms.read", "comms.send", "forms.read", "membership.read", "membership.write", "events.read", "events.write", "events.checkin", "sales.read", "sales.write", "campaigns.read");
     }
 
     public IEnumerable<NavigationItem> GetNavigationItems() =>

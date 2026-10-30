@@ -26,6 +26,7 @@ public sealed class FormsModule : IModule, INavigationContributor
         services.AddModuleDbContext<FormsDbContext>(configuration, FormsDbContext.Schema);
         services.AddScoped<FormService>();
         services.AddScoped<IPersonalDataSource, FormsPersonalData>();
+        services.AddScoped<ICampaignSource, FormCampaignSource>();
         services.AddSingleton<INavigationContributor>(this);
     }
 

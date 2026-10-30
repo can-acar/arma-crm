@@ -219,6 +219,16 @@ cd deploy
 - Bir kural aynı kişiye aynı olay için bir kez uygulanır. Kayıtlı arama kuralı açılırken aramaya zaten uyan kişiler
   istenirse atlanır. Kural ekranında son 100 çalışma görünür.
 
+## Kampanyalar
+
+- Kampanya bir amaç altında yürütülen çalışmayı toplar (yardım kampanyası, üye kazanımı gibi): tarih aralığı,
+  isteğe bağlı TL hedefi, sorumlusu ve durumu vardır.
+- Kampanyaya bağış fonu, etkinlik, toplu ileti ve form bağlanır. Sonuçlar bağlı kaydın kendi modülünden
+  `ICampaignSource` ile alınır; yeni bir modül bu arayüzü kaydederek kampanyalara katılır.
+- Hedefe tarih aralığındaki tamamlanmış TL bağışlar ve ödenmiş bilet gelirleri sayılır. "Ulaşılan kişi" bağış yapan,
+  etkinliğe kaydolan, toplu iletiyi alan veya formu dolduran tekil kişilerdir; bu kişiler tek tuşla bir gruba eklenir.
+- Kullanıcı yalnızca görme yetkisi olan modüllerin kayıtlarını bağlayabilir.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`

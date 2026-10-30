@@ -1,0 +1,15 @@
+@* Hedefe ilerleme çubuğu. *@
+<div class="grid gap-1" title="@CampaignLabels.Money(Raised) / @CampaignLabels.Money(Goal)">
+    <div class="bg-muted h-2 overflow-hidden rounded-full" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Percent">
+        <div class="bg-primary h-full rounded-full" style="width: @(Percent)%"></div>
+    </div>
+    <span class="text-muted-foreground text-xs tabular-nums">@CampaignLabels.Money(Raised) / @CampaignLabels.Money(Goal) · %@Percent</span>
+</div>
+
+@code {
+    [Parameter] public decimal Raised { get; set; }
+
+    [Parameter] public decimal Goal { get; set; }
+
+    private int Percent => CampaignLabels.Percent(Raised, Goal);
+}
