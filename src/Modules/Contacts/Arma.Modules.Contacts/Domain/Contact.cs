@@ -43,6 +43,9 @@ public sealed class Contact : Entity
     /// <summary>Mükerrer kayıt birleştirildiyse asıl kaydın kimliği. Diğer modüller eski kimliği buradan çözer.</summary>
     public Guid? MergedIntoId { get; private set; }
 
+    /// <summary>KVKK kapsamında anonimleştirildiyse zamanı; kayıt bağış ve makbuz bütünlüğü için silinmez.</summary>
+    public DateTimeOffset? AnonymizedAt { get; private set; }
+
     public List<Address> Addresses { get; private set; } = [];
 
     public List<Tag> Tags { get; private set; } = [];

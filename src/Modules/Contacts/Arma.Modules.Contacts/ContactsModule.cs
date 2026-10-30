@@ -5,6 +5,7 @@ using Arma.Modules.Contacts.Contracts;
 using Arma.Modules.Contacts.Infrastructure;
 using Arma.Modules.Contacts.Web;
 using Arma.SharedKernel.Modules;
+using Arma.SharedKernel.Privacy;
 using Arma.SharedKernel.Security;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,7 @@ public sealed class ContactsModule : IModule, INavigationContributor
         services.AddScoped<TaxonomyService>();
         services.AddScoped<IContactAudiences, ContactAudiences>();
         services.AddScoped<ContactTransferService>();
+        services.AddScoped<IPersonalDataSource, ContactsPersonalData>();
         services.AddSingleton<INavigationContributor>(this);
     }
 

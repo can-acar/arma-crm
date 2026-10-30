@@ -109,7 +109,11 @@ public sealed class MessageService(
             return;
         }
 
-        if (message.IsCommercial && message.ContactId is { } contactId
+        if (message.To is null)
+        {
+            message.Skip("Adres yok");
+        }
+        else if (message.IsCommercial && message.ContactId is { } contactId
             && !(await consents.ApprovedAsync(message.Channel, [contactId], cancellationToken)).Contains(contactId))
         {
             message.Skip("İleti izni yok");

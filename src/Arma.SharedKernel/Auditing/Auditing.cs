@@ -9,6 +9,7 @@ public enum AuditAction
     Exported,
     Imported,
     Merged,
+    Anonymized,
 }
 
 /// <summary>Denetim izinde değeri gösterilmeyen alan (TCKN, sağlık bilgisi gibi); yalnızca değiştiği kaydedilir.</summary>
