@@ -5,7 +5,9 @@ Türkiye için geliştirilen, kurumun kendi sunucusuna kurulan, genel amaçlı a
 
 Tamamlanan: çözüm iskeleti, `Arma.UI` bileşen kütüphanesi, PostgreSQL + kurum yalıtımı, kimlik doğrulama
 (parola, zorunlu 2FA, roller ve izinler, API istemcileri), denetim izi, Kişiler modülü (kişi/kurum/hane kartı,
-adresler, etiketler, gruplar, ilişkiler, mükerrer bulma ve birleştirme, CSV içe/dışa aktarma), testler ve kurulum paketi.
+adresler, etiketler, gruplar, ilişkiler, mükerrer bulma ve birleştirme, CSV içe/dışa aktarma), Aktiviteler modülü
+(not, arama, toplantı, görev, kişi zaman çizelgesi, Görevlerim), Wolverine ile modüller arası olaylar, testler ve
+kurulum paketi.
 
 ## Teknoloji
 
@@ -14,6 +16,7 @@ adresler, etiketler, gruplar, ilişkiler, mükerrer bulma ve birleştirme, CSV i
 | Çalışma zamanı | .NET 10 (LTS) |
 | Arayüz | Blazor Web App (Interactive Server), Tailwind CSS v4, shadcn/ui tarzı `Arma.UI` |
 | Veritabanı | PostgreSQL (EF Core 10 + Npgsql), modül başına şema, Row Level Security |
+| Mesajlaşma | Wolverine: modüller arası olaylar, PostgreSQL'de kalıcı kuyruk ve outbox |
 | Gözlemlenebilirlik | OpenTelemetry, yerelde .NET Aspire paneli |
 | Test | xUnit v3, bUnit, NetArchTest, Shouldly |
 | Kurulum | Docker Compose paketi (`deploy/`) |
@@ -25,12 +28,13 @@ src/
   Arma.Host/              ASP.NET Core giriş noktası: Blazor, API, modül kaydı, Tailwind derlemesi
   Arma.UI/                shadcn/ui tarzı Razor bileşenleri (Button, Card, Input, Table, Badge, Alert...)
   Arma.SharedKernel/      Entity, Result, kurum bağlamı, IModule sözleşmesi, izin tanımları
-  Arma.Infrastructure/    Modüllerin ortak altyapısı: kiracı bağlantısı, kayıt damgaları, geçerli kullanıcı
+  Arma.Infrastructure/    Modüllerin ortak altyapısı: kiracı bağlantısı, kayıt damgaları, geçerli kullanıcı, mesajlaşma
   Arma.ServiceDefaults/   OpenTelemetry, sağlık kontrolleri, dayanıklı HTTP istemcileri
   Arma.AppHost/           .NET Aspire ile yerel geliştirme ortamı
   Modules/
     Contacts/             Kişiler modülü (Domain, Application, Infrastructure, Web) + Contracts
-    Identity/             Kullanıcılar, roller, izinler, 2FA, API istemcileri (Identity + OpenIddict)
+    Activities/           Not, arama, toplantı, görev; kişi zaman çizelgesi; Contracts: zaman çizelgesi mesajı
+    Identity/             Kullanıcılar, roller, izinler, 2FA, API istemcileri (Identity + OpenIddict); Contracts: kullanıcı listesi
     Audit/                Denetim izi tablosu, arama ekranı; Contracts: kayıt geçmişi bileşeni
 tests/
   Arma.Modules.Contacts.Tests/   TCKN/VKN kontrolleri, kişi kuralları
@@ -117,6 +121,11 @@ cd deploy
 
 - Her modül kendi PostgreSQL şemasını kullanır; başka modülün tablosuna yazmaz.
 - Modüller birbirine yalnızca `*.Contracts` projeleri üzerinden erişir.
+- Bir modülün diğerlerini etkileyen değişikliği (örneğin kişi birleştirme) Wolverine olayı olarak, veritabanı
+  değişikliğiyle aynı işlemde `wolverine` şemasına yazılır ve arka planda işlenir; uygulama çökse de kaybolmaz.
+  İşlenemeyen mesajlar `wolverine.wolverine_dead_letters` tablosunda kalır.
+- Başka bir modül, kişinin zaman çizelgesine `RecordTimelineEntry` mesajıyla kayıt düşer (bağış alındı gibi);
+  aynı kaynak tekrar gelirse kayıt güncellenir.
 - Her tabloda `tenant_id` vardır. EF sorgu filtresine ek olarak PostgreSQL Row Level Security
   politikası, `app.tenant_id` oturum değişkenine göre başka kurumun satırını gizler.
 - Şema değişiklikleri uygulama açılışında değil `dotnet Arma.Host.dll migrate` komutuyla uygulanır
@@ -129,5 +138,4 @@ cd deploy
 - Hassas alanların veritabanında şifrelenmesi.
 - İl-ilçe-mahalle referans verisi (şu an yalnızca 81 il listesi var, ilçe serbest metin).
 - `Arma.UI`: Dialog, Select, Combobox, Dropdown Menu, Sheet, Tabs, Toast, Data Table.
-- Wolverine ile modüller arası olaylar ve outbox.
 - Windows Server (IIS) kurulum paketi.

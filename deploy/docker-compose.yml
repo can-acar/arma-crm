@@ -10,6 +10,8 @@ x-arma-env: &arma-env
   # Yalnızca iç ağda, HTTPS olmadan çalışan kurulumlar için; API belirteç ucunu HTTP üzerinden açar.
   Arma__Security__AllowHttp: ${ARMA_ALLOW_HTTP:-false}
   ASPNETCORE_ENVIRONMENT: Production
+  # Ekranda gösterilen ve formlarda girilen tarih-saatlerin saat dilimi.
+  TZ: ${ARMA_TIMEZONE:-Europe/Istanbul}
 
 services:
   postgres:

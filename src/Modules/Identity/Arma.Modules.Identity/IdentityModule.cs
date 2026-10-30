@@ -1,3 +1,4 @@
+using Arma.Modules.Identity.Contracts;
 using System.Reflection;
 using Arma.Infrastructure.Persistence;
 using Arma.Modules.Identity.Application;
@@ -126,6 +127,7 @@ public sealed class IdentityModule : IModule, INavigationContributor
         services.AddScoped<UserAdminService>();
         services.AddScoped<RoleAdminService>();
         services.AddScoped<ApiClientService>();
+        services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddSingleton<INavigationContributor>(this);
     }
 
@@ -148,9 +150,9 @@ public sealed class IdentityModule : IModule, INavigationContributor
         });
         await EnsureRoleAsync(roles, new ArmaRole(SystemRoles.Staff)
         {
-            Description = "Kişi kayıtlarını görür ve düzenler.",
+            Description = "Kişi kayıtlarını ve aktiviteleri görür, düzenler.",
             IsSystem = true,
-        }, "contacts.read", "contacts.write");
+        }, "contacts.read", "contacts.write", "activities.read", "activities.write");
     }
 
     public IEnumerable<NavigationItem> GetNavigationItems() =>

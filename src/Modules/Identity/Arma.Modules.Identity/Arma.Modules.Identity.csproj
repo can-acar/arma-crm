@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\..\Arma.Infrastructure\Arma.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\Arma.SharedKernel\Arma.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\Arma.UI\Arma.UI.csproj" />
+    <ProjectReference Include="..\Arma.Modules.Identity.Contracts\Arma.Modules.Identity.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

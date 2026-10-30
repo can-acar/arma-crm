@@ -1,0 +1,130 @@
+@page "/activities"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = ActivitiesPermissions.Read)]
+@inherits ActivityPageBase
+@inject IUserDirectory Users
+
+<PageTitle>Aktiviteler · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Aktiviteler</h1>
+            <p class="text-muted-foreground text-sm">Tüm notlar, görüşmeler ve görevler</p>
+        </div>
+        @if (CanWrite)
+        {
+            <Button OnClick="() => New(ActivityKind.Note)">Yeni aktivite</Button>
+        }
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Input Type="search" placeholder="Konu veya açıklamada ara" Value="@search" ValueChanged="SearchAsync" aria-label="Ara" Class="lg:col-span-2" />
+        <NativeSelect Value="@kind" ValueChanged="KindChangedAsync" aria-label="Tür">
+            <option value="">Tüm türler</option>
+            @foreach (var option in ActivityLabels.UserKinds.Append(ActivityKind.System))
+            {
+                <option value="@option">@ActivityLabels.Kind(option)</option>
+            }
+        </NativeSelect>
+        <NativeSelect Value="@status" ValueChanged="StatusChangedAsync" aria-label="Durum">
+            <option value="">Tüm durumlar</option>
+            <option value="@ActivityStatus.Open">Açık görevler</option>
+            <option value="overdue">Geciken görevler</option>
+            <option value="@ActivityStatus.Done">Tamamlanan</option>
+            <option value="@ActivityStatus.Cancelled">İptal</option>
+        </NativeSelect>
+        <NativeSelect Value="@assignee" ValueChanged="AssigneeChangedAsync" aria-label="Kullanıcı">
+            <option value="">Tüm kullanıcılar</option>
+            @foreach (var user in users)
+            {
+                <option value="@user.Id">@user.FullName</option>
+            }
+        </NativeSelect>
+    </div>
+
+    <FormAlert Error="@Error" />
+
+    <Card>
+        <CardContent>
+            @if (result is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (result.Items.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Aramanıza uyan aktivite yok.</p>
+            }
+            else
+            {
+                <ul class="divide-y">
+                    @foreach (var activity in result.Items)
+                    {
+                        <ActivityItem Activity="activity" CanWrite="CanWrite" CanDelete="CanDelete"
+                                      OnComplete="CompleteAsync" OnReopen="ReopenAsync" OnEdit="Edit" OnDelete="AskDelete" />
+                    }
+                </ul>
+            }
+        </CardContent>
+    </Card>
+
+    @if (result is not null && result.Total > result.PageSize)
+    {
+        <div class="flex items-center justify-between text-sm">
+            <span class="text-muted-foreground">@result.Total kayıt · sayfa @result.Page / @PageCount</span>
+            <div class="flex gap-2">
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="result.Page <= 1" OnClick="() => GoAsync(result.Page - 1)">Önceki</Button>
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="result.Page >= PageCount" OnClick="() => GoAsync(result.Page + 1)">Sonraki</Button>
+            </div>
+        </div>
+    }
+</div>
+
+<ActivityEditor @bind-Open="EditorOpen" Editing="Editing" DefaultKind="NewKind" OnSaved="ReloadAsync" />
+<DeleteActivityDialog Activity="Deleting" OnConfirm="DeleteAsync" OnCancel="() => Deleting = null" />
+
+@code {
+    private ActivityPage? result;
+    private IReadOnlyList<UserSummary> users = [];
+    private string? search, kind, status, assignee;
+    private int currentPage = 1;
+
+    private int PageCount => result is null ? 1 : (int)Math.Ceiling(result.Total / (double)result.PageSize);
+
+    protected override async Task ReloadAsync()
+    {
+        if (users.Count == 0)
+        {
+            users = await Users.ActiveUsersAsync();
+        }
+
+        result = await Activities.ListAsync(new ActivityFilter(
+            AssignedTo: Guid.TryParse(assignee, out var userId) ? userId : null,
+            Kind: Enum.TryParse<ActivityKind>(kind, out var k) ? k : null,
+            Status: status == "overdue" ? null : Enum.TryParse<ActivityStatus>(status, out var s) ? s : null,
+            OverdueOnly: status == "overdue",
+            Search: search,
+            Page: currentPage));
+    }
+
+    private Task SearchAsync(string? value) => FilterAsync(() => search = value);
+
+    private Task KindChangedAsync(string? value) => FilterAsync(() => kind = value);
+
+    private Task StatusChangedAsync(string? value) => FilterAsync(() => status = value);
+
+    private Task AssigneeChangedAsync(string? value) => FilterAsync(() => assignee = value);
+
+    private Task FilterAsync(Action apply)
+    {
+        apply();
+        currentPage = 1;
+        return ReloadAsync();
+    }
+
+    private Task GoAsync(int target)
+    {
+        currentPage = target;
+        return ReloadAsync();
+    }
+}
