@@ -6,7 +6,8 @@ Türkiye için geliştirilen, kurumun kendi sunucusuna kurulan, genel amaçlı a
 Tamamlanan: çözüm iskeleti, `Arma.UI` bileşen kütüphanesi, PostgreSQL + kurum yalıtımı, kimlik doğrulama
 (parola, zorunlu 2FA, roller ve izinler, API istemcileri), denetim izi, Kişiler modülü (kişi/kurum/hane kartı,
 adresler, etiketler, gruplar, ilişkiler, mükerrer bulma ve birleştirme, CSV içe/dışa aktarma), Aktiviteler modülü
-(not, arama, toplantı, görev, kişi zaman çizelgesi, Görevlerim), Wolverine ile modüller arası olaylar, testler ve
+(not, arama, toplantı, görev, kişi zaman çizelgesi, Görevlerim), Bağışlar modülü (fonlar, sıralı makbuz,
+iade, kamuya açık bağış formu, iyzico ve PayTR), Wolverine ile modüller arası olaylar, testler ve
 kurulum paketi.
 
 ## Teknoloji
@@ -34,6 +35,7 @@ src/
   Modules/
     Contacts/             Kişiler modülü (Domain, Application, Infrastructure, Web) + Contracts
     Activities/           Not, arama, toplantı, görev; kişi zaman çizelgesi; Contracts: zaman çizelgesi mesajı
+    Giving/               Bağışlar, fonlar, makbuz, çevrim içi bağış formu ve ödeme kuruluşları
     Identity/             Kullanıcılar, roller, izinler, 2FA, API istemcileri (Identity + OpenIddict); Contracts: kullanıcı listesi
     Audit/                Denetim izi tablosu, arama ekranı; Contracts: kayıt geçmişi bileşeni
 tests/
@@ -108,6 +110,16 @@ cd deploy
   `Authorization: Bearer` başlığıyla gönderilir. İstemci yalnızca kendisine verilen izinleri kullanabilir.
 - Oturum ve belirteç anahtarları veritabanında (`identity.data_protection_keys`) saklanır; konteyner
   yeniden başlasa da oturumlar düşmez.
+
+## Bağış ve ödeme
+
+- Makbuz numarası kurum başına, her yıl 1'den başlayarak boşluksuz artar (`{önek}{yıl}-000001`).
+  Kesilmiş makbuzun tutarı, tarihi ve bağışçısı değişmez; iptal edilen numara tekrar kullanılmaz.
+- Kamuya açık bağış formu `/bagis` adresindedir. Ödeme kuruluşu `Giving:Payments:Provider` ile seçilir
+  (`none`, `iyzico`, `paytr`); anahtarlar ortam değişkeni veya `.env` ile verilir, veritabanına yazılmaz.
+- Ödeme sonucu yalnızca imzası doğrulanmış (PayTR) veya kuruluştan sorgulanmış (iyzico) bildirimle
+  tamamlanır; aynı bildirim tekrar gelirse sonuç değişmez.
+- Geliştirmede `Giving__Payments__Provider=test` sahte ödeme sayfasını açar; canlı ortamda kullanılamaz.
 
 ## Denetim izi
 

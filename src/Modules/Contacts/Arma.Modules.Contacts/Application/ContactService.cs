@@ -60,7 +60,7 @@ public sealed record DuplicateCandidate(Guid Id, string DisplayName, string? Ema
 
 public sealed record CreateRelationshipRequest(Guid OtherContactId, RelationshipType Type, bool ThisIsFrom, string? Description, DateOnly? StartDate);
 
-public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimeProvider clock, IDbContextOutbox outbox) : IContactDirectory
+public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimeProvider clock, IDbContextOutbox outbox) : IContactDirectory, IContactRegistry
 {
     public const int MaxPageSize = 100;
 
@@ -362,6 +362,26 @@ public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimePr
         }
 
         return null;
+    }
+
+    public async Task<ContactRegistration> FindOrCreatePersonAsync(string firstName, string lastName, string? email, string? phone, CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var normalized = email.Trim().ToLowerInvariant();
+            var existing = await db.Contacts.AsNoTracking()
+                .Where(c => c.Type == ContactType.Person && c.Email != null && c.Email.ToLower() == normalized)
+                .OrderBy(c => c.CreatedAt)
+                .Select(c => (Guid?)c.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (existing is not null)
+            {
+                return new ContactRegistration(existing, false, null);
+            }
+        }
+
+        var created = await CreatePersonAsync(new CreatePersonRequest(firstName, lastName, email, phone, null), cancellationToken);
+        return created.IsSuccess ? new ContactRegistration(created.Value, true, null) : new ContactRegistration(null, false, created.Error!.Message);
     }
 
     public async Task<IReadOnlyDictionary<Guid, ContactSummary>> FindManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)

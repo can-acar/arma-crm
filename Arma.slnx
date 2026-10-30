@@ -20,6 +20,9 @@
     <Project Path="src/Modules/Contacts/Arma.Modules.Contacts.Contracts/Arma.Modules.Contacts.Contracts.csproj" />
     <Project Path="src/Modules/Contacts/Arma.Modules.Contacts/Arma.Modules.Contacts.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Giving/">
+    <Project Path="src/Modules/Giving/Arma.Modules.Giving/Arma.Modules.Giving.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/Arma.Modules.Identity.Contracts/Arma.Modules.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/Arma.Modules.Identity/Arma.Modules.Identity.csproj" />

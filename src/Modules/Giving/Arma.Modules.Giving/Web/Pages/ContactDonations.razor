@@ -1,0 +1,75 @@
+@inject DonationService Donations
+@inject IContactDirectory Directory
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+@* Kişi kartındaki "Bağışlar" sekmesi. *@
+<div class="grid gap-4">
+    @if (summary is not null)
+    {
+        <div class="grid gap-4 sm:grid-cols-3">
+            <Card>
+                <CardHeader>
+                    <CardDescription>Toplam bağış</CardDescription>
+                    <CardTitle Class="text-lg"><TotalsLine Totals="summary.Lifetime" /></CardTitle>
+                </CardHeader>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardDescription>Bu yıl</CardDescription>
+                    <CardTitle Class="text-lg"><TotalsLine Totals="summary.ThisYear" /></CardTitle>
+                </CardHeader>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardDescription>İlk ve son bağış</CardDescription>
+                    <CardTitle Class="text-lg">@(summary.FirstGift is { } first ? $"{GivingLabels.Date(first)} · {GivingLabels.Date(summary.LastGift!.Value)}" : "-")</CardTitle>
+                </CardHeader>
+            </Card>
+        </div>
+    }
+
+    <Card>
+        <CardHeader>
+            <CardTitle>Bağış geçmişi</CardTitle>
+            @if (canWrite)
+            {
+                <CardAction><Button Size="ButtonSize.Sm" OnClick="() => editorOpen = true">Bağış kaydet</Button></CardAction>
+            }
+        </CardHeader>
+        <CardContent>
+            @if (items.Count == 0)
+            {
+                <p class="text-muted-foreground text-sm">Henüz bağış yok.</p>
+            }
+            else
+            {
+                <DonationTable Items="items" ShowContact="false" />
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<DonationEditor @bind-Open="editorOpen" Contact="contact" OnSaved="_ => LoadAsync()" />
+
+@code {
+    private DonorSummary? summary;
+    private IReadOnlyList<DonationView> items = [];
+    private ContactSummary? contact;
+    private bool canWrite, editorOpen;
+
+    [Parameter] public Guid ContactId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        canWrite = CurrentUser.HasPermission(GivingPermissions.Write);
+        contact = await Directory.FindAsync(ContactId);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        summary = await Donations.DonorSummaryAsync(ContactId);
+        items = (await Donations.ListAsync(new DonationFilter(ContactId: ContactId, PageSize: 200))).Items;
+    }
+}

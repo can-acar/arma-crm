@@ -1,0 +1,196 @@
+@inject DonationService Donations
+@inject FundService Funds
+@inject TimeProvider Clock
+
+@* Bağış ekleme ve düzenleme penceresi. Bağış listesi, bağış ayrıntısı ve kişi kartı kullanır. *@
+<Dialog Open="Open" OpenChanged="OpenChanged" Class="sm:max-w-xl">
+    <DialogHeader>
+        <DialogTitle>@(Editing is null ? "Bağış kaydet" : "Bağışı düzenle")</DialogTitle>
+        @if (Editing?.HasReceipt == true)
+        {
+            <DialogDescription>Makbuzu kesildiği için tutar, tarih ve bağışçı değiştirilemez.</DialogDescription>
+        }
+    </DialogHeader>
+
+    <FormAlert Error="@error" />
+
+    <form id="donation-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="grid gap-2">
+            <Label>Bağışçı</Label>
+            <ContactPicker @bind-Selected="contact" />
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-3">
+            <div class="grid gap-2 sm:col-span-2">
+                <Label for="donation-amount">Tutar</Label>
+                <Input id="donation-amount" inputmode="decimal" @bind-Value="amount" placeholder="1.250,00" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="donation-currency">Para birimi</Label>
+                <NativeSelect id="donation-currency" @bind-Value="currency">
+                    @foreach (var currencyCode in GivingLabels.Currencies)
+                    {
+                        <option value="@currencyCode">@currencyCode</option>
+                    }
+                </NativeSelect>
+            </div>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="donation-date">Tarih</Label>
+                <input id="donation-date" type="date" class="@Styles.Input" @bind="receivedOn" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="donation-method">Ödeme yöntemi</Label>
+                <NativeSelect id="donation-method" @bind-Value="method" disabled="@(Editing?.Method == PaymentMethod.Online)">
+                    @foreach (var option in Editing?.Method == PaymentMethod.Online ? [PaymentMethod.Online] : GivingLabels.ManualMethods)
+                    {
+                        <option value="@option">@GivingLabels.Method(option)</option>
+                    }
+                </NativeSelect>
+            </div>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="donation-fund">Fon</Label>
+                <NativeSelect id="donation-fund" @bind-Value="fund">
+                    <option value="">Genel (fon seçilmedi)</option>
+                    @foreach (var item in funds)
+                    {
+                        <option value="@item.Id">@item.Name</option>
+                    }
+                </NativeSelect>
+            </div>
+            <div class="grid gap-2">
+                <Label for="donation-reference">Dekont / işlem no</Label>
+                <Input id="donation-reference" @bind-Value="reference" maxlength="100" />
+            </div>
+        </div>
+
+        @if (method == nameof(PaymentMethod.InKind))
+        {
+            <div class="grid gap-2">
+                <Label for="donation-inkind">Bağışlanan mal</Label>
+                <Input id="donation-inkind" @bind-Value="inKind" maxlength="500" placeholder="Örnek: 20 koli gıda (tahmini değer)" />
+            </div>
+        }
+
+        <div class="grid gap-2">
+            <Label for="donation-note">Not</Label>
+            <Textarea id="donation-note" @bind-Value="note" rows="2" maxlength="1000" />
+        </div>
+    </form>
+
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="CloseAsync">Vazgeç</Button>
+        <Button Type="submit" form="donation-form" Disabled="saving">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Turkish = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+    private ContactSummary? contact;
+    private string? amount, reference, note, inKind, error, fund;
+    private string? currency = "TRY", method = nameof(PaymentMethod.BankTransfer);
+    private DateOnly receivedOn;
+    private IReadOnlyList<FundView> funds = [];
+    private bool saving, wasOpen;
+
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    [Parameter] public DonationView? Editing { get; set; }
+
+    /// <summary>Yeni kayıtta önceden seçili bağışçı.</summary>
+    [Parameter] public ContactSummary? Contact { get; set; }
+
+    [Parameter] public EventCallback<Guid> OnSaved { get; set; }
+
+    [Inject] private IContactDirectory Directory { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Open && !wasOpen)
+        {
+            funds = await Funds.ListAsync(activeOnly: true);
+            await ResetAsync();
+        }
+
+        wasOpen = Open;
+    }
+
+    private async Task ResetAsync()
+    {
+        error = null;
+        if (Editing is { } d)
+        {
+            contact = await Directory.FindAsync(d.ContactId);
+            amount = d.Amount.ToString("N2", Turkish);
+            currency = d.Currency;
+            receivedOn = d.ReceivedOn;
+            method = d.Method.ToString();
+            fund = d.FundId?.ToString();
+            reference = d.Reference;
+            note = d.Note;
+            inKind = d.InKindDescription;
+
+            // Pasif fona bağlı eski kayıt düzenlenirken fon listede görünsün.
+            if (d.FundId is { } fundId && funds.All(f => f.Id != fundId))
+            {
+                funds = [.. funds, new FundView(fundId, d.FundName ?? "(pasif fon)", null, false, false, 0, 0)];
+            }
+
+            return;
+        }
+
+        contact = Contact;
+        amount = reference = note = inKind = fund = null;
+        currency = "TRY";
+        method = nameof(PaymentMethod.BankTransfer);
+        receivedOn = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (contact is null)
+        {
+            error = "Bağışçı seçin.";
+            return;
+        }
+
+        if (!decimal.TryParse(amount, System.Globalization.NumberStyles.Number, Turkish, out var value))
+        {
+            error = "Tutarı 1.250,50 biçiminde girin.";
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            var request = new SaveDonationRequest(contact.Id, value, currency, receivedOn,
+                Guid.TryParse(fund, out var fundId) ? fundId : null, Enum.Parse<PaymentMethod>(method!), reference, note, inKind);
+            var result = Editing is null ? await Donations.RecordAsync(request) : await Donations.UpdateAsync(Editing.Id, request);
+            if (!result.IsSuccess)
+            {
+                error = result.Error!.Message;
+                return;
+            }
+
+            await CloseAsync();
+            await OnSaved.InvokeAsync(result.Value);
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        Open = wasOpen = false;
+        await OpenChanged.InvokeAsync(false);
+    }
+}

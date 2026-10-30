@@ -44,6 +44,7 @@ public sealed class ArmaAppFactory : WebApplicationFactory<Program>, IAsyncLifet
         builder.UseSetting("Arma:TenantId", TenantId.ToString());
         builder.UseSetting("Arma:MigrateOnStartup", "true");
         builder.UseSetting("Arma:Security:AllowHttp", "true");
+        builder.UseSetting("Giving:Payments:Provider", "test");
     }
 
     public async Task<T> WithScopeAsync<T>(Func<IServiceProvider, Task<T>> action)

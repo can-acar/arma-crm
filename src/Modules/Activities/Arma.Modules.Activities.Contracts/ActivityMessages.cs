@@ -25,3 +25,6 @@ public sealed record RecordTimelineEntry(
     DateTimeOffset OccurredAt,
     string SourceModule,
     string SourceId);
+
+/// <summary>Kaynağı silinen veya geçersiz olan (ödemesi başarısız bağış gibi) zaman çizelgesi kaydını kaldırır.</summary>
+public sealed record RemoveTimelineEntry(string SourceModule, string SourceId);
