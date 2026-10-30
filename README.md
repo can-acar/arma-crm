@@ -47,9 +47,10 @@ dotnet run --project src/Arma.AppHost
 
 PostgreSQL konteynerini ve uygulamayı birlikte başlatır, şemayı günceller ve Aspire panelini açar.
 
-**Kendi PostgreSQL'inizle:** `src/Arma.Host/appsettings.Development.json` içindeki bağlantıyı düzenleyin, sonra:
+**Kendi PostgreSQL'inizle:** bağlantı dizesini depoya değil, kullanıcı gizli ayarlarına yazın:
 
 ```bash
+dotnet user-secrets set "ConnectionStrings:arma" "Host=localhost;Database=arma;Username=arma;Password=<parola>" --project src/Arma.Host
 dotnet run --project src/Arma.Host
 ```
 
