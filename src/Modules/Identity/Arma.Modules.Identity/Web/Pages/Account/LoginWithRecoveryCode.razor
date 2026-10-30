@@ -1,0 +1,65 @@
+@page "/account/login-recovery"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+@inject SignInManager<ArmaUser> SignIn
+@inject NavigationManager Navigation
+
+<PageTitle>Kurtarma kodu · Arma CRM</PageTitle>
+
+<Card>
+    <CardHeader>
+        <CardTitle><h1 class="text-xl">Kurtarma kodu</h1></CardTitle>
+        <CardDescription>2FA'yı açarken kaydettiğiniz kodlardan birini girin. Her kod bir kez kullanılabilir.</CardDescription>
+    </CardHeader>
+    <CardContent>
+        <EditForm Model="Input" FormName="login-recovery" OnValidSubmit="VerifyAsync" method="post" class="grid gap-4">
+            <DataAnnotationsValidator />
+            <FormMessage Error="@error" />
+            <div class="grid gap-2">
+                <Label For="code">Kurtarma kodu</Label>
+                <InputText id="code" autocomplete="off" @bind-Value="Input.Code" class="@Styles.Input" required />
+            </div>
+            <Button Type="submit" Class="w-full">Giriş yap</Button>
+        </EditForm>
+    </CardContent>
+</Card>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+    }
+
+    private string? error;
+
+    [SupplyParameterFromForm] private RecoveryModel Input { get; set; } = default!;
+
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (await SignIn.GetTwoFactorAuthenticationUserAsync() is null)
+        {
+            Navigation.NavigateTo("account/login");
+        }
+    }
+
+    private async Task VerifyAsync()
+    {
+        var result = await SignIn.TwoFactorRecoveryCodeSignInAsync(Input.Code.Replace(" ", ""));
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo(Login.SafeReturnUrl(ReturnUrl), forceLoad: true);
+        }
+        else
+        {
+            error = result.IsLockedOut ? "Hesap geçici olarak kilitlendi." : "Kurtarma kodu geçersiz.";
+        }
+    }
+
+    private sealed class RecoveryModel
+    {
+        [Required(ErrorMessage = "Kod gerekli.")]
+        public string Code { get; set; } = "";
+    }
+}

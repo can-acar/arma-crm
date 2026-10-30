@@ -1,0 +1,153 @@
+@page "/admin/roles"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = IdentityPermissions.ManageRoles)]
+@inject RoleAdminService Service
+@inject PermissionCatalog Catalog
+
+<PageTitle>Roller · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Roller ve izinler</h1>
+        <p class="text-muted-foreground text-sm">Her kullanıcının bir rolü vardır; rol, hangi işlemleri yapabileceğini belirler.</p>
+    </div>
+
+    <FormMessage Error="@error" Info="@info" />
+
+    <div class="grid gap-6 lg:grid-cols-[240px_1fr]">
+        <div class="flex flex-col gap-2">
+            @foreach (var role in roles)
+            {
+                <button type="button" class="@RoleButtonClass(role)" @onclick="() => Select(role)">
+                    <span class="font-medium">@role.Name</span>
+                    <span class="text-muted-foreground text-xs">@role.UserCount kullanıcı</span>
+                </button>
+            }
+            <form class="mt-4 grid gap-2" @onsubmit="CreateAsync" @onsubmit:preventDefault>
+                <Label For="new-role">Yeni rol</Label>
+                <Input id="new-role" @bind-Value="newRoleName" placeholder="Örneğin Gönüllü koordinatörü" />
+                <Button Type="submit" Variant="ButtonVariant.Outline" Size="ButtonSize.Sm">Ekle</Button>
+            </form>
+        </div>
+
+        @if (selected is not null)
+        {
+            <Card>
+                <CardHeader>
+                    <CardTitle>@selected.Name</CardTitle>
+                    <CardDescription>@selected.Description</CardDescription>
+                    @if (!selected.IsSystem)
+                    {
+                        <CardAction><Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="DeleteAsync">Rolü sil</Button></CardAction>
+                    }
+                </CardHeader>
+                <CardContent class="grid gap-6">
+                    <label class="flex items-center gap-2 text-sm">
+                        <Checkbox Checked="selected.RequiresTwoFactor" CheckedChanged="SetTwoFactorAsync" disabled="@isAdmin" />
+                        Bu roldeki kullanıcılar için iki adımlı doğrulama zorunlu
+                    </label>
+                    <Separator />
+                    @foreach (var group in Catalog.Grouped())
+                    {
+                        <div class="grid gap-2">
+                            <h3 class="text-sm font-semibold">@group.Key</h3>
+                            @foreach (var permission in group)
+                            {
+                                <label class="flex items-start gap-2 text-sm">
+                                    <Checkbox Class="mt-0.5" Checked="draft.Contains(permission.Name)" CheckedChanged="on => Toggle(permission.Name, on)" disabled="@isAdmin" />
+                                    <span>
+                                        @permission.Description
+                                        <code class="text-muted-foreground ml-1 text-xs">@permission.Name</code>
+                                    </span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </CardContent>
+                @if (!isAdmin)
+                {
+                    <CardFooter><Button OnClick="SaveAsync">İzinleri kaydet</Button></CardFooter>
+                }
+            </Card>
+        }
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<RoleListItem> roles = [];
+    private RoleListItem? selected;
+    private HashSet<string> draft = [];
+    private string? newRoleName;
+    private string? error, info;
+
+    private bool isAdmin => selected?.Name == SystemRoles.Administrator;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync(Guid? keep = null)
+    {
+        roles = await Service.ListAsync();
+        var target = roles.FirstOrDefault(r => r.Id == (keep ?? selected?.Id)) ?? roles.FirstOrDefault();
+        if (target is not null)
+        {
+            Select(target);
+        }
+    }
+
+    private void Select(RoleListItem role)
+    {
+        selected = role;
+        draft = role.Permissions.ToHashSet();
+    }
+
+    private void Toggle(string permission, bool on)
+    {
+        if (on)
+        {
+            draft.Add(permission);
+        }
+        else
+        {
+            draft.Remove(permission);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        var result = await Service.SetPermissionsAsync(selected!.Id, draft);
+        (error, info) = result.IsSuccess ? ((string?)null, "İzinler kaydedildi. Kullanıcılar birkaç dakika içinde yeni izinlerle çalışır.") : (result.Error!.Message, (string?)null);
+        await LoadAsync();
+    }
+
+    private async Task SetTwoFactorAsync(bool required)
+    {
+        var result = await Service.SetTwoFactorRequirementAsync(selected!.Id, required);
+        (error, info) = result.IsSuccess ? ((string?)null, "Kaydedildi.") : (result.Error!.Message, (string?)null);
+        await LoadAsync();
+    }
+
+    private async Task CreateAsync()
+    {
+        var result = await Service.CreateAsync(newRoleName ?? "", null, false);
+        if (!result.IsSuccess)
+        {
+            (error, info) = (result.Error!.Message, null);
+            return;
+        }
+
+        (error, info, newRoleName) = (null, "Rol eklendi; izinlerini seçin.", null);
+        await LoadAsync(result.Value);
+    }
+
+    private async Task DeleteAsync()
+    {
+        var result = await Service.DeleteAsync(selected!.Id);
+        (error, info) = result.IsSuccess ? ((string?)null, "Rol silindi.") : (result.Error!.Message, (string?)null);
+        selected = null;
+        await LoadAsync();
+    }
+
+    private string RoleButtonClass(RoleListItem role) =>
+        "flex flex-col items-start rounded-md border px-3 py-2 text-left text-sm hover:bg-accent " +
+        (role.Id == selected?.Id ? "bg-accent border-ring" : "");
+}

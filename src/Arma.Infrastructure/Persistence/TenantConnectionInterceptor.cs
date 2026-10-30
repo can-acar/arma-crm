@@ -2,13 +2,13 @@ using System.Data.Common;
 using Arma.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
-namespace Arma.Modules.Contacts.Infrastructure;
+namespace Arma.Infrastructure.Persistence;
 
 /// <summary>
 /// Her bağlantıda <c>app.tenant_id</c> oturum değişkenini atar. PostgreSQL Row Level Security
 /// politikaları bu değişkene bakar; EF sorgu filtresi unutulsa bile başka kurumun satırı dönmez.
 /// </summary>
-internal sealed class TenantConnectionInterceptor(ITenantContext tenant) : DbConnectionInterceptor
+public sealed class TenantConnectionInterceptor(ITenantContext tenant) : DbConnectionInterceptor
 {
     public override async Task ConnectionOpenedAsync(DbConnection connection, ConnectionEndEventData eventData, CancellationToken cancellationToken = default)
     {

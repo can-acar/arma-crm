@@ -1,6 +1,8 @@
 using Arma.Host;
 using Arma.Host.Components;
+using Arma.Infrastructure.Security;
 using Arma.SharedKernel.Tenancy;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,11 +12,32 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITenantContext, ConfiguredTenantContext>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+builder.Services.AddArmaAuthorization(ArmaModules.All.SelectMany(m => m.Permissions));
+
+// Ters vekil (nginx, IIS ARR, Caddy) arkasında HTTPS bilgisinin doğru görünmesi için.
+// Yalnızca uygulamaya doğrudan erişim kapalıysa açılmalı.
+var trustForwardedHeaders = builder.Configuration.GetValue<bool>("Arma:Security:TrustForwardedHeaders");
+if (trustForwardedHeaders)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
 
 foreach (var module in ArmaModules.All)
 {
     module.AddServices(builder.Services, builder.Configuration);
 }
+
+builder.Services.AddLocalization();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    string[] cultures = ["tr-TR", "en-US"];
+    options.SetDefaultCulture(cultures[0]).AddSupportedCultures(cultures).AddSupportedUICultures(cultures);
+});
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -38,6 +61,11 @@ if (migrateOnly || app.Configuration.GetValue<bool>("Arma:MigrateOnStartup"))
     }
 }
 
+if (trustForwardedHeaders)
+{
+    app.UseForwardedHeaders();
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -45,14 +73,26 @@ if (!app.Environment.IsDevelopment())
 }
 else
 {
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
 }
 
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+// API yanıtları (401, 403, 404) olduğu gibi döner; yalnızca sayfa isteklerinde "bulunamadı" sayfası gösterilir.
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/api") && !context.Request.Path.StartsWithSegments("/connect"),
+    pages => pages.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 app.UseHttpsRedirection();
+app.UseRequestLocalization();
+
+app.UseAuthentication();
+foreach (var module in ArmaModules.All)
+{
+    module.UseMiddleware(app);
+}
+
+app.UseAuthorization();
 app.UseAntiforgery();
 
-app.MapStaticAssets();
+app.MapStaticAssets().AllowAnonymous();
 app.MapDefaultEndpoints();
 
 foreach (var module in ArmaModules.All)
@@ -65,3 +105,6 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(ArmaModules.PageAssemblies);
 
 app.Run();
+
+/// <summary>Entegrasyon testlerinin <c>WebApplicationFactory</c> ile uygulamayı başlatabilmesi için.</summary>
+public partial class Program;

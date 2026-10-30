@@ -1,5 +1,6 @@
 @page "/contacts/new"
 @rendermode InteractiveServer
+@attribute [Authorize(Policy = ContactsPermissions.Write)]
 @inject ContactService Contacts
 @inject NavigationManager Navigation
 

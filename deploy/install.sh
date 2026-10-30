@@ -15,3 +15,4 @@ fi
 docker compose build
 docker compose up -d
 echo "Arma CRM çalışıyor: http://localhost:$(grep '^ARMA_PORT=' .env | cut -d= -f2)"
+echo "İlk açılışta tarayıcıda yönetici hesabı oluşturma ekranı gelir."

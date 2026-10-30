@@ -67,8 +67,8 @@ public static class ServiceDefaultsExtensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        app.MapHealthChecks(HealthPath);
-        app.MapHealthChecks(AlivePath, new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") });
+        app.MapHealthChecks(HealthPath).AllowAnonymous();
+        app.MapHealthChecks(AlivePath, new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") }).AllowAnonymous();
         return app;
     }
 }

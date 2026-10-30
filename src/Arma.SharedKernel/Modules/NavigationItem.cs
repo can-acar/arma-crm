@@ -1,7 +1,8 @@
 namespace Arma.SharedKernel.Modules;
 
 /// <summary>Kenar çubuğunda gösterilecek bir modül bağlantısı.</summary>
-public sealed record NavigationItem(string Title, string Href, int Order);
+/// <param name="Permission">Bağlantıyı görmek için gereken izin; null ise her oturum açmış kullanıcı görür.</param>
+public sealed record NavigationItem(string Title, string Href, int Order, string? Permission = null);
 
 public interface INavigationContributor
 {
