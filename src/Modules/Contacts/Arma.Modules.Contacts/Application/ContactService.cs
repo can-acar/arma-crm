@@ -12,7 +12,17 @@ public sealed record ContactListItem(Guid Id, ContactType Type, string DisplayNa
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);
 
-public sealed record ContactFilter(string? Search = null, ContactType? Type = null, Guid? TagId = null, Guid? GroupId = null);
+public sealed record ContactFilter(
+    string? Search = null,
+    ContactType? Type = null,
+    Guid? TagId = null,
+    Guid? GroupId = null,
+    string? City = null,
+    bool? HasEmail = null,
+    bool? HasPhone = null,
+    DateOnly? CreatedSince = null,
+    IReadOnlyCollection<Guid>? Include = null,
+    IReadOnlyCollection<Guid>? Exclude = null);
 
 public sealed record CreatePersonRequest(string FirstName, string LastName, string? Email, string? Phone, string? Tckn);
 
@@ -111,6 +121,38 @@ public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimePr
         if (filter.GroupId is { } groupId)
         {
             query = query.Where(c => c.Groups.Any(g => g.Id == groupId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.City))
+        {
+            var city = filter.City.Trim();
+            query = query.Where(c => c.Addresses.Any(a => a.City == city));
+        }
+
+        if (filter.HasEmail is { } hasEmail)
+        {
+            query = hasEmail ? query.Where(c => c.Email != null) : query.Where(c => c.Email == null);
+        }
+
+        if (filter.HasPhone is { } hasPhone)
+        {
+            query = hasPhone ? query.Where(c => c.Phone != null) : query.Where(c => c.Phone == null);
+        }
+
+        if (filter.CreatedSince is { } since)
+        {
+            var from = new DateTimeOffset(since.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            query = query.Where(c => c.CreatedAt >= from);
+        }
+
+        if (filter.Include is { } include)
+        {
+            query = query.Where(c => include.Contains(c.Id));
+        }
+
+        if (filter.Exclude is { Count: > 0 } exclude)
+        {
+            query = query.Where(c => !exclude.Contains(c.Id));
         }
 
         return query;

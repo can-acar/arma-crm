@@ -32,6 +32,8 @@ public sealed class ContactsModule : IModule, INavigationContributor
         services.AddScoped<TaxonomyService>();
         services.AddScoped<IContactAudiences, ContactAudiences>();
         services.AddScoped<ContactTransferService>();
+        services.AddScoped<ContactSearchService>();
+        services.AddScoped<IDashboardContributor, ContactsDashboard>();
         services.AddScoped<IPersonalDataSource, ContactsPersonalData>();
         services.AddSingleton<INavigationContributor>(this);
     }
@@ -48,6 +50,7 @@ public sealed class ContactsModule : IModule, INavigationContributor
     public IEnumerable<NavigationItem> GetNavigationItems() =>
     [
         new("Kişiler", "contacts", 10, ContactsPermissions.Read),
-        new("Etiket ve gruplar", "contacts/groups", 11, ContactsPermissions.Read),
+        new("Gelişmiş arama", "contacts/search", 11, ContactsPermissions.Read),
+        new("Etiket ve gruplar", "contacts/groups", 12, ContactsPermissions.Read),
     ];
 }

@@ -30,6 +30,9 @@ public sealed class PrivacyModule : IModule, INavigationContributor
         services.AddScoped<DataRequestService>();
         services.AddScoped<PersonalDataService>();
         services.AddScoped<IPersonalDataSource, PrivacyPersonalData>();
+        services.AddScoped<PrivacyInsights>();
+        services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<PrivacyInsights>());
+        services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<PrivacyInsights>());
         services.AddSingleton<IContactPanel, PrivacyPanel>();
         services.AddSingleton<INavigationContributor>(this);
     }

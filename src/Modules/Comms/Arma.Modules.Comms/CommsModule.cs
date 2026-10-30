@@ -30,6 +30,9 @@ public sealed class CommsModule : IModule, INavigationContributor
         services.AddScoped<MessageService>();
         services.AddScoped<MailingService>();
         services.AddScoped<Arma.SharedKernel.Privacy.IPersonalDataSource, CommsPersonalData>();
+        services.AddScoped<CommsInsights>();
+        services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<CommsInsights>());
+        services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<CommsInsights>());
         services.AddSingleton<IContactPanel, CommsPanel>();
         services.AddSingleton<INavigationContributor>(this);
         AddSenders(services, configuration);

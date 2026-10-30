@@ -26,6 +26,9 @@ public sealed class ActivitiesModule : IModule, INavigationContributor
         services.AddModuleDbContext<ActivitiesDbContext>(configuration, ActivitiesDbContext.Schema);
         services.AddScoped<ActivityService>();
         services.AddScoped<Arma.SharedKernel.Privacy.IPersonalDataSource, ActivitiesPersonalData>();
+        services.AddScoped<ActivitiesInsights>();
+        services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<ActivitiesInsights>());
+        services.AddScoped<Arma.SharedKernel.Modules.IDashboardContributor>(sp => sp.GetRequiredService<ActivitiesInsights>());
         services.AddSingleton<IContactPanel, TimelinePanel>();
         services.AddSingleton<INavigationContributor>(this);
     }
