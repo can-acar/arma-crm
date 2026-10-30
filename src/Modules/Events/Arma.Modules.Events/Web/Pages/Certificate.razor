@@ -1,0 +1,38 @@
+@page "/e/bilet/{Code}/belge"
+@layout PlainLayout
+@attribute [AllowAnonymous]
+@inject EventService Events
+
+<PageTitle>Katılım belgesi · @ticket?.EventTitle</PageTitle>
+
+@if (ticket?.CheckedInAt is null)
+{
+    <div class="mx-auto max-w-md p-6"><Alert><AlertTitle>Belge bulunamadı</AlertTitle><AlertDescription>Katılım belgesi etkinliğe giriş yapılan biletler için düzenlenir.</AlertDescription></Alert></div>
+}
+else
+{
+    <div class="mx-auto flex max-w-4xl flex-col gap-4 p-6 print:p-0">
+        <div class="flex justify-end print:hidden">
+            <button type="button" class="@ButtonVariants.For(ButtonVariant.Default, ButtonSize.Default)" onclick="window.print()">Yazdır</button>
+        </div>
+        @* A4 yatay. *@
+        <article class="bg-background flex aspect-[297/210] flex-col items-center justify-center gap-6 rounded-lg border-8 border-double p-12 text-center print:rounded-none">
+            <p class="text-muted-foreground text-sm tracking-[0.3em] uppercase">Katılım belgesi</p>
+            <p class="text-4xl font-semibold">@ticket.Name</p>
+            <p class="max-w-xl text-lg">@ticket.StartsAt.ToLocalTime().ToString("d MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")) tarihinde düzenlenen <span class="font-semibold">@ticket.EventTitle</span> etkinliğine katılmıştır.</p>
+            @if (ticket.Location is not null)
+            {
+                <p class="text-muted-foreground">@ticket.Location</p>
+            }
+            <p class="text-muted-foreground mt-8 font-mono text-xs">Belge no: @ticket.Code</p>
+        </article>
+    </div>
+}
+
+@code {
+    private TicketPageView? ticket;
+
+    [Parameter] public string Code { get; set; } = "";
+
+    protected override async Task OnInitializedAsync() => ticket = await Events.TicketAsync(Code);
+}

@@ -31,6 +31,9 @@
     <Project Path="src/Modules/Identity/Arma.Modules.Identity.Contracts/Arma.Modules.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/Arma.Modules.Identity/Arma.Modules.Identity.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Events/">
+    <Project Path="src/Modules/Events/Arma.Modules.Events/Arma.Modules.Events.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Forms/">
     <Project Path="src/Modules/Forms/Arma.Modules.Forms/Arma.Modules.Forms.csproj" />
   </Folder>

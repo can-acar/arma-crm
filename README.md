@@ -181,6 +181,20 @@ cd deploy
   0 kapatır). Zamanlanmış işler `IScheduledJob` ile yazılır ve dakikada bir yoklanır; birden çok sunucu
   çalışıyorsa yalnızca birinde `Arma__Jobs__Enabled=true` bırakın.
 
+## Etkinlikler
+
+- Etkinlik taslak olarak hazırlanır, yayımlanınca `/e/{adres}` sayfasından kayıt alınır (ad, soyad, e-posta;
+  kişi e-postayla bulunur veya açılır). Kontenjan etkinlik ve bilet türü bazında konabilir; dolunca kayıtlar
+  yedek listeye alınır, bir kayıt iptal edilince sıradaki kişi kesin kayda geçer ve e-postayla bilgilendirilir.
+  Aynı anda gelen kayıtlar kontenjanı aşmasın diye etkinlik satırı kilitlenir.
+- Her kayda tahmin edilemeyen bir bilet kodu verilir; onay e-postasında bilet bağlantısı (`/e/bilet/{kod}`,
+  `ARMA_PUBLIC_URL` gerekir) ve karekod bulunur. Giriş ekranında kod kamerayla (tarayıcı destekliyorsa),
+  el okuyucusuyla veya elle okutulur; ikinci okutma ve yedekteki bilet reddedilir.
+- Ücretli biletin ödemesi personel tarafından işaretlenir (girişte veya havaleyle). Çevrim içi kartla bilet
+  ödemesi henüz yok.
+- Giriş yapan katılımcı `/e/bilet/{kod}/belge` adresinden katılım belgesini yazdırabilir. Etkinlikten bir gün
+  önce kayıtlılara hatırlatma e-postası gider; etkinlik iptal edilirse herkese bildirim gider.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`
