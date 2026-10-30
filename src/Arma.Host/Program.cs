@@ -34,6 +34,7 @@ foreach (var module in ArmaModules.All)
 }
 
 builder.AddArmaMessaging(ArmaModules.ModuleAssemblies);
+builder.Services.AddHostedService<Arma.Infrastructure.Jobs.ScheduledJobRunner>();
 
 builder.Services.AddLocalization();
 builder.Services.Configure<RequestLocalizationOptions>(options =>

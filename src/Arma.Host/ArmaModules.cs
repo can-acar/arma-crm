@@ -6,6 +6,7 @@ using Arma.Modules.Forms;
 using Arma.Modules.Comms;
 using Arma.Modules.Giving;
 using Arma.Modules.Identity;
+using Arma.Modules.Membership;
 using Arma.Modules.Privacy;
 using Arma.SharedKernel.Modules;
 
@@ -14,7 +15,7 @@ namespace Arma.Host;
 /// <summary>Bu kurulumda etkin olan modüller. Yeni modül buraya eklenir.</summary>
 public static class ArmaModules
 {
-    public static IReadOnlyList<IModule> All { get; } = [new IdentityModule(), new AuditModule(), new ContactsModule(), new ActivitiesModule(), new GivingModule(), new CommsModule(), new PrivacyModule(), new FormsModule()];
+    public static IReadOnlyList<IModule> All { get; } = [new IdentityModule(), new AuditModule(), new ContactsModule(), new ActivitiesModule(), new GivingModule(), new CommsModule(), new PrivacyModule(), new FormsModule(), new MembershipModule()];
 
     public static Assembly[] ModuleAssemblies { get; } = All.Select(m => m.GetType().Assembly).Distinct().ToArray();
 
