@@ -1,0 +1,164 @@
+@page "/f/{Slug}"
+@layout PublicLayout
+@attribute [AllowAnonymous]
+@* Form başka sitelere iframe ile gömülür; üçüncü taraf çerezleri engellendiğinde antiforgery çerezi gelmez. Bot koruması gizli alanla yapılır. *@
+@attribute [Microsoft.AspNetCore.Antiforgery.RequireAntiforgeryToken(required: false)]
+@inject FormService Forms
+
+<PageTitle>@(form?.Settings.Title ?? "Form")</PageTitle>
+
+<div class="mx-auto flex max-w-lg flex-col gap-6 p-6">
+    @if (form is null)
+    {
+        <Alert><AlertDescription>Bu form artık yanıt kabul etmiyor.</AlertDescription></Alert>
+    }
+    else
+    {
+        <div class="text-center">
+            <h1 class="text-2xl font-semibold tracking-tight">@form.Settings.Title</h1>
+            @if (!string.IsNullOrWhiteSpace(form.Settings.Intro))
+            {
+                <p class="text-muted-foreground text-sm whitespace-pre-line">@form.Settings.Intro</p>
+            }
+        </div>
+
+        <Card>
+            <CardContent>
+                @if (submitted)
+                {
+                    <Alert><AlertDescription>@(string.IsNullOrWhiteSpace(form.Settings.SuccessMessage) ? "Teşekkür ederiz, yanıtınız alındı." : form.Settings.SuccessMessage)</AlertDescription></Alert>
+                }
+                else
+                {
+                    <form method="post" @formname="webform" @onsubmit="SubmitAsync" class="grid gap-4">
+                        <FormAlert Error="@error" />
+                        @foreach (var field in form.Fields)
+                        {
+                            var id = $"f-{field.Key}";
+                            var name = $"v.{field.Key}";
+                            var value = Posted(name);
+                            @if (field.Type == FieldType.Checkbox)
+                            {
+                                <label class="flex items-start gap-2 text-sm">
+                                    <input type="checkbox" id="@id" name="@name" class="mt-0.5" checked="@(value == "on")" required="@field.Required" />
+                                    <span>@field.Label</span>
+                                </label>
+                            }
+                            else
+                            {
+                                <div class="grid gap-2">
+                                    <Label For="@id">@field.Label@(field.Required ? " *" : "")</Label>
+                                    @switch (field.Type)
+                                    {
+                                        case FieldType.TextArea:
+                                            <textarea id="@id" name="@name" rows="4" maxlength="5000" class="@Styles.Textarea" required="@field.Required">@value</textarea>
+                                            break;
+                                        case FieldType.Select:
+                                            <select id="@id" name="@name" class="@Styles.Select" required="@field.Required">
+                                                <option value="">Seçin</option>
+                                                @foreach (var option in field.Options)
+                                                {
+                                                    <option value="@option" selected="@(option == value)">@option</option>
+                                                }
+                                            </select>
+                                            break;
+                                        default:
+                                            <input id="@id" name="@name" type="@InputType(field.Type)" value="@value" maxlength="300" autocomplete="@AutoComplete(field)" class="@Styles.Input" required="@field.Required" />
+                                            break;
+                                    }
+                                    @if (field.Help is not null)
+                                    {
+                                        <p class="text-muted-foreground text-xs">@field.Help</p>
+                                    }
+                                </div>
+                            }
+                        }
+
+                        @if (form.Settings.AskEmailConsent)
+                        {
+                            <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="c.email" class="mt-0.5" checked="@(Posted("c.email") == "on")" /> <span>Kampanya ve duyurular için bana e-posta gönderilmesine izin veriyorum.</span></label>
+                        }
+                        @if (form.Settings.AskSmsConsent)
+                        {
+                            <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="c.sms" class="mt-0.5" checked="@(Posted("c.sms") == "on")" /> <span>Kampanya ve duyurular için bana SMS gönderilmesine izin veriyorum.</span></label>
+                        }
+                        @if (form.Settings.ConsentNoticeSlug is { } consentSlug)
+                        {
+                            <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="c.explicit" class="mt-0.5" required checked="@(Posted("c.explicit") == "on")" /> <span><a class="underline" href="kvkk/@consentSlug" target="_blank">Açık rıza metnini</a> okudum ve onaylıyorum. *</span></label>
+                        }
+                        @if (form.Settings.InfoNoticeSlug is { } infoSlug)
+                        {
+                            <p class="text-muted-foreground text-xs">Kişisel verilerinizin nasıl işlendiğini <a class="underline" href="kvkk/@infoSlug" target="_blank">aydınlatma metninde</a> bulabilirsiniz.</p>
+                        }
+
+                        @* Botların doldurduğu gizli alan; dolu gelirse yanıt sessizce yok sayılır. *@
+                        <div class="hidden" aria-hidden="true">
+                            <input name="website" tabindex="-1" autocomplete="off" />
+                        </div>
+
+                        <Button Type="submit" Class="w-full">Gönder</Button>
+                    </form>
+                }
+            </CardContent>
+        </Card>
+    }
+</div>
+
+@code {
+    private FormView? form;
+    private string? error;
+    private bool submitted;
+
+    [CascadingParameter] private Microsoft.AspNetCore.Http.HttpContext HttpContext { get; set; } = default!;
+
+    [Parameter] public string Slug { get; set; } = "";
+
+    protected override async Task OnInitializedAsync() => form = await Forms.PublishedAsync(Slug);
+
+    private string? Posted(string name) =>
+        HttpContext.Request.HasFormContentType ? HttpContext.Request.Form[name].FirstOrDefault() : null;
+
+    private async Task SubmitAsync()
+    {
+        if (form is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(Posted("website")))
+        {
+            submitted = true;
+            return;
+        }
+
+        var values = form.Fields.ToDictionary(f => f.Key, f => Posted($"v.{f.Key}"));
+        var input = new FormInput(values, Posted("c.email") == "on", Posted("c.sms") == "on", Posted("c.explicit") == "on",
+            HttpContext.Connection.RemoteIpAddress?.ToString());
+        var result = await Forms.SubmitAsync(Slug, input);
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        submitted = true;
+    }
+
+    private static string InputType(FieldType type) => type switch
+    {
+        FieldType.Email => "email",
+        FieldType.Phone => "tel",
+        FieldType.Date => "date",
+        FieldType.Number => "text",
+        _ => "text",
+    };
+
+    private static string? AutoComplete(FormField field) => field.MapsTo switch
+    {
+        FieldMap.FirstName => "given-name",
+        FieldMap.LastName => "family-name",
+        FieldMap.Email => "email",
+        FieldMap.Phone => "tel",
+        _ => null,
+    };
+}

@@ -19,6 +19,7 @@ public class ModuleBoundaryTests
         ["Arma.Modules.Comms"] = typeof(Arma.Modules.Comms.Contracts.SendTransactionalEmail).Assembly,
         ["Arma.Modules.Contacts"] = typeof(IContactDirectory).Assembly,
         ["Arma.Modules.Identity"] = typeof(Arma.Modules.Identity.Contracts.IUserDirectory).Assembly,
+        ["Arma.Modules.Privacy"] = typeof(Arma.Modules.Privacy.Contracts.INoticeDirectory).Assembly,
     };
 
     [Fact]
@@ -45,6 +46,7 @@ public class ModuleBoundaryTests
         ["Arma.Modules.Audit"] = typeof(Arma.Modules.Audit.AuditModule).Assembly,
         ["Arma.Modules.Comms"] = typeof(Arma.Modules.Comms.CommsModule).Assembly,
         ["Arma.Modules.Contacts"] = typeof(Arma.Modules.Contacts.ContactsModule).Assembly,
+        ["Arma.Modules.Forms"] = typeof(Arma.Modules.Forms.FormsModule).Assembly,
         ["Arma.Modules.Giving"] = typeof(Arma.Modules.Giving.GivingModule).Assembly,
         ["Arma.Modules.Identity"] = typeof(Arma.Modules.Identity.IdentityModule).Assembly,
         ["Arma.Modules.Privacy"] = typeof(Arma.Modules.Privacy.PrivacyModule).Assembly,

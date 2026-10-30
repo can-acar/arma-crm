@@ -37,6 +37,15 @@ public sealed class ConsentRecordService(PrivacyDbContext db, IContactDirectory 
             .Select(x => new ConsentHistoryItem(x.c.Id, x.Title, x.c.VersionNumber, x.c.Granted, x.c.Source, x.c.IpAddress, x.c.Note, x.c.RecordedAt, x.c.CreatedBy))
             .ToListAsync(cancellationToken);
 
+    internal async Task RecordBySlugAsync(Guid contactId, string slug, bool granted, string source, string? ipAddress, CancellationToken cancellationToken)
+    {
+        var noticeId = await db.Notices.Where(n => n.Slug == slug).Select(n => (Guid?)n.Id).FirstOrDefaultAsync(cancellationToken);
+        if (noticeId is { } id)
+        {
+            await RecordAsync(contactId, id, granted, source, ipAddress, null, cancellationToken);
+        }
+    }
+
     /// <summary>Metnin yayımlanmış son sürümüne rıza verildiğini veya geri alındığını kaydeder.</summary>
     public async Task<Result<Guid>> RecordAsync(Guid contactId, Guid noticeId, bool granted, string source, string? ipAddress, string? note, CancellationToken cancellationToken = default)
     {

@@ -12,8 +12,12 @@ public sealed record NoticeVersionView(Guid Id, Guid NoticeId, int Number, strin
 public sealed record SaveNoticeRequest(string Title, string Slug, bool RequiresConsent, string Text);
 
 /// <summary>Aydınlatma ve açık rıza metinleri.</summary>
-public sealed class NoticeService(PrivacyDbContext db, TimeProvider clock)
+public sealed class NoticeService(PrivacyDbContext db, TimeProvider clock) : Contracts.INoticeDirectory
 {
+    async Task<IReadOnlyList<Contracts.NoticeOption>> Contracts.INoticeDirectory.PublishedAsync(CancellationToken cancellationToken) =>
+        await db.Notices.AsNoTracking().Where(n => n.CurrentVersion > 0).OrderBy(n => n.Title)
+            .Select(n => new Contracts.NoticeOption(n.Slug, n.Title, n.RequiresConsent)).ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<NoticeView>> ListAsync(CancellationToken cancellationToken = default) =>
         await db.Notices.AsNoTracking().OrderBy(n => n.Title)
             .Select(n => new NoticeView(n.Id, n.Title, n.Slug, n.RequiresConsent, n.DraftText, n.CurrentVersion, n.PublishedAt, n.HasUnpublishedChanges))

@@ -31,7 +31,11 @@
     <Project Path="src/Modules/Identity/Arma.Modules.Identity.Contracts/Arma.Modules.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/Arma.Modules.Identity/Arma.Modules.Identity.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Forms/">
+    <Project Path="src/Modules/Forms/Arma.Modules.Forms/Arma.Modules.Forms.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Privacy/">
+    <Project Path="src/Modules/Privacy/Arma.Modules.Privacy.Contracts/Arma.Modules.Privacy.Contracts.csproj" />
     <Project Path="src/Modules/Privacy/Arma.Modules.Privacy/Arma.Modules.Privacy.csproj" />
   </Folder>
   <Folder Name="/tests/">

@@ -135,6 +135,9 @@ internal sealed class PrivacyPersonalData(PrivacyDbContext db, ConsentRecordServ
 
 public static class PrivacyEventHandler
 {
+    public static Task Handle(Contracts.RecordExplicitConsent message, ConsentRecordService consents, CancellationToken cancellationToken) =>
+        consents.RecordBySlugAsync(message.ContactId, message.NoticeSlug, message.Granted, message.Source, message.IpAddress, cancellationToken);
+
     public static Task Handle(ContactsMerged message, DataRequestService requests, CancellationToken cancellationToken) =>
         requests.MoveContactAsync(message.DuplicateId, message.PrimaryId, cancellationToken);
 }

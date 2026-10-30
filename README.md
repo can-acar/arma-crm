@@ -156,6 +156,19 @@ cd deploy
 - Denetim izi, işlem güvenliği ve ispat için anonimleştirmeden sonra da saklanır; anonimleştirmenin kendisi
   denetim izine değer yazmadan kaydedilir.
 
+## Pano, arama ve formlar
+
+- Ana sayfa pano: her modül `IDashboardContributor` ile kutucuk ve grafik ekler; kullanıcı yalnızca yetkisi
+  olan modüllerin kutucuklarını görür.
+- Gelişmiş arama (`/contacts/search`): kişi alanlarıyla birlikte modüllerin `IContactCriteriaProvider` ile
+  eklediği ölçütler (son bağış, toplam bağış, ileti izni, açık rıza, açık görev…) birleştirilir. Aramalar
+  kaydedilir, sonuç CSV olarak indirilir veya bir gruba eklenir; toplu ileti bu gruba gönderilir.
+- Formlar (`/forms`): alanları ekrandan tanımlanan web formları `/f/{adres}` adresinde yayımlanır ve
+  `<iframe>` ile başka sitelere gömülebilir. Ad, soyad ve e-posta kişi kaydına eşlenirse yanıt kişiye bağlanır
+  (aynı e-posta varsa o kişi kullanılır), etiket ve grup eklenir, e-posta/SMS izni ve açık rıza işlenir,
+  zaman çizelgesine yazılır. Gömülebilmesi için yalnızca `/f/` altındaki sayfalar çerçeve kısıtı başlığı
+  (`X-Frame-Options`, `frame-ancestors`) taşımaz; bu sayfalarda antiforgery yerine gizli bot alanı kullanılır.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`

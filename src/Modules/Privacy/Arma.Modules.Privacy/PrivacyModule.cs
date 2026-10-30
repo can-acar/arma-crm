@@ -26,6 +26,7 @@ public sealed class PrivacyModule : IModule, INavigationContributor
     {
         services.AddModuleDbContext<PrivacyDbContext>(configuration, PrivacyDbContext.Schema);
         services.AddScoped<NoticeService>();
+        services.AddScoped<Contracts.INoticeDirectory>(sp => sp.GetRequiredService<NoticeService>());
         services.AddScoped<ConsentRecordService>();
         services.AddScoped<DataRequestService>();
         services.AddScoped<PersonalDataService>();
