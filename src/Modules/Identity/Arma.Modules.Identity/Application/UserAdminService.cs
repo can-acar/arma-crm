@@ -1,5 +1,6 @@
 using Arma.Modules.Identity.Domain;
 using Arma.Modules.Identity.Infrastructure;
+using Arma.SharedKernel.Auditing;
 using Arma.SharedKernel.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ public sealed record UserListItem(Guid Id, string FullName, string Email, string
 
 public sealed record CreateUserRequest(string FullName, string Email, string Password, string Role);
 
-public sealed class UserAdminService(ArmaIdentityDbContext db, UserManager<ArmaUser> users, TimeProvider clock)
+public sealed class UserAdminService(ArmaIdentityDbContext db, UserManager<ArmaUser> users, TimeProvider clock, IAuditLog audit)
 {
     public async Task<IReadOnlyList<UserListItem>> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -50,6 +51,7 @@ public sealed class UserAdminService(ArmaIdentityDbContext db, UserManager<ArmaU
         }
 
         await users.AddToRoleAsync(user, request.Role);
+        await audit.WriteAsync(AuditAction.Created, "User", user.Id.ToString(), $"{user.Email} kullanıcısı {request.Role} rolüyle oluşturuldu");
         return user.Id;
     }
 
@@ -75,6 +77,7 @@ public sealed class UserAdminService(ArmaIdentityDbContext db, UserManager<ArmaU
         }
 
         await users.UpdateSecurityStampAsync(user);
+        await audit.WriteAsync(AuditAction.Updated, "User", user.Id.ToString(), $"{user.Email} rolü {string.Join(", ", current)} → {role}");
         return true;
     }
 
@@ -100,6 +103,7 @@ public sealed class UserAdminService(ArmaIdentityDbContext db, UserManager<ArmaU
         user.IsActive = active;
         await users.UpdateAsync(user);
         await users.UpdateSecurityStampAsync(user);
+        await audit.WriteAsync(AuditAction.Updated, "User", user.Id.ToString(), $"{user.Email} {(active ? "etkinleştirildi" : "pasifleştirildi")}");
         return true;
     }
 
@@ -128,6 +132,7 @@ public sealed class UserAdminService(ArmaIdentityDbContext db, UserManager<ArmaU
         await users.SetTwoFactorEnabledAsync(user, false);
         await users.ResetAuthenticatorKeyAsync(user);
         await users.UpdateSecurityStampAsync(user);
+        await audit.WriteAsync(AuditAction.Updated, "User", user.Id.ToString(), $"{user.Email} için 2FA sıfırlandı");
         return true;
     }
 
@@ -141,7 +146,13 @@ public sealed class UserAdminService(ArmaIdentityDbContext db, UserManager<ArmaU
 
         var token = await users.GeneratePasswordResetTokenAsync(user);
         var reset = await users.ResetPasswordAsync(user, token, newPassword);
-        return reset.Succeeded ? true : reset.ToError();
+        if (!reset.Succeeded)
+        {
+            return reset.ToError();
+        }
+
+        await audit.WriteAsync(AuditAction.Updated, "User", user.Id.ToString(), $"{user.Email} parolası yönetici tarafından sıfırlandı");
+        return true;
     }
 
     private async Task<bool> IsLastAdministratorAsync(ArmaUser user)

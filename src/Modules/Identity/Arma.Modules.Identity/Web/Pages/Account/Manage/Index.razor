@@ -17,7 +17,7 @@
         <CardContent>
             <EditForm Model="Profile" FormName="profile" OnValidSubmit="SaveProfileAsync" method="post" class="grid gap-4">
                 <DataAnnotationsValidator />
-                <FormMessage Info="@profileMessage" />
+                <FormAlert Info="@profileMessage" />
                 <div class="grid gap-2">
                     <Label For="name">Ad soyad</Label>
                     <InputText id="name" @bind-Value="Profile.FullName" class="@Styles.Input" required />
@@ -34,7 +34,7 @@
         <CardContent>
             <EditForm Model="Password" FormName="password" OnValidSubmit="ChangePasswordAsync" method="post" class="grid gap-4">
                 <DataAnnotationsValidator />
-                <FormMessage Error="@passwordError" Info="@passwordMessage" />
+                <FormAlert Error="@passwordError" Info="@passwordMessage" />
                 <div class="grid gap-2">
                     <Label For="current">Mevcut parola</Label>
                     <InputText id="current" type="password" autocomplete="current-password" @bind-Value="Password.Current" class="@Styles.Input" required />

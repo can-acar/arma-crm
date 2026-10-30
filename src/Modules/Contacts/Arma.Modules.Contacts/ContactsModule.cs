@@ -27,6 +27,8 @@ public sealed class ContactsModule : IModule, INavigationContributor
 
         services.AddScoped<ContactService>();
         services.AddScoped<IContactDirectory>(sp => sp.GetRequiredService<ContactService>());
+        services.AddScoped<TaxonomyService>();
+        services.AddScoped<ContactTransferService>();
         services.AddSingleton<INavigationContributor>(this);
     }
 
@@ -39,5 +41,9 @@ public sealed class ContactsModule : IModule, INavigationContributor
         await db.Database.MigrateAsync(cancellationToken);
     }
 
-    public IEnumerable<NavigationItem> GetNavigationItems() => [new NavigationItem("Kişiler", "contacts", 10, ContactsPermissions.Read)];
+    public IEnumerable<NavigationItem> GetNavigationItems() =>
+    [
+        new("Kişiler", "contacts", 10, ContactsPermissions.Read),
+        new("Etiket ve gruplar", "contacts/groups", 11, ContactsPermissions.Read),
+    ];
 }

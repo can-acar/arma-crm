@@ -16,7 +16,7 @@
     <CardContent>
         <EditForm Model="Input" FormName="login-2fa" OnValidSubmit="VerifyAsync" method="post" class="grid gap-4">
             <DataAnnotationsValidator />
-            <FormMessage Error="@error" />
+            <FormAlert Error="@error" />
             <div class="grid gap-2">
                 <Label For="code">Doğrulama kodu</Label>
                 <InputText id="code" autocomplete="one-time-code" inputmode="numeric" @bind-Value="Input.Code" class="@Styles.Input" required />

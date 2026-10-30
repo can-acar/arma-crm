@@ -3,8 +3,9 @@
 Türkiye için geliştirilen, kurumun kendi sunucusuna kurulan, genel amaçlı açık mimarili CRM.
 Ürün ve teknik plan: [Arma CRM: Ürün ve Teknik Plan](https://claude.ai/code/artifact/dbdc5b76-403a-4e02-ae8f-15fadaf086ba).
 
-Tamamlanan: çözüm iskeleti, `Arma.UI` bileşen kütüphanesi, Kişiler modülü, PostgreSQL + kurum yalıtımı,
-kimlik doğrulama (parola, zorunlu 2FA, roller ve izinler, API istemcileri), testler ve kurulum paketi.
+Tamamlanan: çözüm iskeleti, `Arma.UI` bileşen kütüphanesi, PostgreSQL + kurum yalıtımı, kimlik doğrulama
+(parola, zorunlu 2FA, roller ve izinler, API istemcileri), denetim izi, Kişiler modülü (kişi/kurum/hane kartı,
+adresler, etiketler, gruplar, ilişkiler, mükerrer bulma ve birleştirme, CSV içe/dışa aktarma), testler ve kurulum paketi.
 
 ## Teknoloji
 
@@ -30,6 +31,7 @@ src/
   Modules/
     Contacts/             Kişiler modülü (Domain, Application, Infrastructure, Web) + Contracts
     Identity/             Kullanıcılar, roller, izinler, 2FA, API istemcileri (Identity + OpenIddict)
+    Audit/                Denetim izi tablosu, arama ekranı; Contracts: kayıt geçmişi bileşeni
 tests/
   Arma.Modules.Contacts.Tests/   TCKN/VKN kontrolleri, kişi kuralları
   Arma.UI.Tests/                 bileşen testleri (bUnit)
@@ -103,6 +105,14 @@ cd deploy
 - Oturum ve belirteç anahtarları veritabanında (`identity.data_protection_keys`) saklanır; konteyner
   yeniden başlasa da oturumlar düşmez.
 
+## Denetim izi
+
+- `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`
+  tablosuna yazılır (kim, ne zaman, hangi IP, alan bazında eski ve yeni değer).
+- `[SensitiveData]` işaretli alanların (TCKN gibi) değeri yazılmaz, yalnızca değiştiği görülür.
+  Maskesiz görüntüleme, dışa aktarma, içe aktarma ve birleştirme ayrıca kaydedilir.
+- Tablo yalnızca eklemeye açıktır: bir tetikleyici güncelleme ve silmeyi reddeder.
+
 ## Mimari kurallar
 
 - Her modül kendi PostgreSQL şemasını kullanır; başka modülün tablosuna yazmaz.
@@ -116,7 +126,8 @@ cd deploy
 
 ## Sıradaki adımlar (Faz 0'dan kalanlar)
 
-- Denetim izi (AuditLog) ve hassas alanların şifrelenmesi.
+- Hassas alanların veritabanında şifrelenmesi.
+- İl-ilçe-mahalle referans verisi (şu an yalnızca 81 il listesi var, ilçe serbest metin).
 - `Arma.UI`: Dialog, Select, Combobox, Dropdown Menu, Sheet, Tabs, Toast, Data Table.
 - Wolverine ile modüller arası olaylar ve outbox.
 - Windows Server (IIS) kurulum paketi.

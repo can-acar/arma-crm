@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Auditing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +25,11 @@ public static class ModuleDbContextExtensions
         services.AddDbContext<TContext>((sp, options) => options
             .UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, schema))
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(sp.GetRequiredService<TenantConnectionInterceptor>(), sp.GetRequiredService<EntityStampInterceptor>()));
+            // Sıra önemli: önce damgalar (silme yumuşak silmeye döner), sonra denetim izi.
+            .AddInterceptors(
+                sp.GetRequiredService<TenantConnectionInterceptor>(),
+                sp.GetRequiredService<EntityStampInterceptor>(),
+                sp.GetRequiredService<AuditInterceptor>()));
 
         return services;
     }
@@ -46,5 +51,6 @@ public static class ModuleDbContextExtensions
 
         services.AddScoped<TenantConnectionInterceptor>();
         services.AddScoped<EntityStampInterceptor>();
+        services.AddScoped<AuditInterceptor>();
     }
 }

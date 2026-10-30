@@ -2,6 +2,8 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Policy = ContactsPermissions.Read)]
 @inject ContactService Contacts
+@inject TaxonomyService Taxonomy
+@inject ICurrentUser CurrentUser
 
 <PageTitle>Kişiler · Arma CRM</PageTitle>
 
@@ -9,18 +11,48 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h1 class="text-2xl font-semibold tracking-tight">Kişiler</h1>
-            <p class="text-muted-foreground text-sm">Kişi ve kurum kayıtları</p>
+            <p class="text-muted-foreground text-sm">Kişi, kurum ve hane kayıtları</p>
         </div>
-        <Button Href="contacts/new">Yeni kayıt</Button>
+        <div class="flex flex-wrap gap-2">
+            @if (CurrentUser.HasPermission(ContactsPermissions.Export))
+            {
+                <Button Variant="ButtonVariant.Outline" Href="@ExportUrl" target="_blank">Dışa aktar (CSV)</Button>
+            }
+            @if (CurrentUser.HasPermission(ContactsPermissions.Write))
+            {
+                <Button Variant="ButtonVariant.Outline" Href="contacts/import">İçe aktar</Button>
+                <Button Href="contacts/new">Yeni kayıt</Button>
+            }
+        </div>
     </div>
 
     <Card>
         <CardHeader>
             <CardTitle>Kayıtlar</CardTitle>
             <CardDescription>@(result?.Total ?? 0) kayıt</CardDescription>
-            <CardAction>
-                <Input Type="search" placeholder="Ad veya e-posta ara" Value="@search" ValueChanged="OnSearchChanged" Class="w-64" aria-label="Ara" />
-            </CardAction>
+            <div class="col-span-full mt-2 grid gap-2 sm:grid-cols-4">
+                <Input Type="search" placeholder="Ad, e-posta veya telefon" Value="@search" ValueChanged="v => FilterAsync(() => search = v)" aria-label="Ara" />
+                <NativeSelect Value="@type" ValueChanged="v => FilterAsync(() => type = v)" aria-label="Tür">
+                    <option value="">Tüm türler</option>
+                    <option value="Person">Kişi</option>
+                    <option value="Organization">Kurum</option>
+                    <option value="Household">Hane</option>
+                </NativeSelect>
+                <NativeSelect Value="@tagId" ValueChanged="v => FilterAsync(() => tagId = v)" aria-label="Etiket">
+                    <option value="">Tüm etiketler</option>
+                    @foreach (var tag in tags)
+                    {
+                        <option value="@tag.Id">@tag.Name</option>
+                    }
+                </NativeSelect>
+                <NativeSelect Value="@groupId" ValueChanged="v => FilterAsync(() => groupId = v)" aria-label="Grup">
+                    <option value="">Tüm gruplar</option>
+                    @foreach (var group in groups)
+                    {
+                        <option value="@group.Id">@group.Name</option>
+                    }
+                </NativeSelect>
+            </div>
         </CardHeader>
         <CardContent>
             @if (result is null)
@@ -44,20 +76,29 @@
                             <TableHead>Tür</TableHead>
                             <TableHead>E-posta</TableHead>
                             <TableHead>Telefon</TableHead>
-                            <TableHead>Kimlik no</TableHead>
+                            <TableHead>İl</TableHead>
+                            <TableHead>Etiketler</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         @foreach (var item in result.Items)
                         {
                             <TableRow @key="item.Id">
-                                <TableCell Class="font-medium">@item.DisplayName</TableCell>
+                                <TableCell Class="font-medium"><a class="hover:underline" href="contacts/@item.Id">@item.DisplayName</a></TableCell>
                                 <TableCell>
-                                    <Badge Variant="@(item.Type == ContactType.Person ? BadgeVariant.Secondary : BadgeVariant.Outline)">@TypeLabel(item.Type)</Badge>
+                                    <Badge Variant="@(item.Type == ContactType.Person ? BadgeVariant.Secondary : BadgeVariant.Outline)">@ContactLabels.Type(item.Type)</Badge>
                                 </TableCell>
                                 <TableCell>@item.Email</TableCell>
                                 <TableCell>@item.Phone</TableCell>
-                                <TableCell Class="font-mono text-xs">@item.MaskedNationalId</TableCell>
+                                <TableCell>@item.City</TableCell>
+                                <TableCell>
+                                    <div class="flex flex-wrap gap-1">
+                                        @foreach (var tag in item.Tags)
+                                        {
+                                            <TagBadge Tag="tag" />
+                                        }
+                                    </div>
+                                </TableCell>
                             </TableRow>
                         }
                     </TableBody>
@@ -77,16 +118,49 @@
     private const int PageSize = 25;
 
     private PagedResult<ContactListItem>? result;
-    private string? search;
+    private IReadOnlyList<TagDto> tags = [];
+    private IReadOnlyList<GroupDto> groups = [];
+    private string? search, type, tagId, groupId;
     private int currentPage = 1;
 
     private int PageCount => result is null ? 1 : Math.Max(1, (int)Math.Ceiling(result.Total / (double)PageSize));
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    private ContactFilter Filter => new(
+        search,
+        Enum.TryParse<ContactType>(type, out var t) ? t : null,
+        Guid.TryParse(tagId, out var tag) ? tag : null,
+        Guid.TryParse(groupId, out var g) ? g : null);
 
-    private Task OnSearchChanged(string? value)
+    private string ExportUrl
     {
-        search = value;
+        get
+        {
+            var f = Filter;
+            var query = new List<string>();
+            if (!string.IsNullOrWhiteSpace(f.Search)) query.Add("search=" + Uri.EscapeDataString(f.Search));
+            if (f.Type is not null) query.Add("type=" + f.Type);
+            if (f.TagId is not null) query.Add("tagId=" + f.TagId);
+            if (f.GroupId is not null) query.Add("groupId=" + f.GroupId);
+            return "api/v1/contacts/export" + (query.Count > 0 ? "?" + string.Join("&", query) : "");
+        }
+    }
+
+    [SupplyParameterFromQuery(Name = "group")] private string? GroupQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tag")] private string? TagQuery { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        groupId = GroupQuery;
+        tagId = TagQuery;
+        tags = await Taxonomy.TagsAsync();
+        groups = await Taxonomy.GroupsAsync();
+        await LoadAsync();
+    }
+
+    private Task FilterAsync(Action apply)
+    {
+        apply();
         currentPage = 1;
         return LoadAsync();
     }
@@ -97,12 +171,5 @@
         return LoadAsync();
     }
 
-    private async Task LoadAsync() => result = await Contacts.ListAsync(search, currentPage, PageSize);
-
-    private static string TypeLabel(ContactType type) => type switch
-    {
-        ContactType.Organization => "Kurum",
-        ContactType.Household => "Hane",
-        _ => "Kişi",
-    };
+    private async Task LoadAsync() => result = await Contacts.ListAsync(Filter, currentPage, PageSize);
 }
