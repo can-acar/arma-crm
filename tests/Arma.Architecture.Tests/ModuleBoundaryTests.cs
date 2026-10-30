@@ -28,8 +28,29 @@ public class ModuleBoundaryTests
         Types.InAssembly(ContactsContracts).ShouldNot().HaveDependencyOnAny("Microsoft.EntityFrameworkCore", "Arma.Modules.Contacts.Domain", "Arma.Modules.Contacts.Infrastructure")
             .GetResult().IsSuccessful.ShouldBeTrue();
 
-    [Fact]
-    public void Contacts_module_does_not_depend_on_host() =>
-        Types.InAssembly(typeof(Arma.Modules.Contacts.ContactsModule).Assembly).ShouldNot().HaveDependencyOn("Arma.Host")
+    public static TheoryData<string> ModuleAssemblies => new(Modules.Keys);
+
+    private static readonly Dictionary<string, Assembly> Modules = new()
+    {
+        ["Arma.Modules.Contacts"] = typeof(Arma.Modules.Contacts.ContactsModule).Assembly,
+        ["Arma.Modules.Identity"] = typeof(Arma.Modules.Identity.IdentityModule).Assembly,
+    };
+
+    [Theory]
+    [MemberData(nameof(ModuleAssemblies))]
+    public void Modules_do_not_depend_on_host(string module) =>
+        Types.InAssembly(Modules[module]).ShouldNot().HaveDependencyOn("Arma.Host")
             .GetResult().IsSuccessful.ShouldBeTrue();
+
+    /// <summary>Bir modül başka bir modüle yalnızca onun Contracts paketi üzerinden bağlanabilir.</summary>
+    [Theory]
+    [MemberData(nameof(ModuleAssemblies))]
+    public void Modules_only_use_other_modules_through_contracts(string module)
+    {
+        string[] internals = [.. Modules.Keys.Where(m => m != module)
+            .SelectMany(m => new[] { $"{m}.Domain", $"{m}.Application", $"{m}.Infrastructure", $"{m}.Web" })];
+
+        Types.InAssembly(Modules[module]).ShouldNot().HaveDependencyOnAny(internals)
+            .GetResult().IsSuccessful.ShouldBeTrue();
+    }
 }

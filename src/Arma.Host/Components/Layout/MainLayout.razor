@@ -11,8 +11,10 @@
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">
-        <header class="flex h-14 items-center border-b px-6 md:hidden">
-            <span class="font-semibold">Arma CRM</span>
+        <header class="flex h-14 items-center justify-between gap-4 border-b px-6">
+            <span class="font-semibold md:hidden">Arma CRM</span>
+            <span class="hidden md:block"></span>
+            <UserMenu />
         </header>
         <main class="flex-1 p-6">
             @Body

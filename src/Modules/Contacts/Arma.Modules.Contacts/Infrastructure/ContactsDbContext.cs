@@ -1,11 +1,10 @@
 using Arma.Modules.Contacts.Domain;
-using Arma.SharedKernel.Domain;
 using Arma.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace Arma.Modules.Contacts.Infrastructure;
 
-public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> options, ITenantContext tenant, TimeProvider clock)
+public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> options, ITenantContext tenant)
     : DbContext(options)
 {
     public const string Schema = "contacts";
@@ -39,24 +38,5 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
 
             entity.HasQueryFilter(c => c.TenantId == tenantId && !c.IsDeleted);
         });
-    }
-
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        var now = clock.GetUtcNow();
-        foreach (var entry in ChangeTracker.Entries<Entity>())
-        {
-            if (entry.State == EntityState.Added)
-            {
-                entry.Entity.TenantId = tenantId;
-                entry.Entity.CreatedAt = now;
-            }
-            else if (entry.State == EntityState.Modified)
-            {
-                entry.Entity.UpdatedAt = now;
-            }
-        }
-
-        return base.SaveChangesAsync(cancellationToken);
     }
 }

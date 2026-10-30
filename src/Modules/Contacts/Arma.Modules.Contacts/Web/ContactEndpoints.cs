@@ -10,7 +10,7 @@ internal static class ContactEndpoints
 {
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/v1/contacts").WithTags("Kişiler");
+        var group = endpoints.MapGroup("/api/v1/contacts").WithTags("Kişiler").RequireAuthorization(ContactsPermissions.Read);
 
         group.MapGet("/", (ContactService service, string? search, int page = 1, int pageSize = 25, CancellationToken ct = default) =>
             service.ListAsync(search, page, pageSize, ct));
@@ -19,10 +19,12 @@ internal static class ContactEndpoints
             await service.FindAsync(id, ct) is { } contact ? Results.Ok(contact) : Results.NotFound());
 
         group.MapPost("/people", async (ContactService service, CreatePersonRequest request, CancellationToken ct) =>
-            ToResponse(await service.CreatePersonAsync(request, ct)));
+            ToResponse(await service.CreatePersonAsync(request, ct)))
+            .RequireAuthorization(ContactsPermissions.Write);
 
         group.MapPost("/organizations", async (ContactService service, CreateOrganizationRequest request, CancellationToken ct) =>
-            ToResponse(await service.CreateOrganizationAsync(request, ct)));
+            ToResponse(await service.CreateOrganizationAsync(request, ct)))
+            .RequireAuthorization(ContactsPermissions.Write);
     }
 
     private static IResult ToResponse(Result<Guid> result) => result.IsSuccess

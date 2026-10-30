@@ -1,5 +1,6 @@
 @page "/contacts"
 @rendermode InteractiveServer
+@attribute [Authorize(Policy = ContactsPermissions.Read)]
 @inject ContactService Contacts
 
 <PageTitle>Kişiler · Arma CRM</PageTitle>

@@ -3,8 +3,8 @@
 Türkiye için geliştirilen, kurumun kendi sunucusuna kurulan, genel amaçlı açık mimarili CRM.
 Ürün ve teknik plan: [Arma CRM: Ürün ve Teknik Plan](https://claude.ai/code/artifact/dbdc5b76-403a-4e02-ae8f-15fadaf086ba).
 
-Bu depo şu an **Faz 0 (Temel)** aşamasında: çözüm iskeleti, `Arma.UI` bileşen kütüphanesi,
-ilk modül (Kişiler), PostgreSQL + kurum yalıtımı, testler ve kurulum paketi.
+Tamamlanan: çözüm iskeleti, `Arma.UI` bileşen kütüphanesi, Kişiler modülü, PostgreSQL + kurum yalıtımı,
+kimlik doğrulama (parola, zorunlu 2FA, roller ve izinler, API istemcileri), testler ve kurulum paketi.
 
 ## Teknoloji
 
@@ -23,15 +23,18 @@ ilk modül (Kişiler), PostgreSQL + kurum yalıtımı, testler ve kurulum paketi
 src/
   Arma.Host/              ASP.NET Core giriş noktası: Blazor, API, modül kaydı, Tailwind derlemesi
   Arma.UI/                shadcn/ui tarzı Razor bileşenleri (Button, Card, Input, Table, Badge, Alert...)
-  Arma.SharedKernel/      Entity, Result, kurum bağlamı, IModule sözleşmesi
+  Arma.SharedKernel/      Entity, Result, kurum bağlamı, IModule sözleşmesi, izin tanımları
+  Arma.Infrastructure/    Modüllerin ortak altyapısı: kiracı bağlantısı, kayıt damgaları, geçerli kullanıcı
   Arma.ServiceDefaults/   OpenTelemetry, sağlık kontrolleri, dayanıklı HTTP istemcileri
   Arma.AppHost/           .NET Aspire ile yerel geliştirme ortamı
   Modules/
     Contacts/             Kişiler modülü (Domain, Application, Infrastructure, Web) + Contracts
+    Identity/             Kullanıcılar, roller, izinler, 2FA, API istemcileri (Identity + OpenIddict)
 tests/
   Arma.Modules.Contacts.Tests/   TCKN/VKN kontrolleri, kişi kuralları
   Arma.UI.Tests/                 bileşen testleri (bUnit)
   Arma.Architecture.Tests/       modül sınırı kuralları
+  Arma.IntegrationTests/         uygulamayı gerçek PostgreSQL ile çalıştıran testler
 deploy/                   Linux kurulum paketi (Docker Compose + install.sh)
 ```
 
@@ -60,6 +63,13 @@ dotnet run --project src/Arma.Host
 dotnet test --solution Arma.slnx
 ```
 
+Entegrasyon testleri PostgreSQL ister; her test sınıfı geçici bir veritabanı açıp siler. Bağlantıyı
+veritabanı oluşturma yetkisi olan bir kullanıcıyla verin, verilmezse bu testler atlanır:
+
+```bash
+export ARMA_TEST_CONNECTION="Host=localhost;Database=postgres;Username=arma;Password=<parola>"
+```
+
 **Yeni migration (örnek: Kişiler modülü):**
 
 ```bash
@@ -78,6 +88,21 @@ cd deploy
 önce `migrate` servisini, sonra uygulamayı başlatır. Güncellemede aynı komut yeterlidir.
 `.env` dosyasını yedekleyin.
 
+## Kimlik ve yetki
+
+- İlk açılışta `/setup` ekranı ilk yöneticiyi oluşturur. Kullanıcı olmadan başka sayfa açılmaz.
+- Yönetici rolündekiler iki adımlı doğrulamayı (TOTP: Google/Microsoft Authenticator) açmadan çalışamaz.
+  Her rol için 2FA zorunluluğu Roller ekranından açılabilir.
+- 5 hatalı parola denemesinde hesap 15 dakika kilitlenir. Oturum 60 dakika işlem yapılmazsa kapanır
+  (`Arma:Security:SessionTimeoutMinutes`).
+- Yetki izin bazlıdır (`contacts.read`, `users.manage` gibi). Her modül kendi izinlerini `IModule.Permissions`
+  ile tanımlar; Yönetici rolü yeni modüllerin izinlerini de otomatik alır.
+- Başka sistemler API'ye OAuth2 istemci kimlik bilgileriyle erişir: Yönetim > API istemcileri ekranından
+  istemci oluşturulur, `POST /connect/token` (`grant_type=client_credentials`) ile belirteç alınır ve
+  `Authorization: Bearer` başlığıyla gönderilir. İstemci yalnızca kendisine verilen izinleri kullanabilir.
+- Oturum ve belirteç anahtarları veritabanında (`identity.data_protection_keys`) saklanır; konteyner
+  yeniden başlasa da oturumlar düşmez.
+
 ## Mimari kurallar
 
 - Her modül kendi PostgreSQL şemasını kullanır; başka modülün tablosuna yazmaz.
@@ -91,7 +116,7 @@ cd deploy
 
 ## Sıradaki adımlar (Faz 0'dan kalanlar)
 
-- Kimlik ve yetki: ASP.NET Core Identity + OpenIddict, 2FA. **Şu an API ve sayfalarda kimlik doğrulaması yok.**
+- Denetim izi (AuditLog) ve hassas alanların şifrelenmesi.
 - `Arma.UI`: Dialog, Select, Combobox, Dropdown Menu, Sheet, Tabs, Toast, Data Table.
 - Wolverine ile modüller arası olaylar ve outbox.
 - Windows Server (IIS) kurulum paketi.

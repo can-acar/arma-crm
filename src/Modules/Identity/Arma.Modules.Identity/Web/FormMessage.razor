@@ -1,0 +1,15 @@
+@* Sunucu tarafı formlarda hata veya bilgi mesajı. *@
+@if (!string.IsNullOrEmpty(Error))
+{
+    <Alert Variant="AlertVariant.Destructive"><AlertDescription>@Error</AlertDescription></Alert>
+}
+else if (!string.IsNullOrEmpty(Info))
+{
+    <Alert><AlertDescription>@Info</AlertDescription></Alert>
+}
+
+@code {
+    [Parameter] public string? Error { get; set; }
+
+    [Parameter] public string? Info { get; set; }
+}
