@@ -1,5 +1,6 @@
 using System.Net;
 using Arma.Modules.Activities.Application;
+using Arma.Modules.Comms.Senders;
 using Arma.Modules.Contacts.Application;
 using Arma.Modules.Giving.Application;
 using Arma.Modules.Giving.Domain;
@@ -126,6 +127,13 @@ public sealed class GivingTests(ArmaAppFactory factory) : IClassFixture<ArmaAppF
         // Aynı bildirim tekrar gelirse sonuç değişmez.
         var replay = await client.PostAsync("/api/v1/payments/test/callback", Form(order, "150", "success", signature), ct);
         replay.Headers.Location!.ToString().ShouldContain("/bagis/tesekkurler");
+
+        // Teşekkür e-postası yalnızca bir kez gider.
+        var sink = factory.Services.GetRequiredService<TestMessageSink>();
+        var thanks = await EventuallyAsync(() => Task.FromResult(sink.Sent.Where(m => m.To == "online@example.org").ToList()), m => m.Count > 0);
+        await Task.Delay(1000, ct);
+        sink.Sent.Count(m => m.To == "online@example.org").ShouldBe(1);
+        thanks.Single().Body.ShouldContain("150,00 TL tutarındaki bağışınız");
     }
 
     [Fact]

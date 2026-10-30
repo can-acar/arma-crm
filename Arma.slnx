@@ -16,6 +16,10 @@
     <Project Path="src/Modules/Audit/Arma.Modules.Audit.Contracts/Arma.Modules.Audit.Contracts.csproj" />
     <Project Path="src/Modules/Audit/Arma.Modules.Audit/Arma.Modules.Audit.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Comms/">
+    <Project Path="src/Modules/Comms/Arma.Modules.Comms.Contracts/Arma.Modules.Comms.Contracts.csproj" />
+    <Project Path="src/Modules/Comms/Arma.Modules.Comms/Arma.Modules.Comms.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Contacts/">
     <Project Path="src/Modules/Contacts/Arma.Modules.Contacts.Contracts/Arma.Modules.Contacts.Contracts.csproj" />
     <Project Path="src/Modules/Contacts/Arma.Modules.Contacts/Arma.Modules.Contacts.csproj" />

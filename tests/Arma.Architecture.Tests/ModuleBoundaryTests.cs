@@ -16,6 +16,7 @@ public class ModuleBoundaryTests
     private static readonly Dictionary<string, Assembly> Contracts = new()
     {
         ["Arma.Modules.Activities"] = typeof(Arma.Modules.Activities.Contracts.RecordTimelineEntry).Assembly,
+        ["Arma.Modules.Comms"] = typeof(Arma.Modules.Comms.Contracts.SendTransactionalEmail).Assembly,
         ["Arma.Modules.Contacts"] = typeof(IContactDirectory).Assembly,
         ["Arma.Modules.Identity"] = typeof(Arma.Modules.Identity.Contracts.IUserDirectory).Assembly,
     };
@@ -42,6 +43,7 @@ public class ModuleBoundaryTests
     {
         ["Arma.Modules.Activities"] = typeof(Arma.Modules.Activities.ActivitiesModule).Assembly,
         ["Arma.Modules.Audit"] = typeof(Arma.Modules.Audit.AuditModule).Assembly,
+        ["Arma.Modules.Comms"] = typeof(Arma.Modules.Comms.CommsModule).Assembly,
         ["Arma.Modules.Contacts"] = typeof(Arma.Modules.Contacts.ContactsModule).Assembly,
         ["Arma.Modules.Giving"] = typeof(Arma.Modules.Giving.GivingModule).Assembly,
         ["Arma.Modules.Identity"] = typeof(Arma.Modules.Identity.IdentityModule).Assembly,

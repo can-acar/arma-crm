@@ -268,7 +268,7 @@ public sealed class DonationService(
     }
 
     /// <summary>Kaydı kaydeder ve kişinin zaman çizelgesini aynı işlemde günceller.</summary>
-    internal async Task SaveWithTimelineAsync(Donation donation, CancellationToken cancellationToken)
+    internal async Task SaveWithTimelineAsync(Donation donation, CancellationToken cancellationToken, object? alsoPublish = null)
     {
         outbox.Enroll(db);
         object message = donation.Status is DonationStatus.Completed or DonationStatus.Refunded
@@ -276,6 +276,11 @@ public sealed class DonationService(
                 donation.Note, ToTimestamp(donation.ReceivedOn), SourceModule, donation.Id.ToString())
             : new RemoveTimelineEntry(SourceModule, donation.Id.ToString());
         await outbox.PublishAsync(message);
+        if (alsoPublish is not null)
+        {
+            await outbox.PublishAsync(alsoPublish);
+        }
+
         await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
     }
 
