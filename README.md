@@ -27,7 +27,7 @@ src/
   Arma.ServiceDefaults/   OpenTelemetry, sağlık kontrolleri, dayanıklı HTTP istemcileri
   Arma.AppHost/           .NET Aspire ile yerel geliştirme ortamı
   Modules/
-    Identity/             Kullanıcılar, roller, giriş/çıkış (ASP.NET Core Identity, çerez oturumu)
+    Identity/             Kullanıcılar, roller, giriş/çıkış, iki adımlı doğrulama (ASP.NET Core Identity, çerez oturumu)
     Contacts/             Kişiler modülü (Domain, Application, Infrastructure, Web) + Contracts
 tests/
   Arma.Modules.Contacts.Tests/   TCKN/VKN kontrolleri, kişi kuralları
@@ -61,6 +61,9 @@ dotnet run --project src/Arma.Host
 ```bash
 dotnet run --project src/Arma.Host -- create-admin admin@ornek.com.tr "Ad Soyad"
 ```
+
+Giriş yaptıktan sonra kenar çubuğundaki **Hesap güvenliği** sayfasından iki adımlı doğrulama
+(Google/Microsoft Authenticator gibi TOTP uygulamaları) açılabilir; açılışta 10 kurtarma kodu bir kez gösterilir.
 
 **Testler:**
 
@@ -110,7 +113,7 @@ docker compose run --rm -it migrate create-admin admin@ornek.com.tr "Ad Soyad"
 
 ## Sıradaki adımlar (Faz 0'dan kalanlar)
 
-- Kimlik: 2FA (TOTP) sayfaları, kullanıcı yönetimi ekranı, parola sıfırlama (e-posta altyapısı gerekiyor).
+- Kimlik: kurum genelinde 2FA zorunluluğu, kullanıcı yönetimi ekranı, parola sıfırlama (e-posta altyapısı gerekiyor).
 - Kimlik: dış istemciler için OpenIddict ile token tabanlı API erişimi.
 - Kimlik tabloları için Row Level Security (şu an yalnızca EF sorgu filtresi var) ve kayıtların
   `created_by` / `updated_by` alanlarının oturumdaki kullanıcıdan doldurulması.

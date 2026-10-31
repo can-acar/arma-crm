@@ -39,6 +39,16 @@ public class AuthenticationTests(AuthenticationTests.HostFactory factory) : ICla
     }
 
     [Fact]
+    public async Task Security_page_requires_session()
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/account/security", TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+    }
+
+    [Fact]
     public async Task Liveness_check_is_public()
     {
         var response = await factory.CreateClient().GetAsync("/alive", TestContext.Current.CancellationToken);

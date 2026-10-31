@@ -11,6 +11,7 @@
         <div class="mt-auto p-2">
             <AuthorizeView>
                 <div class="text-muted-foreground truncate px-2 pb-2 text-xs">@context.User.Identity?.Name</div>
+                <Button Href="account/security" Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" Class="w-full justify-start">Hesap güvenliği</Button>
                 <form method="post" action="account/logout">
                     <AntiforgeryToken />
                     <Button Type="submit" Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" Class="w-full justify-start">Çıkış yap</Button>

@@ -59,8 +59,13 @@
         var result = await SignIn.PasswordSignInAsync(Form.Email ?? "", Form.Password ?? "", Form.RememberMe, lockoutOnFailure: true);
         if (result.Succeeded)
         {
-            // Yalnızca site içi adreslere dönülür (açık yönlendirme engeli).
-            Navigation.NavigateTo(IsLocal(ReturnUrl) ? ReturnUrl! : "/", forceLoad: true);
+            Navigation.NavigateTo(LocalUrl.OrHome(ReturnUrl), forceLoad: true);
+            return;
+        }
+
+        if (result.RequiresTwoFactor)
+        {
+            Navigation.NavigateTo($"account/login-2fa?returnUrl={Uri.EscapeDataString(LocalUrl.OrHome(ReturnUrl))}&rememberMe={Form.RememberMe}", forceLoad: true);
             return;
         }
 
@@ -68,9 +73,6 @@
             ? "Çok fazla hatalı deneme yapıldı. Hesap bir süre kilitlendi."
             : "E-posta veya parola hatalı.";
     }
-
-    private static bool IsLocal(string? url) =>
-        !string.IsNullOrEmpty(url) && url[0] == '/' && (url.Length == 1 || (url[1] != '/' && url[1] != '\\'));
 
     private sealed class LoginForm
     {

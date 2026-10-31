@@ -1,0 +1,103 @@
+@page "/account/login-2fa"
+@attribute [AllowAnonymous]
+@layout EmptyLayout
+@inject SignInManager<ArmaUser> SignIn
+@inject NavigationManager Navigation
+
+<PageTitle>İki adımlı doğrulama · Arma CRM</PageTitle>
+
+<div class="flex min-h-svh items-center justify-center p-6">
+    <Card Class="w-full max-w-sm">
+        <CardHeader>
+            <CardTitle>İki adımlı doğrulama</CardTitle>
+            <CardDescription>
+                @(UseRecoveryCode ? "Kurtarma kodlarınızdan birini girin." : "Kimlik doğrulayıcı uygulamanızdaki 6 haneli kodu girin.")
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <form method="post" class="grid gap-4" @formname="login-2fa" @onsubmit="VerifyAsync">
+                <AntiforgeryToken />
+                <div class="grid gap-2">
+                    <Label For="code">@(UseRecoveryCode ? "Kurtarma kodu" : "Doğrulama kodu")</Label>
+                    <Input id="code" name="Form.Code" autocomplete="one-time-code" inputmode="@(UseRecoveryCode ? "text" : "numeric")" autofocus required />
+                </div>
+                @if (!UseRecoveryCode)
+                {
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="Form.RememberMachine" value="true" />
+                        Bu cihazı hatırla
+                    </label>
+                }
+
+                @if (error is not null)
+                {
+                    <Alert Variant="AlertVariant.Destructive">
+                        <AlertTitle>Doğrulanamadı</AlertTitle>
+                        <AlertDescription>@error</AlertDescription>
+                    </Alert>
+                }
+
+                <Button Type="submit">Doğrula</Button>
+                <Button Variant="ButtonVariant.Link" Size="ButtonSize.Sm" Href="@SwitchModeHref">
+                    @(UseRecoveryCode ? "Doğrulayıcı kodu kullan" : "Kurtarma kodu kullan")
+                </Button>
+            </form>
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private string? error;
+
+    [SupplyParameterFromForm]
+    private TwoFactorForm Form { get; set; } = default!;
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    private bool RememberMe { get; set; }
+
+    [SupplyParameterFromQuery(Name = "recovery")]
+    private bool UseRecoveryCode { get; set; }
+
+    private string SwitchModeHref =>
+        $"account/login-2fa?returnUrl={Uri.EscapeDataString(LocalUrl.OrHome(ReturnUrl))}&rememberMe={RememberMe}&recovery={!UseRecoveryCode}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Form ??= new();
+
+        // Parola adımı geçilmeden bu sayfaya gelinmez.
+        if (await SignIn.GetTwoFactorAuthenticationUserAsync() is null)
+        {
+            Navigation.NavigateTo(IdentityModule.LoginPath, forceLoad: true);
+        }
+    }
+
+    private async Task VerifyAsync()
+    {
+        // Kurtarma kodları tireyle saklanır; doğrulayıcı kodundaki boşluk ve tireler atılır.
+        var code = (Form.Code ?? "").Replace(" ", "");
+        var result = UseRecoveryCode
+            ? await SignIn.TwoFactorRecoveryCodeSignInAsync(code)
+            : await SignIn.TwoFactorAuthenticatorSignInAsync(code.Replace("-", ""), RememberMe, Form.RememberMachine);
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo(LocalUrl.OrHome(ReturnUrl), forceLoad: true);
+            return;
+        }
+
+        error = result.IsLockedOut
+            ? "Çok fazla hatalı deneme yapıldı. Hesap bir süre kilitlendi."
+            : "Kod geçersiz.";
+    }
+
+    private sealed class TwoFactorForm
+    {
+        public string? Code { get; set; }
+
+        public bool RememberMachine { get; set; }
+    }
+}
