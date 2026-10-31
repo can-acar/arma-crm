@@ -1,0 +1,139 @@
+@page "/donations/recurring"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = GivingPermissions.Read)]
+@inject RecurringDonationService Recurring
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Düzenli bağışlar · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Düzenli bağışlar</h1>
+        <p class="text-muted-foreground text-sm">Bağış formunda "Her ay tekrarla" seçilerek başlatılan bağışlar. Her ay aynı gün kayıtlı karttan çekilir; başarısız tahsilat üç gün sonra yeniden denenir, üst üste @RecurringDonation.MaxFailures başarısızlıkta durur.</p>
+    </div>
+
+    @if (items is not null)
+    {
+        <div class="grid gap-4 sm:grid-cols-3">
+            <Card><CardHeader><CardDescription>Etkin</CardDescription><CardTitle Class="text-lg">@items.Count(r => r.Status == RecurringStatus.Active)</CardTitle></CardHeader></Card>
+            <Card><CardHeader><CardDescription>Aylık toplam</CardDescription><CardTitle Class="text-lg">@Money.Format(items.Where(r => r.Status == RecurringStatus.Active && r.Currency == "TRY").Sum(r => r.Amount), "TRY")</CardTitle></CardHeader></Card>
+            <Card><CardHeader><CardDescription>Durmuş</CardDescription><CardTitle Class="@(items.Any(r => r.Status == RecurringStatus.Paused) ? "text-destructive text-lg" : "text-lg")">@items.Count(r => r.Status == RecurringStatus.Paused)</CardTitle></CardHeader></Card>
+        </div>
+    }
+
+    <div class="flex flex-wrap gap-2">
+        @foreach (var (key, label) in Filters)
+        {
+            <Button Size="ButtonSize.Sm" Variant="@(State == key ? ButtonVariant.Default : ButtonVariant.Outline)" OnClick="() => Select(key)">@label</Button>
+        }
+    </div>
+
+    <FormAlert Error="@error" />
+
+    <Card>
+        <CardContent>
+            @if (shown is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (shown.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Bu durumda düzenli bağış yok.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Bağışçı</TableHead>
+                            <TableHead Class="text-right">Aylık</TableHead>
+                            <TableHead>Fon</TableHead>
+                            <TableHead>Kart</TableHead>
+                            <TableHead>Sıradaki</TableHead>
+                            <TableHead Class="text-right">Toplanan</TableHead>
+                            <TableHead>Durum</TableHead>
+                            <TableHead><span class="sr-only">İşlem</span></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var row in shown)
+                        {
+                            <TableRow>
+                                <TableCell><a class="hover:underline" href="contacts/@row.ContactId">@row.ContactName</a></TableCell>
+                                <TableCell Class="text-right tabular-nums">@Money.Format(row.Amount, row.Currency)</TableCell>
+                                <TableCell>@(row.FundName ?? "Genel")</TableCell>
+                                <TableCell>
+                                    <div>@(row.CardLabel ?? "—")</div>
+                                    <div class="text-muted-foreground text-xs">@row.Provider</div>
+                                </TableCell>
+                                <TableCell>
+                                    @(row.NextChargeOn is { } next ? GivingLabels.Date(next) : "—")
+                                    @if (row.LastError is not null)
+                                    {
+                                        <div class="text-destructive text-xs">@row.FailureCount. deneme başarısız: @row.LastError</div>
+                                    }
+                                </TableCell>
+                                <TableCell Class="text-right tabular-nums">@Money.Format(row.PaidTotal, row.Currency) <span class="text-muted-foreground text-xs">(@row.PaymentCount)</span></TableCell>
+                                <TableCell><Badge Variant="GivingLabels.RecurringVariant(row.Status)">@GivingLabels.Recurring(row.Status)</Badge></TableCell>
+                                <TableCell Class="text-right">
+                                    @if (canWrite && row.Status == RecurringStatus.Paused)
+                                    {
+                                        <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="() => ResumeAsync(row.Id)">Yeniden başlat</Button>
+                                    }
+                                    @if (canWrite && row.Status is RecurringStatus.Active or RecurringStatus.Paused)
+                                    {
+                                        <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => CancelAsync(row.Id)">Durdur</Button>
+                                    }
+                                </TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private static readonly (string Key, string Label)[] Filters = [("active", "Etkin"), ("paused", "Durmuş"), ("cancelled", "Durdurulan"), ("all", "Tümü")];
+
+    private IReadOnlyList<RecurringDonationView>? items, shown;
+    private bool canWrite;
+    private string? error;
+
+    [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
+
+    protected override void OnInitialized() => canWrite = CurrentUser.HasPermission(GivingPermissions.Write);
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        State ??= "active";
+        items = await Recurring.ListAsync();
+        shown = State switch
+        {
+            "paused" => [.. items.Where(r => r.Status == RecurringStatus.Paused)],
+            "cancelled" => [.. items.Where(r => r.Status == RecurringStatus.Cancelled)],
+            "all" => items,
+            _ => [.. items.Where(r => r.Status == RecurringStatus.Active)],
+        };
+    }
+
+    private void Select(string key) => Navigation.NavigateTo($"donations/recurring?state={key}");
+
+    private async Task CancelAsync(Guid id)
+    {
+        var result = await Recurring.CancelAsync(id);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+
+    private async Task ResumeAsync(Guid id)
+    {
+        var result = await Recurring.ResumeAsync(id);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+}

@@ -1,0 +1,113 @@
+@page "/sales/quotes/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = SalesPermissions.Read)]
+@inject QuoteService Quotes
+@inject SalesService Sales
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Teklif @quote?.Number · Arma CRM</PageTitle>
+
+@if (loaded && quote is null)
+{
+    <Alert><AlertTitle>Teklif bulunamadı</AlertTitle><AlertDescription>Silinmiş olabilir.</AlertDescription></Alert>
+}
+else if (quote is not null)
+{
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <a class="text-muted-foreground text-sm hover:underline" href="sales/quotes">Teklifler</a>
+                <h1 class="flex items-center gap-2 text-2xl font-semibold tracking-tight">Teklif <span class="font-mono">@quote.Number</span> <QuoteBadge Status="quote.Status" Expired="quote.Expired(Sales.Today)" /></h1>
+                <p class="text-muted-foreground text-sm">
+                    <a class="hover:underline" href="contacts/@quote.ContactId">@quote.ContactName</a>
+                    @if (quote.OpportunityId is { } opp)
+                    {
+                        <span> · Fırsat: <a class="hover:underline" href="sales/@opp">@quote.OpportunityTitle</a></span>
+                    }
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <Button Variant="ButtonVariant.Outline" Href="@($"sales/quotes/{quote.Id}/print")" target="_blank">Yazdır / PDF</Button>
+                @if (CanWrite)
+                {
+                    @if (quote.Status is QuoteStatus.Draft or QuoteStatus.Sent)
+                    {
+                        <Button Variant="ButtonVariant.Outline" Href="@($"sales/quotes/{quote.Id}/edit")">Düzenle</Button>
+                    }
+                    @if (quote.Status == QuoteStatus.Draft)
+                    {
+                        <Button Variant="ButtonVariant.Outline" OnClick="() => SetAsync(QuoteStatus.Sent)">Gönderildi işaretle</Button>
+                        <Button Variant="ButtonVariant.Destructive" OnClick="DeleteAsync">Sil</Button>
+                    }
+                    @if (quote.Status == QuoteStatus.Sent)
+                    {
+                        <Button OnClick="() => SetAsync(QuoteStatus.Accepted)">Kabul edildi</Button>
+                        <Button Variant="ButtonVariant.Destructive" OnClick="() => SetAsync(QuoteStatus.Rejected)">Reddedildi</Button>
+                    }
+                    @if (quote.Status is QuoteStatus.Accepted or QuoteStatus.Rejected)
+                    {
+                        <Button Variant="ButtonVariant.Outline" OnClick="() => SetAsync(QuoteStatus.Sent)">Yanıtı geri al</Button>
+                    }
+                }
+            </div>
+        </div>
+
+        <FormAlert Error="@error" />
+
+        <Card>
+            <CardContent>
+                <dl class="mb-6 grid grid-cols-2 gap-y-1 text-sm sm:grid-cols-4">
+                    <dt class="text-muted-foreground">Teklif tarihi</dt><dd>@SalesLabels.Date(quote.IssuedOn)</dd>
+                    <dt class="text-muted-foreground">Geçerlilik</dt><dd>@SalesLabels.Date(quote.ValidUntil)</dd>
+                </dl>
+                <QuoteLinesTable Quote="quote" />
+                @if (quote.Terms is not null)
+                {
+                    <div class="mt-6 border-t pt-4">
+                        <h2 class="mb-1 text-sm font-semibold">Şartlar</h2>
+                        <p class="text-sm whitespace-pre-line">@quote.Terms</p>
+                    </div>
+                }
+            </CardContent>
+        </Card>
+    </div>
+}
+
+@code {
+    private QuoteView? quote;
+    private string? error;
+    private bool loaded;
+
+    [Parameter] public Guid Id { get; set; }
+
+    private bool CanWrite => CurrentUser.HasPermission(SalesPermissions.Write);
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        quote = await Quotes.GetAsync(Id);
+        loaded = true;
+    }
+
+    private async Task SetAsync(QuoteStatus status)
+    {
+        var result = await Quotes.SetStatusAsync(Id, status);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        var result = await Quotes.DeleteAsync(Id);
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("sales/quotes");
+        }
+        else
+        {
+            error = result.Error!.Message;
+        }
+    }
+}

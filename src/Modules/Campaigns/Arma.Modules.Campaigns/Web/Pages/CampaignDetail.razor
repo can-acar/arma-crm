@@ -1,0 +1,286 @@
+@page "/campaigns/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = CampaignsPermissions.Read)]
+@inject CampaignService Campaigns
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>@(item?.Name ?? "Kampanya") · Arma CRM</PageTitle>
+
+@if (loaded && item is null)
+{
+    <Alert><AlertTitle>Kampanya bulunamadı</AlertTitle><AlertDescription>Silinmiş veya hiç oluşturulmamış olabilir.</AlertDescription></Alert>
+}
+else if (item is not null && results is not null)
+{
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <a class="text-muted-foreground text-sm hover:underline" href="campaigns">Kampanyalar</a>
+                <h1 class="text-2xl font-semibold tracking-tight">@item.Name</h1>
+                <p class="text-muted-foreground flex items-center gap-2 text-sm">
+                    <StatusBadge Status="item.Status" /> @CampaignLabels.Period(item.StartOn, item.EndOn) · @(item.OwnerName ?? "Sorumlu atanmamış")
+                </p>
+            </div>
+            @if (CanWrite)
+            {
+                <div class="flex gap-2">
+                    <Button Variant="ButtonVariant.Outline" OnClick="() => editOpen = true">Düzenle</Button>
+                    <Button Variant="ButtonVariant.Outline" OnClick="OpenLinkAsync">Kayıt bağla</Button>
+                    <Button Variant="ButtonVariant.Destructive" OnClick="() => deleteOpen = true">Sil</Button>
+                </div>
+            }
+        </div>
+
+        <FormAlert Error="@error" />
+        @if (notice is not null)
+        {
+            <Alert><AlertDescription>@notice</AlertDescription></Alert>
+        }
+
+        @if (item.Description is not null)
+        {
+            <p class="text-sm whitespace-pre-line">@item.Description</p>
+        }
+
+        <div class="grid gap-4 sm:grid-cols-3">
+            <Card>
+                <CardHeader><CardDescription>Toplanan</CardDescription><CardTitle Class="text-2xl tabular-nums">@CampaignLabels.Money(results.Raised)</CardTitle></CardHeader>
+                @if (item.GoalAmount is { } goal)
+                {
+                    <CardContent><GoalProgress Raised="results.Raised" Goal="goal" /></CardContent>
+                }
+            </Card>
+            <Card>
+                <CardHeader><CardDescription>Ulaşılan kişi</CardDescription><CardTitle Class="text-2xl tabular-nums">@results.ReachedContacts.ToString("N0")</CardTitle></CardHeader>
+                <CardContent>
+                    <p class="text-muted-foreground text-xs">Bağış yapan, kaydolan, e-posta alan veya form dolduran tekil kişiler.</p>
+                    @if (CanWrite && results.ReachedContacts > 0)
+                    {
+                        <Button Class="mt-3" Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="OpenGroupAsync">Gruba ekle</Button>
+                    }
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader><CardDescription>Bağlı kayıt</CardDescription><CardTitle Class="text-2xl tabular-nums">@results.Links.Count</CardTitle></CardHeader>
+            </Card>
+        </div>
+
+        <Card>
+            <CardHeader><CardTitle>Bağlı kayıtlar</CardTitle></CardHeader>
+            <CardContent>
+                @if (results.Links.Count == 0)
+                {
+                    <p class="text-muted-foreground text-sm">Kampanyaya henüz kayıt bağlanmadı. Bağış fonu, etkinlik, toplu ileti veya form bağlayın; sonuçlar burada toplanır.</p>
+                }
+                else
+                {
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Tür</TableHead>
+                                <TableHead>Kayıt</TableHead>
+                                <TableHead>Sonuç</TableHead>
+                                @if (CanWrite)
+                                {
+                                    <TableHead><span class="sr-only">İşlem</span></TableHead>
+                                }
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            @foreach (var link in results.Links)
+                            {
+                                <TableRow>
+                                    <TableCell Class="text-sm">@link.KindLabel</TableCell>
+                                    <TableCell>
+                                        @if (link.Href is not null)
+                                        {
+                                            <a class="font-medium hover:underline" href="@link.Href">@link.ItemName</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted-foreground">@link.ItemName</span>
+                                        }
+                                    </TableCell>
+                                    <TableCell Class="text-sm">
+                                        <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                            @foreach (var metric in link.Metrics)
+                                            {
+                                                <span><span class="text-muted-foreground">@metric.Label:</span> <span class="tabular-nums font-medium">@CampaignLabels.Value(metric)</span></span>
+                                            }
+                                        </div>
+                                    </TableCell>
+                                    @if (CanWrite)
+                                    {
+                                        <TableCell Class="text-right">
+                                            <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => UnlinkAsync(link.LinkId)">Bağı kaldır</Button>
+                                        </TableCell>
+                                    }
+                                </TableRow>
+                            }
+                        </TableBody>
+                    </Table>
+                }
+            </CardContent>
+        </Card>
+    </div>
+
+    <CampaignDialog @bind-Open="editOpen" Existing="item" OnSaved="_ => LoadAsync()" />
+
+    <Dialog Open="linkOpen" OpenChanged="v => linkOpen = v" Class="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>Kayıt bağla</DialogTitle>
+            <DialogDescription>Kampanyanın parçası olan fonu, etkinliği, toplu iletiyi veya formu seçin.</DialogDescription>
+        </DialogHeader>
+        <form id="link-form" class="grid gap-4" @onsubmit="LinkAsync" @onsubmit:preventDefault>
+            <div class="grid gap-2">
+                <Label for="link-kind">Tür</Label>
+                <NativeSelect id="link-kind" Value="@linkKind" ValueChanged="v => { linkKind = v; linkItem = null; }">
+                    @foreach (var option in options)
+                    {
+                        <option value="@option.Kind">@option.Label</option>
+                    }
+                </NativeSelect>
+            </div>
+            <div class="grid gap-2">
+                <Label for="link-item">Kayıt</Label>
+                <NativeSelect id="link-item" @bind-Value="linkItem">
+                    <option value="">Seçin</option>
+                    @foreach (var option in options.FirstOrDefault(o => o.Kind == linkKind)?.Items ?? [])
+                    {
+                        <option value="@option.Id">@option.Name</option>
+                    }
+                </NativeSelect>
+            </div>
+        </form>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => linkOpen = false">Vazgeç</Button>
+            <Button Type="submit" form="link-form" Disabled="@(!Guid.TryParse(linkItem, out _))">Bağla</Button>
+        </DialogFooter>
+    </Dialog>
+
+    <Dialog Open="groupOpen" OpenChanged="v => groupOpen = v" Class="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>Ulaşılan kişileri gruba ekle</DialogTitle>
+            <DialogDescription>@results.ReachedContacts.ToString("N0") kişi seçtiğiniz gruba eklenir; teşekkür iletisi veya sonraki kampanya için kullanabilirsiniz.</DialogDescription>
+        </DialogHeader>
+        <form id="group-form" class="grid gap-2" @onsubmit="AddToGroupAsync" @onsubmit:preventDefault>
+            <Label for="group-id">Grup</Label>
+            <NativeSelect id="group-id" @bind-Value="groupId">
+                <option value="">Seçin</option>
+                @foreach (var group in groups)
+                {
+                    <option value="@group.Id">@group.Name</option>
+                }
+            </NativeSelect>
+            @if (groups.Count == 0)
+            {
+                <p class="text-muted-foreground text-xs">Önce Kişiler &gt; Gruplar sayfasından bir grup oluşturun.</p>
+            }
+        </form>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => groupOpen = false">Vazgeç</Button>
+            <Button Type="submit" form="group-form" Disabled="@(!Guid.TryParse(groupId, out _))">Ekle</Button>
+        </DialogFooter>
+    </Dialog>
+
+    <Dialog Open="deleteOpen" OpenChanged="v => deleteOpen = v" Class="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>Kampanya silinsin mi?</DialogTitle>
+            <DialogDescription>Yalnızca kampanya ve bağları silinir. Bağış, kayıt ve gönderimler yerinde kalır.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => deleteOpen = false">Vazgeç</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="DeleteAsync">Sil</Button>
+        </DialogFooter>
+    </Dialog>
+}
+
+@code {
+    private CampaignView? item;
+    private CampaignResults? results;
+    private IReadOnlyList<SourceOption> options = [];
+    private IReadOnlyList<AudienceList> groups = [];
+    private string? linkKind, linkItem, groupId, error, notice;
+    private bool loaded, editOpen, linkOpen, groupOpen, deleteOpen;
+
+    [Parameter] public Guid Id { get; set; }
+
+    private bool CanWrite => CurrentUser.HasPermission(CampaignsPermissions.Write);
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        item = await Campaigns.GetAsync(Id);
+        results = item is null ? null : await Campaigns.ResultsAsync(Id);
+        loaded = true;
+    }
+
+    private async Task OpenLinkAsync()
+    {
+        options = await Campaigns.SourceOptionsAsync(CurrentUser.HasPermission);
+        (linkKind, linkItem, notice) = (options.FirstOrDefault()?.Kind, null, null);
+        linkOpen = true;
+    }
+
+    private async Task LinkAsync()
+    {
+        if (linkKind is null || !Guid.TryParse(linkItem, out var itemId))
+        {
+            return;
+        }
+
+        var result = await Campaigns.LinkAsync(Id, linkKind, itemId);
+        linkOpen = false;
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+
+    private async Task UnlinkAsync(Guid linkId)
+    {
+        var result = await Campaigns.UnlinkAsync(Id, linkId);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+
+    private async Task OpenGroupAsync()
+    {
+        groups = await Campaigns.GroupsAsync();
+        (groupId, notice) = (null, null);
+        groupOpen = true;
+    }
+
+    private async Task AddToGroupAsync()
+    {
+        if (!Guid.TryParse(groupId, out var group))
+        {
+            return;
+        }
+
+        var result = await Campaigns.AddReachedToGroupAsync(Id, group);
+        groupOpen = false;
+        if (result.IsSuccess)
+        {
+            (error, notice) = (null, $"{result.Value:N0} kişi gruba ekleniyor.");
+        }
+        else
+        {
+            error = result.Error!.Message;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        var result = await Campaigns.DeleteAsync(Id);
+        deleteOpen = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("campaigns");
+        }
+        else
+        {
+            error = result.Error!.Message;
+        }
+    }
+}

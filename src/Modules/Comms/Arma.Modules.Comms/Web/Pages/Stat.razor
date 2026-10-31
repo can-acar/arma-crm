@@ -1,0 +1,12 @@
+<Card>
+    <CardHeader>
+        <CardDescription>@Label</CardDescription>
+        <CardTitle Class="text-2xl tabular-nums">@Value</CardTitle>
+    </CardHeader>
+</Card>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    [Parameter] public int Value { get; set; }
+}

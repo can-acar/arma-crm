@@ -5,7 +5,42 @@ name: arma
 x-arma-env: &arma-env
   ConnectionStrings__arma: Host=postgres;Database=arma;Username=arma;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}
   Arma__TenantId: ${ARMA_TENANT_ID:?ARMA_TENANT_ID gerekli}
+  # Önünde HTTPS sonlandıran bir ters vekil (nginx, Caddy) varsa true yapın.
+  Arma__Security__TrustForwardedHeaders: ${ARMA_BEHIND_PROXY:-false}
+  # Yalnızca iç ağda, HTTPS olmadan çalışan kurulumlar için; API belirteç ucunu HTTP üzerinden açar.
+  Arma__Security__AllowHttp: ${ARMA_ALLOW_HTTP:-false}
   ASPNETCORE_ENVIRONMENT: Production
+  # Ekranda gösterilen ve formlarda girilen tarih-saatlerin saat dilimi.
+  TZ: ${ARMA_TIMEZONE:-Europe/Istanbul}
+  # Ödeme sağlayıcıları: anahtarları girilen sağlayıcı "Makbuz ve ödeme" ekranında listelenir ve bağış formunda
+  # seçenek olur. Anahtarlar yalnızca .env dosyasında tutulur. Eklentiyle gelen sağlayıcının ayarları da aynı
+  # biçimdedir: Payments__Providers__<anahtar>__<alan>.
+  Payments__Providers__iyzico__ApiKey: ${IYZICO_API_KEY:-}
+  Payments__Providers__iyzico__SecretKey: ${IYZICO_SECRET_KEY:-}
+  Payments__Providers__iyzico__BaseUrl: ${IYZICO_BASE_URL:-https://api.iyzipay.com}
+  Payments__Providers__paytr__MerchantId: ${PAYTR_MERCHANT_ID:-}
+  Payments__Providers__paytr__MerchantKey: ${PAYTR_MERCHANT_KEY:-}
+  Payments__Providers__paytr__MerchantSalt: ${PAYTR_MERCHANT_SALT:-}
+  Payments__Providers__paytr__TestMode: ${PAYTR_TEST_MODE:-false}
+  Comms__PublicUrl: ${ARMA_PUBLIC_URL:-}
+  Comms__Email__Provider: ${ARMA_EMAIL_PROVIDER:-none}
+  Comms__Email__Host: ${SMTP_HOST:-}
+  Comms__Email__Port: ${SMTP_PORT:-587}
+  Comms__Email__Security: ${SMTP_SECURITY:-auto}
+  Comms__Email__UserName: ${SMTP_USERNAME:-}
+  Comms__Email__Password: ${SMTP_PASSWORD:-}
+  Comms__Email__FromAddress: ${SMTP_FROM_ADDRESS:-}
+  Comms__Email__FromName: ${SMTP_FROM_NAME:-}
+  Comms__Sms__Provider: ${ARMA_SMS_PROVIDER:-none}
+  Comms__Sms__UserCode: ${NETGSM_USERCODE:-}
+  Comms__Sms__Password: ${NETGSM_PASSWORD:-}
+  Comms__Sms__Header: ${NETGSM_HEADER:-}
+  Comms__Iys__Enabled: ${IYS_ENABLED:-false}
+  Comms__Iys__BaseUrl: ${IYS_BASE_URL:-https://api.iys.org.tr}
+  Comms__Iys__UserName: ${IYS_USERNAME:-}
+  Comms__Iys__Password: ${IYS_PASSWORD:-}
+  Comms__Iys__IysCode: ${IYS_CODE:-}
+  Comms__Iys__BrandCode: ${IYS_BRAND_CODE:-}
 
 services:
   postgres:
@@ -30,6 +65,8 @@ services:
       context: ..
     command: ["migrate"]
     environment: *arma-env
+    volumes:
+      - ./plugins:/app/plugins:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,6 +76,9 @@ services:
     image: arma-crm:${ARMA_VERSION:-latest}
     restart: unless-stopped
     environment: *arma-env
+    # Eklentiler deploy/plugins altına, her biri kendi klasörüne kopyalanır (bkz. docs/eklentiler.md).
+    volumes:
+      - ./plugins:/app/plugins:ro
     ports:
       - "${ARMA_PORT:-8080}:8080"
     depends_on:

@@ -1,0 +1,208 @@
+@page "/admin/custom-fields"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = ContactsPermissions.Fields)]
+@inject CustomFieldService CustomFields
+
+<PageTitle>Kişi ek alanları · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Kişi ek alanları</h1>
+            <p class="text-muted-foreground text-sm">Kişi kartına kurumunuza özgü alanlar ekleyin (meslek, kan grubu, gönüllülük alanı gibi). Alanlar gelişmiş aramada ölçüt olarak da çıkar.</p>
+        </div>
+        <Button OnClick="() => Edit(null)">Alan ekle</Button>
+    </div>
+
+    <FormAlert Error="@error" />
+
+    <Card>
+        <CardContent>
+            @if (fields is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (fields.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Henüz ek alan yok.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Alan</TableHead>
+                            <TableHead>Tür</TableHead>
+                            <TableHead>Kayıtlar</TableHead>
+                            <TableHead Class="text-right">Dolu</TableHead>
+                            <TableHead>Durum</TableHead>
+                            <TableHead><span class="sr-only">İşlem</span></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var field in fields)
+                        {
+                            <TableRow>
+                                <TableCell Class="font-medium">@field.Label</TableCell>
+                                <TableCell Class="text-sm">@TypeLabel(field.Type)@(field.Type == CustomFieldType.Choice ? $" ({field.Options.Count})" : "")</TableCell>
+                                <TableCell Class="text-sm">@AppliesLabel(field.AppliesTo)</TableCell>
+                                <TableCell Class="text-right tabular-nums">@field.UsedCount</TableCell>
+                                <TableCell><Badge Variant="field.IsActive ? BadgeVariant.Secondary : BadgeVariant.Outline">@(field.IsActive ? "Açık" : "Gizli")</Badge></TableCell>
+                                <TableCell Class="text-right">
+                                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => Edit(field)">Düzenle</Button>
+                                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => deleting = field">Sil</Button>
+                                </TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<Dialog Open="editorOpen" OpenChanged="v => editorOpen = v" Class="sm:max-w-lg">
+    <DialogHeader><DialogTitle>@(editing is null ? "Yeni alan" : "Alanı düzenle")</DialogTitle></DialogHeader>
+    <FormAlert Error="@formError" />
+    <form id="field-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="grid gap-2">
+            <Label for="field-label">Alan adı</Label>
+            <Input id="field-label" @bind-Value="label" maxlength="100" placeholder="Örnek: Meslek" />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="field-type">Tür</Label>
+                <NativeSelect id="field-type" @bind-Value="type">
+                    @foreach (var t in Enum.GetValues<CustomFieldType>())
+                    {
+                        <option value="@t">@TypeLabel(t)</option>
+                    }
+                </NativeSelect>
+            </div>
+            <div class="grid gap-2">
+                <Label for="field-applies">Gösterildiği kayıtlar</Label>
+                <NativeSelect id="field-applies" @bind-Value="appliesTo">
+                    <option value="">Hepsi</option>
+                    <option value="Person">Kişi</option>
+                    <option value="Organization">Kurum</option>
+                    <option value="Household">Hane</option>
+                </NativeSelect>
+            </div>
+        </div>
+        @if (type == nameof(CustomFieldType.Choice))
+        {
+            <div class="grid gap-2">
+                <Label for="field-options">Seçenekler</Label>
+                <Textarea id="field-options" @bind-Value="options" rows="4" placeholder="Her satıra bir seçenek" />
+            </div>
+        }
+        <div class="grid gap-2">
+            <Label for="field-help">Açıklama</Label>
+            <Input id="field-help" @bind-Value="helpText" maxlength="300" placeholder="Formda alanın altında görünür (isteğe bağlı)" />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="field-order">Sıra</Label>
+                <Input id="field-order" inputmode="numeric" @bind-Value="order" />
+            </div>
+            <label class="flex items-center gap-2 self-end pb-2 text-sm">
+                <Checkbox @bind-Checked="isActive" /> Kişi kartında göster
+            </label>
+        </div>
+    </form>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => editorOpen = false">Vazgeç</Button>
+        <Button Type="submit" form="field-form">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+<Dialog Open="deleting is not null" OpenChanged="v => { if (!v) deleting = null; }" Class="sm:max-w-md">
+    <DialogHeader>
+        <DialogTitle>Alan silinsin mi?</DialogTitle>
+        <DialogDescription>
+            @if (deleting is { UsedCount: > 0 })
+            {
+                <span>@deleting.UsedCount kayıttaki "@deleting.Label" değeri de silinir. Değerleri saklamak için alanı silmek yerine gizleyin.</span>
+            }
+            else
+            {
+                <span>"@deleting?.Label" alanı kaldırılır.</span>
+            }
+        </DialogDescription>
+    </DialogHeader>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => deleting = null">Vazgeç</Button>
+        <Button Variant="ButtonVariant.Destructive" OnClick="DeleteAsync">Sil</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private IReadOnlyList<CustomFieldView>? fields;
+    private CustomFieldView? editing, deleting;
+    private string? label, options, helpText, appliesTo, order, error, formError;
+    private string type = nameof(CustomFieldType.Text);
+    private bool isActive = true, editorOpen;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => fields = await CustomFields.ListAsync();
+
+    internal static string TypeLabel(CustomFieldType type) => type switch
+    {
+        CustomFieldType.Text => "Metin",
+        CustomFieldType.Number => "Sayı",
+        CustomFieldType.Date => "Tarih",
+        CustomFieldType.YesNo => "Evet / hayır",
+        _ => "Seçenekli",
+    };
+
+    private static string AppliesLabel(ContactType? type) => type switch
+    {
+        ContactType.Person => "Kişi",
+        ContactType.Organization => "Kurum",
+        ContactType.Household => "Hane",
+        _ => "Hepsi",
+    };
+
+    private void Edit(CustomFieldView? field)
+    {
+        editing = field;
+        label = field?.Label;
+        type = (field?.Type ?? CustomFieldType.Text).ToString();
+        appliesTo = field?.AppliesTo?.ToString();
+        options = field is null ? null : string.Join('\n', field.Options);
+        helpText = field?.HelpText;
+        order = (field?.Order ?? ((fields?.Count ?? 0) + 1) * 10).ToString();
+        isActive = field?.IsActive ?? true;
+        formError = null;
+        editorOpen = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        var input = new CustomFieldInput(label ?? "", Enum.Parse<CustomFieldType>(type), (options ?? "").Split('\n'),
+            Enum.TryParse<ContactType>(appliesTo, out var applies) ? applies : null, helpText, int.TryParse(order, out var o) ? o : 0, isActive);
+        var result = await CustomFields.SaveAsync(editing?.Id, input);
+        if (!result.IsSuccess)
+        {
+            formError = result.Error!.Message;
+            return;
+        }
+
+        editorOpen = false;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleting is null)
+        {
+            return;
+        }
+
+        var result = await CustomFields.DeleteAsync(deleting.Id);
+        deleting = null;
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+}

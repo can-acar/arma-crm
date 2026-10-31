@@ -2,21 +2,76 @@
   <Folder Name="/src/">
     <Project Path="src/Arma.AppHost/Arma.AppHost.csproj" />
     <Project Path="src/Arma.Host/Arma.Host.csproj" />
+    <Project Path="src/Arma.Infrastructure/Arma.Infrastructure.csproj" />
+    <Project Path="src/Arma.Payments/Arma.Payments.csproj" />
     <Project Path="src/Arma.ServiceDefaults/Arma.ServiceDefaults.csproj" />
     <Project Path="src/Arma.SharedKernel/Arma.SharedKernel.csproj" />
     <Project Path="src/Arma.UI/Arma.UI.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Activities/">
+    <Project Path="src/Modules/Activities/Arma.Modules.Activities.Contracts/Arma.Modules.Activities.Contracts.csproj" />
+    <Project Path="src/Modules/Activities/Arma.Modules.Activities/Arma.Modules.Activities.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Audit/">
+    <Project Path="src/Modules/Audit/Arma.Modules.Audit.Contracts/Arma.Modules.Audit.Contracts.csproj" />
+    <Project Path="src/Modules/Audit/Arma.Modules.Audit/Arma.Modules.Audit.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Comms/">
+    <Project Path="src/Modules/Comms/Arma.Modules.Comms.Contracts/Arma.Modules.Comms.Contracts.csproj" />
+    <Project Path="src/Modules/Comms/Arma.Modules.Comms/Arma.Modules.Comms.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Contacts/">
     <Project Path="src/Modules/Contacts/Arma.Modules.Contacts.Contracts/Arma.Modules.Contacts.Contracts.csproj" />
     <Project Path="src/Modules/Contacts/Arma.Modules.Contacts/Arma.Modules.Contacts.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Giving/">
+    <Project Path="src/Modules/Giving/Arma.Modules.Giving/Arma.Modules.Giving.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Arma.Modules.Identity.Contracts/Arma.Modules.Identity.Contracts.csproj" />
     <Project Path="src/Modules/Identity/Arma.Modules.Identity/Arma.Modules.Identity.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Events/">
+    <Project Path="src/Modules/Events/Arma.Modules.Events/Arma.Modules.Events.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Sales/">
+    <Project Path="src/Modules/Sales/Arma.Modules.Sales/Arma.Modules.Sales.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Automation/">
+    <Project Path="src/Modules/Automation/Arma.Modules.Automation/Arma.Modules.Automation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Campaigns/">
+    <Project Path="src/Modules/Campaigns/Arma.Modules.Campaigns/Arma.Modules.Campaigns.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Cases/">
+    <Project Path="src/Modules/Cases/Arma.Modules.Cases/Arma.Modules.Cases.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Grants/">
+    <Project Path="src/Modules/Grants/Arma.Modules.Grants/Arma.Modules.Grants.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Webhooks/">
+    <Project Path="src/Modules/Webhooks/Arma.Modules.Webhooks/Arma.Modules.Webhooks.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Portal/">
+    <Project Path="src/Modules/Portal/Arma.Modules.Portal/Arma.Modules.Portal.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Arma.Plugins.Sample/Arma.Plugins.Sample.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Forms/">
+    <Project Path="src/Modules/Forms/Arma.Modules.Forms/Arma.Modules.Forms.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Membership/">
+    <Project Path="src/Modules/Membership/Arma.Modules.Membership/Arma.Modules.Membership.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Privacy/">
+    <Project Path="src/Modules/Privacy/Arma.Modules.Privacy.Contracts/Arma.Modules.Privacy.Contracts.csproj" />
+    <Project Path="src/Modules/Privacy/Arma.Modules.Privacy/Arma.Modules.Privacy.csproj" />
+  </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Arma.Host.Tests/Arma.Host.Tests.csproj" />
     <Project Path="tests/Arma.Architecture.Tests/Arma.Architecture.Tests.csproj" />
+    <Project Path="tests/Arma.IntegrationTests/Arma.IntegrationTests.csproj" />
     <Project Path="tests/Arma.Modules.Contacts.Tests/Arma.Modules.Contacts.Tests.csproj" />
     <Project Path="tests/Arma.UI.Tests/Arma.UI.Tests.csproj" />
   </Folder>

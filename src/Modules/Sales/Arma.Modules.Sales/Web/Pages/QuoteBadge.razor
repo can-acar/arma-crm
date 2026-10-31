@@ -1,0 +1,11 @@
+<Badge Variant="Status switch { QuoteStatus.Accepted => BadgeVariant.Secondary, QuoteStatus.Rejected => BadgeVariant.Destructive, QuoteStatus.Draft => BadgeVariant.Outline, _ => BadgeVariant.Default }">@SalesLabels.Status(Status)</Badge>
+@if (Expired)
+{
+    <Badge Variant="BadgeVariant.Destructive" Class="ml-1">Süresi geçti</Badge>
+}
+
+@code {
+    [Parameter] public QuoteStatus Status { get; set; }
+
+    [Parameter] public bool Expired { get; set; }
+}

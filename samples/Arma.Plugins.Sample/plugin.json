@@ -1,0 +1,9 @@
+{
+  "id": "arma.ornek",
+  "name": "Örnek eklenti",
+  "version": "1.0.0",
+  "assembly": "Arma.Plugins.Sample.dll",
+  "author": "Arma CRM",
+  "description": "Eklenti geliştirenler için örnek: menü bağlantısı ve sayfa, izin, kişi kartı sekmesi, pano kutucuğu, API ucu, olay dinleme ve ödeme sağlayıcısı.",
+  "minimumArmaVersion": "1.0"
+}

@@ -1,0 +1,57 @@
+@page "/bagis/test-odeme"
+@layout PlainLayout
+@attribute [AllowAnonymous]
+@inject OnlineGivingService Online
+
+<PageTitle>Test ödemesi</PageTitle>
+
+@* Yalnızca "test" ödeme sağlayıcısı bulunduğunda (geliştirme ve test ortamı) çalışır; gerçek kartla ödeme alınmaz. *@
+<div class="mx-auto max-w-lg p-6">
+    <Card>
+        <CardHeader>
+            <CardTitle><h1 class="text-xl">Test ödeme sayfası</h1></CardTitle>
+            <CardDescription>Gerçek ödeme kuruluşunun yerine geçer. Tutar: @Amount TL</CardDescription>
+        </CardHeader>
+        <CardContent Class="flex gap-2">
+            @if (Online.IsTestProviderAvailable && Callback is not null && Callback.StartsWith(Navigation.BaseUri, StringComparison.Ordinal))
+            {
+                <form method="post" action="@Callback">
+                    <input type="hidden" name="order" value="@Order" />
+                    <input type="hidden" name="amount" value="@Amount" />
+                    <input type="hidden" name="status" value="success" />
+                    <input type="hidden" name="store" value="@Store" />
+                    <input type="hidden" name="sig" value="@Sig" />
+                    <Button Type="submit">Öde</Button>
+                </form>
+                <form method="post" action="@Callback">
+                    <input type="hidden" name="order" value="@Order" />
+                    <input type="hidden" name="amount" value="@Amount" />
+                    <input type="hidden" name="status" value="failed" />
+                    <input type="hidden" name="store" value="@Store" />
+                    <input type="hidden" name="sig" value="@FailSig" />
+                    <Button Type="submit" Variant="ButtonVariant.Outline">Reddet</Button>
+                </form>
+            }
+            else
+            {
+                <p class="text-sm">Test ödemesi bu kurulumda kapalı.</p>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    [SupplyParameterFromQuery] public string? Order { get; set; }
+
+    [SupplyParameterFromQuery] public string? Amount { get; set; }
+
+    [SupplyParameterFromQuery] public string? Callback { get; set; }
+
+    [SupplyParameterFromQuery] public string? Store { get; set; }
+
+    [SupplyParameterFromQuery] public string? Sig { get; set; }
+
+    [SupplyParameterFromQuery(Name = "failsig")] public string? FailSig { get; set; }
+}

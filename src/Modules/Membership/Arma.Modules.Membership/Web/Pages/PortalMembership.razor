@@ -1,0 +1,37 @@
+@inject MembershipService Members
+
+@* Bağışçı portalında "Üyeliğim". Üyeliği olmayan kişide bölüm gösterilmez. *@
+@if (members.Count > 0)
+{
+    <Card>
+        <CardHeader><CardTitle>Üyeliğim</CardTitle></CardHeader>
+        <CardContent Class="grid gap-2">
+            @foreach (var member in members)
+            {
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
+                    <div>
+                        <div class="font-medium">@member.TypeName · üye no @member.Number</div>
+                        <div class="text-muted-foreground text-xs">
+                            @(member.IsLifetime ? "Ömür boyu üyelik" : member.EndOn is { } end ? $"Geçerlilik: {end:dd.MM.yyyy}" : "")
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <StatusBadge Status="member.Status" />
+                        @if (member.Status is MembershipStatus.Current or MembershipStatus.Grace)
+                        {
+                            <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" Href="@($"portal/uye-karti/{member.Id}")" target="_blank">Üye kartı</Button>
+                        }
+                    </div>
+                </div>
+            }
+        </CardContent>
+    </Card>
+}
+
+@code {
+    private IReadOnlyList<MemberView> members = [];
+
+    [Parameter] public Guid ContactId { get; set; }
+
+    protected override async Task OnInitializedAsync() => members = await Members.ForContactAsync(ContactId);
+}

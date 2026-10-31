@@ -1,0 +1,174 @@
+@page "/donations"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = GivingPermissions.Read)]
+@inject DonationService Donations
+@inject FundService Funds
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Bağışlar · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Bağışlar</h1>
+            <p class="text-muted-foreground text-sm">Tamamlanan: @if (result is not null) { <TotalsLine Totals="result.Totals" /> }</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            @if (canReceipt)
+            {
+                <Button Variant="ButtonVariant.Outline" OnClick="OpenBulkAsync">Toplu makbuz</Button>
+            }
+            @if (canWrite)
+            {
+                <Button Variant="ButtonVariant.Outline" Href="donations/bank">Havale eşleştir</Button>
+                <Button OnClick="() => editorOpen = true">Bağış kaydet</Button>
+            }
+        </div>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <Input Type="search" placeholder="Makbuz no, dekont veya not" Value="@search" ValueChanged="v => FilterAsync(() => search = v)" aria-label="Ara" Class="lg:col-span-2" />
+        <input type="date" class="@Styles.Input" aria-label="Başlangıç" value="@from?.ToString("yyyy-MM-dd")" @onchange="e => FilterAsync(() => from = ParseDate(e.Value))" />
+        <input type="date" class="@Styles.Input" aria-label="Bitiş" value="@to?.ToString("yyyy-MM-dd")" @onchange="e => FilterAsync(() => to = ParseDate(e.Value))" />
+        <NativeSelect Value="@fund" ValueChanged="v => FilterAsync(() => fund = v)" aria-label="Fon">
+            <option value="">Tüm fonlar</option>
+            @foreach (var item in funds)
+            {
+                <option value="@item.Id">@item.Name</option>
+            }
+        </NativeSelect>
+        <NativeSelect Value="@status" ValueChanged="v => FilterAsync(() => status = v)" aria-label="Durum">
+            <option value="">Tüm durumlar</option>
+            @foreach (var option in Enum.GetValues<DonationStatus>())
+            {
+                <option value="@option">@GivingLabels.Status(option)</option>
+            }
+        </NativeSelect>
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (result is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (result.Items.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Aramanıza uyan bağış yok.</p>
+            }
+            else
+            {
+                <DonationTable Items="result.Items" />
+            }
+        </CardContent>
+    </Card>
+
+    @if (result is not null && result.Total > result.PageSize)
+    {
+        <div class="flex items-center justify-between text-sm">
+            <span class="text-muted-foreground">@result.Total kayıt · sayfa @result.Page / @PageCount</span>
+            <div class="flex gap-2">
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="result.Page <= 1" OnClick="() => GoAsync(result.Page - 1)">Önceki</Button>
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="result.Page >= PageCount" OnClick="() => GoAsync(result.Page + 1)">Sonraki</Button>
+            </div>
+        </div>
+    }
+</div>
+
+<DonationEditor @bind-Open="editorOpen" OnSaved="OpenDonation" />
+
+<Dialog Open="bulkOpen" OpenChanged="v => bulkOpen = v" Class="sm:max-w-md">
+    <DialogHeader>
+        <DialogTitle>Toplu makbuz</DialogTitle>
+        <DialogDescription>Seçilen yılda tamamlanmış ama makbuzu kesilmemiş bağışlara, bağış tarihi sırasıyla makbuz kesilir. Makbuz numaraları geri alınamaz.</DialogDescription>
+    </DialogHeader>
+    <div class="grid gap-2">
+        <Label for="bulk-year">Yıl</Label>
+        <NativeSelect id="bulk-year" Value="@bulkYear.ToString()" ValueChanged="BulkYearChangedAsync">
+            @for (var y = DateTime.Today.Year; y >= DateTime.Today.Year - 5; y--)
+            {
+                <option value="@y">@y</option>
+            }
+        </NativeSelect>
+        <p class="text-sm">@(bulkPending == 0 ? "Bu yılda makbuz bekleyen bağış yok." : $"{bulkPending} bağış için makbuz kesilecek.")</p>
+        @if (bulkDone is not null)
+        {
+            <Alert><AlertDescription>@bulkDone makbuz kesildi.</AlertDescription></Alert>
+        }
+    </div>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => bulkOpen = false">Kapat</Button>
+        <Button OnClick="IssueBulkAsync" Disabled="@(bulkPending == 0 || bulkBusy)">@(bulkBusy ? "Kesiliyor…" : "Makbuzları kes")</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private DonationPage? result;
+    private IReadOnlyList<FundView> funds = [];
+    private string? search, fund, status;
+    private DateOnly? from, to;
+    private int currentPage = 1;
+    private bool canWrite, canReceipt, editorOpen, bulkOpen, bulkBusy;
+    private int bulkYear = DateTime.Today.Year, bulkPending;
+    private int? bulkDone;
+
+    private async Task OpenBulkAsync()
+    {
+        (bulkYear, bulkDone) = (DateTime.Today.Year, null);
+        bulkPending = await Donations.PendingReceiptCountAsync(bulkYear);
+        bulkOpen = true;
+    }
+
+    private async Task BulkYearChangedAsync(string? value)
+    {
+        bulkYear = int.TryParse(value, out var y) ? y : DateTime.Today.Year;
+        bulkDone = null;
+        bulkPending = await Donations.PendingReceiptCountAsync(bulkYear);
+    }
+
+    private async Task IssueBulkAsync()
+    {
+        bulkBusy = true;
+        bulkDone = await Donations.IssuePendingReceiptsAsync(bulkYear);
+        bulkPending = await Donations.PendingReceiptCountAsync(bulkYear);
+        bulkBusy = false;
+        await LoadAsync();
+    }
+
+    private void OpenDonation(Guid id) => Navigation.NavigateTo($"donations/{id}");
+
+    private int PageCount => result is null ? 1 : (int)Math.Ceiling(result.Total / (double)result.PageSize);
+
+    [SupplyParameterFromQuery(Name = "fund")] public string? FundQuery { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        fund = FundQuery;
+        canWrite = CurrentUser.HasPermission(GivingPermissions.Write);
+        canReceipt = CurrentUser.HasPermission(GivingPermissions.Receipts);
+        funds = await Funds.ListAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        result = await Donations.ListAsync(new DonationFilter(
+            FundId: Guid.TryParse(fund, out var f) ? f : null,
+            Status: Enum.TryParse<DonationStatus>(status, out var s) ? s : null,
+            From: from, To: to, Search: search, Page: currentPage));
+
+    private Task FilterAsync(Action apply)
+    {
+        apply();
+        currentPage = 1;
+        return LoadAsync();
+    }
+
+    private Task GoAsync(int target)
+    {
+        currentPage = target;
+        return LoadAsync();
+    }
+
+    private static DateOnly? ParseDate(object? value) => DateOnly.TryParse(value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+}

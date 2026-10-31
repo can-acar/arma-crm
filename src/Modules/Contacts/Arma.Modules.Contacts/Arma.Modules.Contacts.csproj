@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Arma.Infrastructure\Arma.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\Arma.SharedKernel\Arma.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\Arma.UI\Arma.UI.csproj" />
     <ProjectReference Include="..\Arma.Modules.Contacts.Contracts\Arma.Modules.Contacts.Contracts.csproj" />
+    <ProjectReference Include="..\..\Audit\Arma.Modules.Audit.Contracts\Arma.Modules.Audit.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

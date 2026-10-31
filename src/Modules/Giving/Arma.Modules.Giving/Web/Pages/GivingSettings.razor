@@ -1,0 +1,204 @@
+@page "/admin/giving"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = GivingPermissions.Settings)]
+@inject DonationService Donations
+@inject OnlineGivingService Online
+@inject NavigationManager Navigation
+
+<PageTitle>Makbuz ve ödeme · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Makbuz ve ödeme</h1>
+        <p class="text-muted-foreground text-sm">Makbuzda yazan kurum bilgileri ve çevrim içi bağış formu</p>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+        <Card>
+            <CardHeader>
+                <CardTitle>Makbuz bilgileri</CardTitle>
+                <CardDescription>Makbuz numarası her yıl 1'den başlar: @(prefix)@(DateTime.Now.Year)-000001</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <form class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                    @if (saved)
+                    {
+                        <Alert><AlertDescription>Kaydedildi.</AlertDescription></Alert>
+                    }
+                    <div class="grid gap-2">
+                        <Label for="org-name">Kurum adı</Label>
+                        <Input id="org-name" @bind-Value="organization" maxlength="200" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="org-address">Adres</Label>
+                        <Textarea id="org-address" @bind-Value="address" rows="2" maxlength="500" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="org-legal">Resmî bilgiler</Label>
+                        <Textarea id="org-legal" @bind-Value="legal" rows="2" maxlength="500" placeholder="Vergi dairesi ve no, kütük no" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="org-footer">Makbuz alt notu</Label>
+                        <Textarea id="org-footer" @bind-Value="footer" rows="3" maxlength="1000" placeholder="Teşekkür metni veya vergi indirimi açıklaması" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="org-prefix">Numara öneki</Label>
+                        <Input id="org-prefix" Class="w-32" @bind-Value="prefix" maxlength="10" placeholder="Örn. MKB-" />
+                    </div>
+                    <div><Button Type="submit">Kaydet</Button></div>
+                </form>
+            </CardContent>
+        </Card>
+
+        <Card Class="lg:col-span-2">
+            <CardHeader>
+                <CardTitle>Çevrim içi bağış ve ödeme yöntemleri</CardTitle>
+                <CardDescription>
+                    Bu kurulumda bulunan ödeme sağlayıcıları. İşaretli ve yapılandırılmış olanlar bağış formunda seçenek olarak, bu sırayla sunulur.
+                    Anahtarlar veritabanında tutulmaz; kurulumun ayar dosyasına (.env) girilir.
+                </CardDescription>
+            </CardHeader>
+            <CardContent Class="grid gap-4 text-sm">
+                @if (providersSaved)
+                {
+                    <Alert><AlertDescription>Ödeme yöntemleri kaydedildi.</AlertDescription></Alert>
+                }
+                <FormAlert Error="@providerError" />
+
+                @if (providers.Count == 0)
+                {
+                    <p class="text-muted-foreground">Bu kurulumda ödeme sağlayıcısı yok.</p>
+                }
+                else
+                {
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead Class="w-10"><span class="sr-only">Formda sun</span></TableHead>
+                                <TableHead>Sağlayıcı</TableHead>
+                                <TableHead>Yapabildikleri</TableHead>
+                                <TableHead>Durum</TableHead>
+                                <TableHead Class="w-24"><span class="sr-only">Sıra</span></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            @foreach (var (row, index) in providers.Select((p, i) => (p, i)))
+                            {
+                                var info = row.Info;
+                                <TableRow>
+                                    <TableCell>
+                                        <Checkbox Checked="row.IsOffered" CheckedChanged="@(value => Toggle(info.Key, value))" aria-label="@($"{info.Descriptor.DisplayName} formda sunulsun")" />
+                                    </TableCell>
+                                    <TableCell>
+                                        <div class="font-medium">@info.Descriptor.DisplayName</div>
+                                        @if (info.Descriptor.Description is not null)
+                                        {
+                                            <div class="text-muted-foreground">@info.Descriptor.Description</div>
+                                        }
+                                    </TableCell>
+                                    <TableCell>
+                                        <div class="flex flex-wrap gap-1">
+                                            <Badge Variant="BadgeVariant.Secondary">Tek seferlik</Badge>
+                                            @if (info.Descriptor.Supports(Arma.SharedKernel.Payments.PaymentCapabilities.StoredCard))
+                                            {
+                                                <Badge Variant="BadgeVariant.Secondary">Düzenli bağış</Badge>
+                                            }
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        @if (info.IsConfigured)
+                                        {
+                                            <Badge>Hazır</Badge>
+                                        }
+                                        else
+                                        {
+                                            <Badge Variant="BadgeVariant.Outline">Ayar eksik</Badge>
+                                            <div class="text-muted-foreground mt-1 text-xs">
+                                                @foreach (var field in info.MissingSettings)
+                                                {
+                                                    <div><code>Payments__Providers__@(info.Key)__@field.Key</code> (@field.Label)</div>
+                                                }
+                                            </div>
+                                        }
+                                    </TableCell>
+                                    <TableCell>
+                                        <div class="flex gap-1">
+                                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" Disabled="index == 0" OnClick="() => Move(index, -1)" aria-label="Yukarı">↑</Button>
+                                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Icon" Disabled="index == providers.Count - 1" OnClick="() => Move(index, 1)" aria-label="Aşağı">↓</Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            }
+                        </TableBody>
+                    </Table>
+                    <div><Button OnClick="SaveProvidersAsync">Ödeme yöntemlerini kaydet</Button></div>
+                }
+
+                @if (offered > 0)
+                {
+                    <p>Bağış formu açık. Web sitenize bu bağlantıyı ekleyin: <a class="font-mono underline" href="bagis" target="_blank">@Navigation.ToAbsoluteUri("bagis")</a></p>
+                    <p class="text-muted-foreground">Formda yalnızca "Bağış formunda seçilebilsin" işaretli fonlar görünür. Geri çağrı (bildirim) adresi: <code>@Navigation.ToAbsoluteUri("api/v1/payments/")&lt;sağlayıcı&gt;/callback</code></p>
+                }
+                else
+                {
+                    <p class="text-muted-foreground">Çevrim içi bağış kapalı: formda sunulan, ayarları tam bir ödeme sağlayıcısı yok.</p>
+                }
+            </CardContent>
+        </Card>
+    </div>
+</div>
+
+@code {
+    private string? organization, address, legal, footer, prefix;
+    private bool saved, providersSaved;
+    private string? providerError;
+    private List<PaymentProviderStatus> providers = [];
+
+    private int offered => providers.Count(p => p.IsOffered && p.Info.IsConfigured);
+
+    protected override async Task OnInitializedAsync()
+    {
+        providers = [.. await Online.ProvidersAsync()];
+        var settings = await Donations.ReceiptSettingsAsync();
+        (organization, address, legal, footer, prefix) = (settings.OrganizationName, settings.Address, settings.LegalInfo, settings.Footer, settings.NumberPrefix);
+    }
+
+    private async Task SaveAsync()
+    {
+        await Donations.SaveReceiptSettingsAsync(new ReceiptSettings
+        {
+            OrganizationName = organization ?? "",
+            Address = address,
+            LegalInfo = legal,
+            Footer = footer,
+            NumberPrefix = prefix ?? "",
+        });
+        saved = true;
+    }
+
+    private void Toggle(string key, bool value)
+    {
+        var index = providers.FindIndex(p => p.Info.Key == key);
+        providers[index] = providers[index] with { IsOffered = value };
+        providersSaved = false;
+    }
+
+    private void Move(int index, int delta)
+    {
+        var target = index + delta;
+        if (target < 0 || target >= providers.Count)
+        {
+            return;
+        }
+
+        (providers[index], providers[target]) = (providers[target], providers[index]);
+        providersSaved = false;
+    }
+
+    private async Task SaveProvidersAsync()
+    {
+        var result = await Online.SaveOfferedProvidersAsync([.. providers.Where(p => p.IsOffered).Select(p => p.Info.Key)]);
+        providerError = result.IsSuccess ? null : result.Error!.Message;
+        providersSaved = result.IsSuccess;
+    }
+}

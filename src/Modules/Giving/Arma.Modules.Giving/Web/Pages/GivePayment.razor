@@ -1,0 +1,29 @@
+@page "/bagis/odeme"
+@layout PlainLayout
+@attribute [AllowAnonymous]
+@inject OnlineGivingService Online
+
+<PageTitle>Ödeme</PageTitle>
+
+<div class="mx-auto max-w-2xl p-6">
+    @if (allowed)
+    {
+        <iframe src="@U" title="Güvenli ödeme" class="h-[640px] w-full rounded-lg border bg-white"></iframe>
+    }
+    else
+    {
+        <Alert><AlertDescription>Ödeme sayfası bulunamadı. <a class="underline" href="bagis">Bağış formuna dönün.</a></AlertDescription></Alert>
+    }
+</div>
+
+@code {
+    private bool allowed;
+
+    [SupplyParameterFromQuery] public string? D { get; set; }
+
+    [SupplyParameterFromQuery] public string? U { get; set; }
+
+    // Sayfa yalnızca bekleyen bağışın sağlayıcısının çerçevelenebilir güvenli sayfasını gösterir; başka adres gösterilmez.
+    protected override async Task OnInitializedAsync() =>
+        allowed = U is not null && Guid.TryParseExact(D, "N", out var id) && await Online.AllowsFrameAsync(id, U);
+}
