@@ -20,6 +20,10 @@ public sealed class ArmaAppFactory : WebApplicationFactory<Program>, IAsyncLifet
 
     private readonly string databaseName = "arma_test_" + Guid.NewGuid().ToString("N")[..12];
 
+    public static readonly string SamplePaymentSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+
+    public static readonly string SampleEInvoiceToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+
     public static bool IsConfigured => !string.IsNullOrEmpty(ServerConnection);
 
     public string ConnectionString => new NpgsqlConnectionStringBuilder(ServerConnection) { Database = databaseName }.ConnectionString;
@@ -45,7 +49,9 @@ public sealed class ArmaAppFactory : WebApplicationFactory<Program>, IAsyncLifet
         builder.UseSetting("Arma:MigrateOnStartup", "true");
         builder.UseSetting("Arma:Jobs:Enabled", "false");
         builder.UseSetting("Arma:Security:AllowHttp", "true");
-        builder.UseSetting("Giving:Payments:Provider", "test");
+        // Örnek eklentideki ödeme sağlayıcısının imza anahtarı; her çalıştırmada yeniden üretilir.
+        builder.UseSetting("Payments:Providers:ornek:Secret", SamplePaymentSecret);
+        builder.UseSetting("EInvoicing:Providers:ornek-entegrator:Token", SampleEInvoiceToken);
         builder.UseSetting("Comms:Email:Provider", "test");
         builder.UseSetting("Comms:Sms:Provider", "test");
         builder.UseSetting("Comms:PublicUrl", "https://crm.example.org");

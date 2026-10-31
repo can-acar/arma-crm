@@ -14,6 +14,7 @@ using Arma.Modules.Forms;
 using Arma.Modules.Comms;
 using Arma.Modules.Giving;
 using Arma.Modules.Identity;
+using Arma.Modules.Invoicing;
 using Arma.Modules.Membership;
 using Arma.Modules.Privacy;
 using Arma.Infrastructure.Plugins;
@@ -29,7 +30,7 @@ public static class ArmaModules
     private static bool pluginsLoaded;
 
     /// <summary>Yerleşik modüller. Yeni modül buraya eklenir.</summary>
-    public static IReadOnlyList<IModule> BuiltIn { get; } = [new IdentityModule(), new AuditModule(), new ContactsModule(), new ActivitiesModule(), new GivingModule(), new CommsModule(), new PrivacyModule(), new FormsModule(), new MembershipModule(), new EventsModule(), new SalesModule(), new AutomationModule(), new CampaignsModule(), new CasesModule(), new GrantsModule(), new WebhooksModule(), new PortalModule(), new PluginsModule()];
+    public static IReadOnlyList<IModule> BuiltIn { get; } = [new IdentityModule(), new AuditModule(), new ContactsModule(), new ActivitiesModule(), new GivingModule(), new CommsModule(), new PrivacyModule(), new FormsModule(), new MembershipModule(), new EventsModule(), new SalesModule(), new InvoicingModule(), new AutomationModule(), new CampaignsModule(), new CasesModule(), new GrantsModule(), new WebhooksModule(), new PortalModule(), new PluginsModule()];
 
     public static IReadOnlyList<IModule> All { get; private set; } = BuiltIn;
 

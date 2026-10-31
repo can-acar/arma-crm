@@ -52,6 +52,19 @@ internal static class GivingEndpoints
         endpoints.MapGet("/api/v1/funds", (FundService service, bool activeOnly = false, CancellationToken ct = default) => service.ListAsync(activeOnly, ct))
             .WithTags("Bağışlar").RequireAuthorization(GivingPermissions.Read);
 
+        var recurring = endpoints.MapGroup("/api/v1/recurring-donations").WithTags("Bağışlar");
+        recurring.MapGet("/", (RecurringDonationService service, RecurringStatus? status, Guid? contactId, CancellationToken ct) => service.ListAsync(status, contactId, ct))
+            .RequireAuthorization(GivingPermissions.Read);
+        recurring.MapPost("/{id:guid}/cancel", async (RecurringDonationService service, Guid id, CancellationToken ct) =>
+                NoContent(await service.CancelAsync(id, null, ct)))
+            .RequireAuthorization(GivingPermissions.Write);
+        recurring.MapPost("/{id:guid}/resume", async (RecurringDonationService service, Guid id, CancellationToken ct) =>
+                NoContent(await service.ResumeAsync(id, ct)))
+            .RequireAuthorization(GivingPermissions.Write);
+
+        endpoints.MapGet("/api/v1/payment-providers", (OnlineGivingService service, CancellationToken ct) => service.ProvidersAsync(ct))
+            .WithTags("Ödemeler").RequireAuthorization(GivingPermissions.Settings);
+
         // Ödeme kuruluşlarının geri çağrısı: oturum yoktur, istek imza veya sorguyla doğrulanır.
         endpoints.MapPost("/api/v1/payments/{provider}/callback", async (HttpRequest request, OnlineGivingService online, string provider, CancellationToken ct) =>
             {
@@ -59,7 +72,7 @@ internal static class GivingEndpoints
                 var notification = await online.HandleCallbackAsync(provider, form, ct);
                 var urls = new OnlineGivingUrls($"{request.Scheme}://{request.Host}{request.PathBase}");
                 var donationId = notification is not null && Guid.TryParseExact(notification.OrderId, "N", out var id) ? id : Guid.Empty;
-                return online.Acknowledge(notification, urls.Success(donationId), urls.Fail(donationId));
+                return online.Acknowledge(provider, notification, urls.Success(donationId), urls.Fail(donationId));
             })
             .WithTags("Ödemeler").AllowAnonymous().DisableAntiforgery().ExcludeFromDescription();
     }

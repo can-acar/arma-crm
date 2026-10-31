@@ -3,6 +3,7 @@
     <Project Path="src/Arma.AppHost/Arma.AppHost.csproj" />
     <Project Path="src/Arma.Host/Arma.Host.csproj" />
     <Project Path="src/Arma.Infrastructure/Arma.Infrastructure.csproj" />
+    <Project Path="src/Arma.Payments/Arma.Payments.csproj" />
     <Project Path="src/Arma.ServiceDefaults/Arma.ServiceDefaults.csproj" />
     <Project Path="src/Arma.SharedKernel/Arma.SharedKernel.csproj" />
     <Project Path="src/Arma.UI/Arma.UI.csproj" />
@@ -36,6 +37,10 @@
   </Folder>
   <Folder Name="/src/Modules/Sales/">
     <Project Path="src/Modules/Sales/Arma.Modules.Sales/Arma.Modules.Sales.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Invoicing/">
+    <Project Path="src/Modules/Invoicing/Arma.Modules.Invoicing.Contracts/Arma.Modules.Invoicing.Contracts.csproj" />
+    <Project Path="src/Modules/Invoicing/Arma.Modules.Invoicing/Arma.Modules.Invoicing.csproj" />
   </Folder>
   <Folder Name="/src/Modules/Automation/">
     <Project Path="src/Modules/Automation/Arma.Modules.Automation/Arma.Modules.Automation.csproj" />
