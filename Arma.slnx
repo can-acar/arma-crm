@@ -34,6 +34,9 @@
   <Folder Name="/src/Modules/Events/">
     <Project Path="src/Modules/Events/Arma.Modules.Events/Arma.Modules.Events.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Sales/">
+    <Project Path="src/Modules/Sales/Arma.Modules.Sales/Arma.Modules.Sales.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Forms/">
     <Project Path="src/Modules/Forms/Arma.Modules.Forms/Arma.Modules.Forms.csproj" />
   </Folder>

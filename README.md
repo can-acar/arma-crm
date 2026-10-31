@@ -195,6 +195,19 @@ cd deploy
 - Giriş yapan katılımcı `/e/bilet/{kod}/belge` adresinden katılım belgesini yazdırabilir. Etkinlikten bir gün
   önce kayıtlılara hatırlatma e-postası gider; etkinlik iptal edilirse herkese bildirim gider.
 
+## Satış hattı ve teklifler
+
+- Fırsatlar (başlık, müşteri, tutar, beklenen kapanış, sorumlu) aşamalı bir panoda izlenir; kart sürüklenerek
+  aşama ve sıra değiştirilir. Kaybedildi aşamasına taşınan fırsat için neden sorulur. Panonun üstünde açık
+  toplam ve aşama olasılığıyla ağırlıklı tahmin görünür; kapanmış fırsatlar 30 gün sonra panodan kalkar.
+- Aşamalar ve olasılıkları Yönetim > Satış ayarları'ndan değiştirilir; birden fazla satış hattı tanımlanabilir.
+  İçinde fırsat olan aşama silinemez.
+- Teklifler `T{yıl}-{sıra}` numarasıyla kesilir. Her kalemde miktar, birim, birim fiyat, iskonto ve KDV (%0, 1,
+  10, 20) vardır; tutarlar kuruşa yuvarlanır. Fırsattan hazırlanan teklif kabul edilince fırsat kazanıldı,
+  reddedilince kaybedildi olur. Yazdırma sayfası tarayıcıdan PDF olarak kaydedilebilir.
+- Fırsat ve teklif hareketleri kişinin zaman akışına düşer; gelişmiş aramada "açık fırsatı olan", "şu tarihten
+  sonra satış kazanılan" ve "hiç fırsatı olmayan" ölçütleri vardır.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`
