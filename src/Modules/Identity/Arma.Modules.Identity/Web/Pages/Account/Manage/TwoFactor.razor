@@ -56,7 +56,7 @@
                     </div>
                     <EditForm Model="Input" FormName="enable-2fa" OnValidSubmit="EnableAsync" method="post" class="grid gap-4">
                         <DataAnnotationsValidator />
-                        <FormMessage Error="@error" />
+                        <FormAlert Error="@error" />
                         <div class="grid gap-2">
                             <Label For="code">Uygulamadaki kod</Label>
                             <InputText id="code" autocomplete="one-time-code" inputmode="numeric" @bind-Value="Input.Code" class="@Styles.Input" required />

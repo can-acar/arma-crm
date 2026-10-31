@@ -15,7 +15,7 @@
         <Button OnClick="() => showCreate = !showCreate">@(showCreate ? "Vazgeç" : "Yeni istemci")</Button>
     </div>
 
-    <FormMessage Error="@error" />
+    <FormAlert Error="@error" />
 
     @if (created is not null)
     {

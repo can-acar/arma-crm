@@ -1,0 +1,85 @@
+@namespace Arma.Modules.Audit.Contracts
+
+<Table>
+    <TableHeader>
+        <TableRow>
+            <TableHead>Zaman</TableHead>
+            <TableHead>Kullanıcı</TableHead>
+            <TableHead>İşlem</TableHead>
+            @if (ShowEntity)
+            {
+                <TableHead>Kayıt</TableHead>
+            }
+            <TableHead>Ayrıntı</TableHead>
+        </TableRow>
+    </TableHeader>
+    <TableBody>
+        @foreach (var record in Records)
+        {
+            <TableRow @key="record.Id">
+                <TableCell Class="text-sm whitespace-nowrap">@record.OccurredAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</TableCell>
+                <TableCell Class="text-sm">
+                    @(record.UserName ?? "Sistem")
+                    @if (record.IpAddress is not null)
+                    {
+                        <div class="text-muted-foreground text-xs">@record.IpAddress</div>
+                    }
+                </TableCell>
+                <TableCell><Badge Variant="@Variant(record.Action)">@Label(record.Action)</Badge></TableCell>
+                @if (ShowEntity)
+                {
+                    <TableCell Class="text-sm">
+                        @record.EntityType
+                        <div class="text-muted-foreground font-mono text-xs">@record.EntityId</div>
+                    </TableCell>
+                }
+                <TableCell Class="text-sm">
+                    @if (record.Summary is not null)
+                    {
+                        <div>@record.Summary</div>
+                    }
+                    @foreach (var change in record.Changes)
+                    {
+                        <div class="text-xs">
+                            <span class="font-medium">@change.Property</span>:
+                            @if (change.OldValue is not null)
+                            {
+                                <span class="text-muted-foreground line-through">@Shorten(change.OldValue)</span>
+                                <span> → </span>
+                            }
+                            <span>@(Shorten(change.NewValue) ?? "(boş)")</span>
+                        </div>
+                    }
+                </TableCell>
+            </TableRow>
+        }
+    </TableBody>
+</Table>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AuditRecord> Records { get; set; } = [];
+
+    [Parameter] public bool ShowEntity { get; set; }
+
+    private static string? Shorten(string? value) => value is { Length: > 120 } ? value[..120] + "…" : value;
+
+    private static BadgeVariant Variant(AuditAction action) => action switch
+    {
+        AuditAction.Deleted => BadgeVariant.Destructive,
+        AuditAction.Created => BadgeVariant.Default,
+        _ => BadgeVariant.Secondary,
+    };
+
+    public static string Label(AuditAction action) => action switch
+    {
+        AuditAction.Created => "Oluşturma",
+        AuditAction.Updated => "Değişiklik",
+        AuditAction.Deleted => "Silme",
+        AuditAction.Viewed => "Görüntüleme",
+        AuditAction.Exported => "Dışa aktarma",
+        AuditAction.Imported => "İçe aktarma",
+        AuditAction.Merged => "Birleştirme",
+        AuditAction.Anonymized => "Anonimleştirme",
+        _ => action.ToString(),
+    };
+}

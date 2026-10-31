@@ -16,7 +16,7 @@
     <CardContent>
         <EditForm Model="Input" FormName="login" OnValidSubmit="LoginAsync" method="post" class="grid gap-4">
             <DataAnnotationsValidator />
-            <FormMessage Error="@error" />
+            <FormAlert Error="@error" />
             <div class="grid gap-2">
                 <Label For="email">E-posta</Label>
                 <InputText id="email" type="email" autocomplete="username" @bind-Value="Input.Email" class="@Styles.Input" required />

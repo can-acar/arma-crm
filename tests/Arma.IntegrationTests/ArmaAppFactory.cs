@@ -43,7 +43,12 @@ public sealed class ArmaAppFactory : WebApplicationFactory<Program>, IAsyncLifet
         builder.UseSetting("ConnectionStrings:arma", ConnectionString);
         builder.UseSetting("Arma:TenantId", TenantId.ToString());
         builder.UseSetting("Arma:MigrateOnStartup", "true");
+        builder.UseSetting("Arma:Jobs:Enabled", "false");
         builder.UseSetting("Arma:Security:AllowHttp", "true");
+        builder.UseSetting("Giving:Payments:Provider", "test");
+        builder.UseSetting("Comms:Email:Provider", "test");
+        builder.UseSetting("Comms:Sms:Provider", "test");
+        builder.UseSetting("Comms:PublicUrl", "https://crm.example.org");
     }
 
     public async Task<T> WithScopeAsync<T>(Func<IServiceProvider, Task<T>> action)

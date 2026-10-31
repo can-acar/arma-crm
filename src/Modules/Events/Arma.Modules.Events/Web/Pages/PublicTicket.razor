@@ -1,0 +1,74 @@
+@page "/e/bilet/{Code}"
+@layout PlainLayout
+@attribute [AllowAnonymous]
+@inject EventService Events
+@inject NavigationManager Navigation
+@using QRCoder
+
+<PageTitle>Bilet · @ticket?.EventTitle</PageTitle>
+
+<div class="mx-auto flex max-w-sm flex-col gap-4 p-6">
+    @if (ticket is null)
+    {
+        <Alert><AlertTitle>Bilet bulunamadı</AlertTitle></Alert>
+    }
+    else
+    {
+        @if (New)
+        {
+            <Alert><AlertDescription>@(ticket.Status == RegistrationStatus.Waitlisted ? "Kontenjan dolu olduğu için yedek listeye alındınız. Yer açılırsa e-postayla haber vereceğiz." : "Kaydınız alındı. Bu bilet e-posta adresinize de gönderildi.")</AlertDescription></Alert>
+        }
+        <article class="bg-background flex flex-col items-center gap-3 rounded-lg border p-6 text-center">
+            <p class="text-muted-foreground text-xs tracking-widest uppercase">@(ticket.Status == RegistrationStatus.Waitlisted ? "Yedek liste" : "Bilet")</p>
+            <h1 class="text-xl font-semibold">@ticket.EventTitle</h1>
+            <p class="text-sm">@EventLabels.When(ticket.StartsAt, ticket.EndsAt)</p>
+            @if (ticket.Location is not null)
+            {
+                <p class="text-muted-foreground text-sm">@ticket.Location</p>
+            }
+            @if (ticket.Status == RegistrationStatus.Registered && ticket.EventStatus != EventStatus.Cancelled)
+            {
+                <div class="w-48 [&>svg]:h-auto [&>svg]:w-full">@qr</div>
+            }
+            <p class="font-mono text-lg tracking-widest">@ticket.Code</p>
+            <p class="font-medium">@ticket.Name</p>
+            @if (ticket.TicketName is not null)
+            {
+                <p class="text-sm">@ticket.TicketName · @EventLabels.Money(ticket.Amount) @(ticket.Payment == PaymentState.Unpaid ? "(ödeme bekleniyor)" : "")</p>
+            }
+            @if (ticket.EventStatus == EventStatus.Cancelled)
+            {
+                <Alert><AlertDescription>Etkinlik iptal edildi.</AlertDescription></Alert>
+            }
+            else if (ticket.Status == RegistrationStatus.Cancelled)
+            {
+                <Alert><AlertDescription>Bu kayıt iptal edildi.</AlertDescription></Alert>
+            }
+            @if (ticket.CheckedInAt is not null)
+            {
+                <a class="text-sm underline" href="e/bilet/@ticket.Code/belge">Katılım belgesi</a>
+            }
+        </article>
+    }
+</div>
+
+@code {
+    private TicketPageView? ticket;
+    private MarkupString qr;
+
+    [Parameter] public string Code { get; set; } = "";
+
+    [SupplyParameterFromQuery(Name = "yeni")] public int? NewFlag { get; set; }
+
+    private bool New => NewFlag == 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ticket = await Events.TicketAsync(Code);
+        if (ticket is not null)
+        {
+            using var data = QRCodeGenerator.GenerateQrCode($"{Navigation.BaseUri}e/bilet/{ticket.Code}", QRCodeGenerator.ECCLevel.M);
+            qr = new MarkupString(new SvgQRCode(data).GetGraphic(6));
+        }
+    }
+}

@@ -14,7 +14,7 @@
     <CardContent>
         <EditForm Model="Input" FormName="login-recovery" OnValidSubmit="VerifyAsync" method="post" class="grid gap-4">
             <DataAnnotationsValidator />
-            <FormMessage Error="@error" />
+            <FormAlert Error="@error" />
             <div class="grid gap-2">
                 <Label For="code">Kurtarma kodu</Label>
                 <InputText id="code" autocomplete="off" @bind-Value="Input.Code" class="@Styles.Input" required />

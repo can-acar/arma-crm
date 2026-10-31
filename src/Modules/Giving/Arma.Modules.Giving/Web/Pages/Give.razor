@@ -1,0 +1,159 @@
+@page "/bagis"
+@layout PlainLayout
+@attribute [AllowAnonymous]
+@inject OnlineGivingService Online
+@inject FundService Funds
+@inject DonationService Donations
+@inject NavigationManager Navigation
+
+<PageTitle>Bağış yap</PageTitle>
+
+<div class="mx-auto flex max-w-lg flex-col gap-6 p-6">
+    <div class="text-center">
+        <h1 class="text-2xl font-semibold tracking-tight">@(organization ?? "Bağış yap")</h1>
+        <p class="text-muted-foreground text-sm">Desteğiniz için teşekkür ederiz. Ödeme, güvenli ödeme sayfasında kartla yapılır.</p>
+    </div>
+
+    @if (!Online.IsEnabled)
+    {
+        <Alert><AlertDescription>Çevrim içi bağış şu an kapalı.</AlertDescription></Alert>
+    }
+    else
+    {
+        <Card>
+            <CardContent>
+                <EditForm Model="Input" FormName="give" OnValidSubmit="StartAsync" method="post" class="grid gap-4">
+                    <DataAnnotationsValidator />
+                    <FormAlert Error="@error" />
+                    <ValidationSummary class="text-destructive text-sm" />
+
+                    <div class="grid gap-2">
+                        <Label For="amount">Tutar (TL)</Label>
+                        <InputText id="amount" inputmode="decimal" @bind-Value="Input.Amount" class="@Styles.Input" placeholder="100" required />
+                    </div>
+
+                    @if (funds.Count > 0)
+                    {
+                        <div class="grid gap-2">
+                            <Label For="fund">Bağış amacı</Label>
+                            <InputSelect id="fund" @bind-Value="Input.FundId" class="@Styles.Select">
+                                <option value="">Genel bağış</option>
+                                @foreach (var fund in funds)
+                                {
+                                    <option value="@fund.Id">@fund.Name</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    }
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="grid gap-2">
+                            <Label For="first">Ad</Label>
+                            <InputText id="first" autocomplete="given-name" @bind-Value="Input.FirstName" class="@Styles.Input" required />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label For="last">Soyad</Label>
+                            <InputText id="last" autocomplete="family-name" @bind-Value="Input.LastName" class="@Styles.Input" required />
+                        </div>
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="email">E-posta</Label>
+                        <InputText id="email" type="email" autocomplete="email" @bind-Value="Input.Email" class="@Styles.Input" required />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="phone">Telefon (isteğe bağlı)</Label>
+                        <InputText id="phone" type="tel" autocomplete="tel" @bind-Value="Input.Phone" class="@Styles.Input" />
+                    </div>
+
+                    @* Botların doldurduğu gizli alan; dolu gelirse istek sessizce reddedilir. *@
+                    <div class="hidden" aria-hidden="true">
+                        <InputText id="website" tabindex="-1" autocomplete="off" @bind-Value="Input.Website" />
+                    </div>
+
+                    <label class="flex items-start gap-2 text-sm">
+                        <InputCheckbox @bind-Value="Input.Consent" class="@($"{Styles.Checkbox} mt-0.5")" />
+                        <span>Kişisel verilerimin bağışımın işlenmesi ve makbuz gönderimi için kaydedileceğini okudum, onaylıyorum.</span>
+                    </label>
+
+                    <Button Type="submit" Class="w-full">Ödemeye geç</Button>
+                </EditForm>
+            </CardContent>
+        </Card>
+    }
+</div>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Turkish = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+    private IReadOnlyList<FundView> funds = [];
+    private string? organization, error;
+
+    [CascadingParameter] private Microsoft.AspNetCore.Http.HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm] private GiveModel Input { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+        funds = await Funds.PublicAsync();
+        var settings = await Donations.ReceiptSettingsAsync();
+        organization = settings.OrganizationName.Length > 0 ? settings.OrganizationName : null;
+    }
+
+    private async Task StartAsync()
+    {
+        if (!string.IsNullOrEmpty(Input.Website))
+        {
+            Navigation.NavigateTo("bagis/basarisiz");
+            return;
+        }
+
+        if (!Input.Consent)
+        {
+            error = "Devam etmek için kişisel veri onayını işaretleyin.";
+            return;
+        }
+
+        if (!decimal.TryParse(Input.Amount, System.Globalization.NumberStyles.Number, Turkish, out var amount))
+        {
+            error = "Tutarı 100 veya 250,50 biçiminde girin.";
+            return;
+        }
+
+        var request = HttpContext.Request;
+        var urls = new OnlineGivingUrls($"{request.Scheme}://{request.Host}{request.PathBase}");
+        var ip = HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "127.0.0.1";
+        var result = await Online.StartAsync(new OnlineDonationRequest(Input.FirstName, Input.LastName, Input.Email, Input.Phone, amount,
+            Guid.TryParse(Input.FundId, out var fundId) ? fundId : null), ip, urls);
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        var start = result.Value!;
+        Navigation.NavigateTo(start.RedirectUrl ?? $"bagis/odeme?d={start.DonationId:N}&u={Uri.EscapeDataString(start.IframeUrl!)}");
+    }
+
+    private sealed class GiveModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Tutar gerekli.")]
+        public string Amount { get; set; } = "";
+
+        public string? FundId { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Ad gerekli."), System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string FirstName { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Soyad gerekli."), System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string LastName { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "E-posta gerekli."), System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "E-posta adresi geçersiz.")]
+        public string Email { get; set; } = "";
+
+        public string? Phone { get; set; }
+
+        public string? Website { get; set; }
+
+        public bool Consent { get; set; }
+    }
+}

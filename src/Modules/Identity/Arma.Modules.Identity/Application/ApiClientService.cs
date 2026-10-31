@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using Arma.SharedKernel.Auditing;
 using Arma.SharedKernel.Domain;
 using Arma.SharedKernel.Security;
 using OpenIddict.Abstractions;
@@ -16,7 +17,7 @@ public sealed record CreatedApiClient(string ClientId, string ClientSecret);
 /// Başka sistemlerin (web sitesi, muhasebe yazılımı) API'ye erişmesi için OAuth2 istemci kimlik bilgileri akışı.
 /// İstemciye verilen izinler, aldığı erişim belirtecine eklenir.
 /// </summary>
-public sealed class ApiClientService(IOpenIddictApplicationManager applications, PermissionCatalog catalog)
+public sealed class ApiClientService(IOpenIddictApplicationManager applications, PermissionCatalog catalog, IAuditLog audit)
 {
     public const string PermissionsProperty = "arma_permissions";
 
@@ -61,6 +62,7 @@ public sealed class ApiClientService(IOpenIddictApplicationManager applications,
         descriptor.Properties[PermissionsProperty] = JsonSerializer.SerializeToElement(granted);
 
         await applications.CreateAsync(descriptor, cancellationToken);
+        await audit.WriteAsync(AuditAction.Created, "ApiClient", clientId, $"{descriptor.DisplayName}: {string.Join(", ", granted)}", cancellationToken);
         return new CreatedApiClient(clientId, secret);
     }
 
@@ -73,6 +75,7 @@ public sealed class ApiClientService(IOpenIddictApplicationManager applications,
         }
 
         await applications.DeleteAsync(application, cancellationToken);
+        await audit.WriteAsync(AuditAction.Deleted, "ApiClient", clientId, null, cancellationToken);
         return true;
     }
 

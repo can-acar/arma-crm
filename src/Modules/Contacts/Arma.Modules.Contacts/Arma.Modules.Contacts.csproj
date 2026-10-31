@@ -5,6 +5,7 @@
     <ProjectReference Include="..\..\..\Arma.SharedKernel\Arma.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\Arma.UI\Arma.UI.csproj" />
     <ProjectReference Include="..\Arma.Modules.Contacts.Contracts\Arma.Modules.Contacts.Contracts.csproj" />
+    <ProjectReference Include="..\..\Audit\Arma.Modules.Audit.Contracts\Arma.Modules.Audit.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

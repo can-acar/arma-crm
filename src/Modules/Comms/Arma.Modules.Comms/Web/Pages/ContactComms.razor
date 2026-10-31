@@ -1,0 +1,208 @@
+@inject ConsentService Consents
+@inject MessageService Messages
+@inject MailingService Mailings
+@inject ICurrentUser CurrentUser
+
+@* Kişi kartındaki "İletişim" sekmesi: ileti izinleri, tek ileti gönderme ve geçmiş. *@
+<div class="grid gap-4">
+    <Card>
+        <CardHeader>
+            <CardTitle>Ticari ileti izinleri</CardTitle>
+            <CardDescription>İzni onaylı olmayan kişiye tanıtım, kampanya ve bağış çağrısı gönderilmez. Bilgilendirme iletileri (makbuz gibi) izinden bağımsızdır.</CardDescription>
+        </CardHeader>
+        <CardContent Class="grid gap-3">
+            <FormAlert Error="@consentError" />
+            @foreach (var consent in consents)
+            {
+                <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+                    <div class="grid gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium">@CommsLabels.Channel(consent.Channel)</span>
+                            <Badge Variant="CommsLabels.ConsentVariant(consent.Status)">@CommsLabels.Consent(consent.Status)</Badge>
+                            @if (consent.IysState != IysState.NotRequired)
+                            {
+                                <Badge Variant="consent.IysState == IysState.Failed ? BadgeVariant.Destructive : BadgeVariant.Outline">@CommsLabels.Iys(consent.IysState)</Badge>
+                            }
+                        </div>
+                        @if (consent.RecordedAt is { } at)
+                        {
+                            <span class="text-muted-foreground text-xs">@consent.Address · @CommsLabels.Source(consent.Source) · @CommsLabels.DateTime(at)</span>
+                        }
+                        @if (consent.IysError is not null)
+                        {
+                            <span class="text-destructive text-xs">@consent.IysError</span>
+                        }
+                    </div>
+                    @if (canConsent)
+                    {
+                        <div class="flex gap-2">
+                            @if (consent.Status != ConsentStatus.Approved)
+                            {
+                                <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="() => SetConsentAsync(consent.Channel, ConsentStatus.Approved)">Onay al</Button>
+                            }
+                            @if (consent.Status != ConsentStatus.Rejected)
+                            {
+                                <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => SetConsentAsync(consent.Channel, ConsentStatus.Rejected)">Ret</Button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </CardContent>
+    </Card>
+
+    <Card>
+        <CardHeader>
+            <CardTitle>Gönderilen iletiler</CardTitle>
+            @if (canSend)
+            {
+                <CardAction>
+                    <div class="flex gap-2">
+                        <Button Size="ButtonSize.Sm" OnClick="() => Compose(Channel.Email)">E-posta gönder</Button>
+                        <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="() => Compose(Channel.Sms)">SMS gönder</Button>
+                    </div>
+                </CardAction>
+            }
+        </CardHeader>
+        <CardContent>
+            @if (history.Count == 0)
+            {
+                <p class="text-muted-foreground text-sm">Henüz ileti gönderilmedi.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Tarih</TableHead>
+                            <TableHead>Kanal</TableHead>
+                            <TableHead>İleti</TableHead>
+                            <TableHead>Durum</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var message in history)
+                        {
+                            <TableRow>
+                                <TableCell Class="whitespace-nowrap">@CommsLabels.DateTime(message.SentAt ?? message.CreatedAt)</TableCell>
+                                <TableCell>@CommsLabels.Channel(message.Channel)</TableCell>
+                                <TableCell>
+                                    <div class="font-medium">@(message.Subject ?? Shorten(message.Body))</div>
+                                    <div class="text-muted-foreground text-xs">@message.To@(message.IsCommercial ? " · ticari" : "")</div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge Variant="CommsLabels.StatusVariant(message.Status)">@CommsLabels.Status(message.Status)</Badge>
+                                    @if (message.Error is not null)
+                                    {
+                                        <div class="text-muted-foreground text-xs">@message.Error</div>
+                                    }
+                                </TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<Dialog @bind-Open="composeOpen">
+    <DialogHeader>
+        <DialogTitle>@(channel == Channel.Email ? "E-posta gönder" : "SMS gönder")</DialogTitle>
+    </DialogHeader>
+    <FormAlert Error="@sendError" />
+    <form id="compose-form" class="grid gap-4" @onsubmit="SendAsync" @onsubmit:preventDefault>
+        @if (templates.Count > 0)
+        {
+            <div class="grid gap-2">
+                <Label for="compose-template">Şablon</Label>
+                <NativeSelect id="compose-template" Value="@templateId" ValueChanged="UseTemplate">
+                    <option value="">Şablon kullanma</option>
+                    @foreach (var template in templates)
+                    {
+                        <option value="@template.Id">@template.Name</option>
+                    }
+                </NativeSelect>
+            </div>
+        }
+        @if (channel == Channel.Email)
+        {
+            <div class="grid gap-2">
+                <Label for="compose-subject">Konu</Label>
+                <Input id="compose-subject" @bind-Value="subject" maxlength="300" />
+            </div>
+        }
+        <div class="grid gap-2">
+            <Label for="compose-body">Metin</Label>
+            <Textarea id="compose-body" @bind-Value="body" rows="@(channel == Channel.Email ? 8 : 4)" maxlength="@(channel == Channel.Email ? 20000 : 900)" />
+            <span class="text-muted-foreground text-xs">Kullanılabilir alanlar: @string.Join(", ", MessageText.Fields.Select(f => f.Field))</span>
+        </div>
+        <label class="flex items-center gap-2 text-sm"><Checkbox @bind-Checked="commercial" /> Ticari ileti (tanıtım, kampanya, bağış çağrısı): yalnızca izin varsa gönderilir, iptal bağlantısı eklenir</label>
+    </form>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => composeOpen = false">Vazgeç</Button>
+        <Button Type="submit" form="compose-form">Gönder</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private IReadOnlyList<ConsentView> consents = [];
+    private IReadOnlyList<MessageView> history = [];
+    private IReadOnlyList<TemplateView> templates = [];
+    private Channel channel = Channel.Email;
+    private string? subject, body, templateId, sendError, consentError;
+    private bool canSend, canConsent, composeOpen, commercial;
+
+    [Parameter] public Guid ContactId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        canSend = CurrentUser.HasPermission(CommsPermissions.Send);
+        canConsent = CurrentUser.HasPermission(CommsPermissions.Consent);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        consents = await Consents.ForContactAsync(ContactId);
+        history = await Messages.ForContactAsync(ContactId);
+    }
+
+    private async Task SetConsentAsync(Channel target, ConsentStatus status)
+    {
+        var result = await Consents.SetAsync(ContactId, target, status, "manual");
+        consentError = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+
+    private async Task Compose(Channel target)
+    {
+        (channel, subject, body, templateId, sendError, commercial) = (target, null, null, null, null, false);
+        templates = await Mailings.TemplatesAsync(target);
+        composeOpen = true;
+    }
+
+    private void UseTemplate(string? id)
+    {
+        templateId = id;
+        if (templates.FirstOrDefault(t => t.Id.ToString() == id) is { } template)
+        {
+            (subject, body) = (template.Subject, template.Body);
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        var result = await Messages.SendToContactAsync(new SendToContactRequest(ContactId, channel, subject, body ?? "", commercial));
+        if (!result.IsSuccess)
+        {
+            sendError = result.Error!.Message;
+            return;
+        }
+
+        composeOpen = false;
+        await LoadAsync();
+    }
+
+    private static string Shorten(string text) => text.Length <= 80 ? text : text[..79] + "…";
+}

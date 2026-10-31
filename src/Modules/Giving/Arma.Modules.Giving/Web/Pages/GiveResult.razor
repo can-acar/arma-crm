@@ -1,0 +1,38 @@
+@page "/bagis/tesekkurler"
+@page "/bagis/basarisiz"
+@layout PlainLayout
+@attribute [AllowAnonymous]
+@inject OnlineGivingService Online
+@inject NavigationManager Navigation
+
+<PageTitle>Bağış</PageTitle>
+
+<div class="mx-auto max-w-lg p-6">
+    <Card>
+        <CardHeader>
+            <CardTitle><h1 class="text-xl">@title</h1></CardTitle>
+            <CardDescription>@message</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button Variant="ButtonVariant.Outline" Href="bagis">Bağış formuna dön</Button>
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private string title = "", message = "";
+
+    [SupplyParameterFromQuery] public string? D { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var status = Guid.TryParseExact(D, "N", out var id) ? await Online.StatusAsync(id) : null;
+        (title, message) = status switch
+        {
+            { Status: DonationStatus.Completed } s => ("Teşekkür ederiz", $"{Money.Format(s.Amount, "TRY")} tutarındaki bağışınız alındı. Desteğiniz için teşekkür ederiz."),
+            { Status: DonationStatus.Pending } => ("Ödemeniz işleniyor", "Ödeme kuruluşundan onay bekleniyor. Birkaç dakika içinde tamamlanır; tekrar ödeme yapmayın."),
+            _ when Navigation.Uri.Contains("/bagis/tesekkurler", StringComparison.Ordinal) => ("Ödemeniz işleniyor", "Ödeme sonucunu bekliyoruz."),
+            _ => ("Ödeme tamamlanamadı", "Kartınızdan ücret alınmadı. Bilgilerinizi kontrol edip tekrar deneyebilirsiniz."),
+        };
+    }
+}

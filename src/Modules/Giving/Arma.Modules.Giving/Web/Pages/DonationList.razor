@@ -1,0 +1,116 @@
+@page "/donations"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = GivingPermissions.Read)]
+@inject DonationService Donations
+@inject FundService Funds
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Bağışlar · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Bağışlar</h1>
+            <p class="text-muted-foreground text-sm">Tamamlanan: @if (result is not null) { <TotalsLine Totals="result.Totals" /> }</p>
+        </div>
+        @if (canWrite)
+        {
+            <Button OnClick="() => editorOpen = true">Bağış kaydet</Button>
+        }
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <Input Type="search" placeholder="Makbuz no, dekont veya not" Value="@search" ValueChanged="v => FilterAsync(() => search = v)" aria-label="Ara" Class="lg:col-span-2" />
+        <input type="date" class="@Styles.Input" aria-label="Başlangıç" value="@from?.ToString("yyyy-MM-dd")" @onchange="e => FilterAsync(() => from = ParseDate(e.Value))" />
+        <input type="date" class="@Styles.Input" aria-label="Bitiş" value="@to?.ToString("yyyy-MM-dd")" @onchange="e => FilterAsync(() => to = ParseDate(e.Value))" />
+        <NativeSelect Value="@fund" ValueChanged="v => FilterAsync(() => fund = v)" aria-label="Fon">
+            <option value="">Tüm fonlar</option>
+            @foreach (var item in funds)
+            {
+                <option value="@item.Id">@item.Name</option>
+            }
+        </NativeSelect>
+        <NativeSelect Value="@status" ValueChanged="v => FilterAsync(() => status = v)" aria-label="Durum">
+            <option value="">Tüm durumlar</option>
+            @foreach (var option in Enum.GetValues<DonationStatus>())
+            {
+                <option value="@option">@GivingLabels.Status(option)</option>
+            }
+        </NativeSelect>
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (result is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (result.Items.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Aramanıza uyan bağış yok.</p>
+            }
+            else
+            {
+                <DonationTable Items="result.Items" />
+            }
+        </CardContent>
+    </Card>
+
+    @if (result is not null && result.Total > result.PageSize)
+    {
+        <div class="flex items-center justify-between text-sm">
+            <span class="text-muted-foreground">@result.Total kayıt · sayfa @result.Page / @PageCount</span>
+            <div class="flex gap-2">
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="result.Page <= 1" OnClick="() => GoAsync(result.Page - 1)">Önceki</Button>
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="result.Page >= PageCount" OnClick="() => GoAsync(result.Page + 1)">Sonraki</Button>
+            </div>
+        </div>
+    }
+</div>
+
+<DonationEditor @bind-Open="editorOpen" OnSaved="OpenDonation" />
+
+@code {
+    private DonationPage? result;
+    private IReadOnlyList<FundView> funds = [];
+    private string? search, fund, status;
+    private DateOnly? from, to;
+    private int currentPage = 1;
+    private bool canWrite, editorOpen;
+
+    private void OpenDonation(Guid id) => Navigation.NavigateTo($"donations/{id}");
+
+    private int PageCount => result is null ? 1 : (int)Math.Ceiling(result.Total / (double)result.PageSize);
+
+    [SupplyParameterFromQuery(Name = "fund")] public string? FundQuery { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        fund = FundQuery;
+        canWrite = CurrentUser.HasPermission(GivingPermissions.Write);
+        funds = await Funds.ListAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        result = await Donations.ListAsync(new DonationFilter(
+            FundId: Guid.TryParse(fund, out var f) ? f : null,
+            Status: Enum.TryParse<DonationStatus>(status, out var s) ? s : null,
+            From: from, To: to, Search: search, Page: currentPage));
+
+    private Task FilterAsync(Action apply)
+    {
+        apply();
+        currentPage = 1;
+        return LoadAsync();
+    }
+
+    private Task GoAsync(int target)
+    {
+        currentPage = target;
+        return LoadAsync();
+    }
+
+    private static DateOnly? ParseDate(object? value) => DateOnly.TryParse(value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+}

@@ -1,0 +1,268 @@
+@page "/memberships/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = MembershipPermissions.Read)]
+@inject MembershipService Members
+@inject ICurrentUser CurrentUser
+
+<PageTitle>Üye @member?.Number · Arma CRM</PageTitle>
+
+@if (member is null)
+{
+    @if (loaded)
+    {
+        <Alert><AlertTitle>Üyelik bulunamadı</AlertTitle></Alert>
+    }
+}
+else
+{
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <p class="text-muted-foreground text-sm"><a class="hover:underline" href="memberships">Üyeler</a></p>
+                <h1 class="text-2xl font-semibold tracking-tight">@member.ContactName</h1>
+                <p class="flex items-center gap-2 text-sm">Üye no @member.Number · @member.TypeName <StatusBadge Status="member.Status" /></p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <Button Variant="ButtonVariant.Outline" Href="@($"memberships/{member.Id}/card")" target="_blank">Üye kartı</Button>
+                @if (canWrite)
+                {
+                    @if (!member.IsLifetime)
+                    {
+                        <Button OnClick="OpenRenew">Yenile</Button>
+                    }
+                    <Button Variant="ButtonVariant.Outline" OnClick="OpenDues">Aidat al</Button>
+                    <Button Variant="ButtonVariant.Outline" OnClick="OpenEdit">Düzenle</Button>
+                    @if (member.Status != MembershipStatus.Cancelled)
+                    {
+                        <Button Variant="ButtonVariant.Outline" OnClick="OpenCancel">Üyeliği sonlandır</Button>
+                    }
+                }
+            </div>
+        </div>
+
+        <div class="grid gap-6 lg:grid-cols-3">
+            <Card>
+                <CardHeader><CardTitle>Bilgiler</CardTitle></CardHeader>
+                <CardContent>
+                    <dl class="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm">
+                        <dt class="text-muted-foreground">Kişi</dt>
+                        <dd><a class="hover:underline" href="contacts/@member.ContactId">@member.ContactName</a></dd>
+                        <dt class="text-muted-foreground">Giriş tarihi</dt>
+                        <dd>@MembershipLabels.Date(member.JoinedOn)</dd>
+                        <dt class="text-muted-foreground">Geçerli dönem</dt>
+                        <dd>@MembershipLabels.Date(member.StartOn) – @(member.EndOn is { } end ? MembershipLabels.Date(end) : "süresiz")</dd>
+                        <dt class="text-muted-foreground">Dönem aidatı</dt>
+                        <dd>@(member.Fee > 0 ? MembershipLabels.Money(member.Fee) : "Aidatsız")</dd>
+                        @if (member.CancelledOn is { } cancelled)
+                        {
+                            <dt class="text-muted-foreground">Ayrılış</dt>
+                            <dd>@MembershipLabels.Date(cancelled) @member.CancelReason</dd>
+                        }
+                        @if (member.Note is not null)
+                        {
+                            <dt class="text-muted-foreground">Not</dt>
+                            <dd class="whitespace-pre-line">@member.Note</dd>
+                        }
+                    </dl>
+                </CardContent>
+            </Card>
+
+            <Card Class="lg:col-span-2">
+                <CardHeader>
+                    <CardTitle>Aidat ödemeleri</CardTitle>
+                    <CardDescription>Toplam @MembershipLabels.Money(payments.Sum(p => p.Amount))</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    @if (payments.Count == 0)
+                    {
+                        <p class="text-muted-foreground text-sm">Aidat ödemesi yok.</p>
+                    }
+                    else
+                    {
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Tarih</TableHead>
+                                    <TableHead Class="text-right">Tutar</TableHead>
+                                    <TableHead>Yöntem</TableHead>
+                                    <TableHead>Dönem</TableHead>
+                                    <TableHead></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                @foreach (var payment in payments)
+                                {
+                                    <TableRow>
+                                        <TableCell>@MembershipLabels.Date(payment.PaidOn)</TableCell>
+                                        <TableCell Class="text-right tabular-nums">@MembershipLabels.Money(payment.Amount)</TableCell>
+                                        <TableCell>@MembershipLabels.Method(payment.Method)</TableCell>
+                                        <TableCell class="whitespace-nowrap">@MembershipLabels.Date(payment.PeriodStart) – @(payment.PeriodEnd is { } end ? MembershipLabels.Date(end) : "süresiz")</TableCell>
+                                        <TableCell Class="text-right">
+                                            @if (canWrite)
+                                            {
+                                                <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => DeletePaymentAsync(payment.Id)">Sil</Button>
+                                            }
+                                        </TableCell>
+                                    </TableRow>
+                                }
+                            </TableBody>
+                        </Table>
+                    }
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+
+    <Dialog @bind-Open="duesOpen" Class="sm:max-w-lg">
+        <DialogHeader>
+            <DialogTitle>@(renewing ? "Üyeliği yenile" : "Aidat al")</DialogTitle>
+            <DialogDescription>@(renewing ? RenewHint : "Dönem değişmez; ödeme geçerli döneme yazılır.")</DialogDescription>
+        </DialogHeader>
+        <FormAlert Error="@dialogError" />
+        <form id="dues-form" class="grid gap-4" @onsubmit="SaveDuesAsync" @onsubmit:preventDefault>
+            <DuesFields Optional="renewing" @bind-Collect="collect" @bind-Amount="amount" @bind-Method="method" @bind-PaidOn="paidOn" />
+        </form>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => duesOpen = false">Vazgeç</Button>
+            <Button Type="submit" form="dues-form">@(renewing ? "Yenile" : "Kaydet")</Button>
+        </DialogFooter>
+    </Dialog>
+
+    <Dialog @bind-Open="cancelOpen">
+        <DialogHeader>
+            <DialogTitle>Üyeliği sonlandır</DialogTitle>
+            <DialogDescription>İstifa, ihraç veya vefat gibi. Kayıt ve ödemeler saklanır; yenilenirse üyelik yeniden açılır.</DialogDescription>
+        </DialogHeader>
+        <FormAlert Error="@dialogError" />
+        <form id="cancel-form" class="grid gap-4" @onsubmit="CancelAsync" @onsubmit:preventDefault>
+            <div class="grid gap-2">
+                <Label for="cancel-date">Ayrılış tarihi</Label>
+                <input id="cancel-date" type="date" class="@Styles.Input" @bind="cancelOn" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="cancel-reason">Neden</Label>
+                <Input id="cancel-reason" @bind-Value="cancelReason" maxlength="300" placeholder="İstifa" />
+            </div>
+        </form>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = false">Vazgeç</Button>
+            <Button Variant="ButtonVariant.Destructive" Type="submit" form="cancel-form">Sonlandır</Button>
+        </DialogFooter>
+    </Dialog>
+
+    <Dialog @bind-Open="editOpen">
+        <DialogHeader><DialogTitle>Üyeliği düzenle</DialogTitle></DialogHeader>
+        <FormAlert Error="@dialogError" />
+        <form id="edit-form" class="grid gap-4" @onsubmit="SaveEditAsync" @onsubmit:preventDefault>
+            <div class="grid gap-2">
+                <Label for="edit-type">Üyelik türü</Label>
+                <NativeSelect id="edit-type" @bind-Value="editType">
+                    @foreach (var type in types)
+                    {
+                        <option value="@type.Id">@type.Name</option>
+                    }
+                </NativeSelect>
+                <p class="text-muted-foreground text-xs">Yeni tür, sonraki yenilemede süre ve aidat için kullanılır.</p>
+            </div>
+            <div class="grid gap-2">
+                <Label for="edit-note">Not</Label>
+                <Textarea id="edit-note" @bind-Value="editNote" rows="3" maxlength="1000" />
+            </div>
+        </form>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => editOpen = false">Vazgeç</Button>
+            <Button Type="submit" form="edit-form">Kaydet</Button>
+        </DialogFooter>
+    </Dialog>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo Turkish = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+    private MemberView? member;
+    private IReadOnlyList<DuesView> payments = [];
+    private IReadOnlyList<MembershipTypeView> types = [];
+    private string? dialogError, amount, cancelReason, editType, editNote;
+    private DuesMethod method = DuesMethod.BankTransfer;
+    private DateOnly paidOn, cancelOn;
+    private bool loaded, canWrite, duesOpen, cancelOpen, editOpen, renewing, collect;
+
+    [Parameter] public Guid Id { get; set; }
+
+    private string RenewHint => member is { Status: MembershipStatus.Expired or MembershipStatus.Cancelled }
+        ? "Süresi dolduğu için yeni dönem bugünden başlar."
+        : $"Yeni dönem {MembershipLabels.Date(member!.EndOn!.Value.AddDays(1))} tarihinde başlar.";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        canWrite = CurrentUser.HasPermission(MembershipPermissions.Write);
+        await LoadAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        member = await Members.GetAsync(Id);
+        payments = await Members.PaymentsAsync(Id);
+    }
+
+    private void OpenRenew() => OpenDuesDialog(true);
+
+    private void OpenDues() => OpenDuesDialog(false);
+
+    private void OpenDuesDialog(bool renew)
+    {
+        (renewing, dialogError, paidOn, method) = (renew, null, Members.Today, DuesMethod.BankTransfer);
+        collect = !renew || member!.Fee > 0;
+        amount = member!.Fee > 0 ? member.Fee.ToString("N2", Turkish) : null;
+        duesOpen = true;
+    }
+
+    private void OpenCancel() => (cancelOn, cancelReason, dialogError, cancelOpen) = (Members.Today, null, null, true);
+
+    private async Task OpenEdit()
+    {
+        types = await Members.TypesAsync();
+        (editType, editNote, dialogError, editOpen) = (member!.TypeId.ToString(), member.Note, null, true);
+    }
+
+    private async Task SaveDuesAsync()
+    {
+        DuesInput? dues = null;
+        if (collect || !renewing)
+        {
+            if (!MembershipLabels.TryParseMoney(amount, out var value))
+            {
+                dialogError = "Aidat tutarını 1.250,00 biçiminde girin.";
+                return;
+            }
+
+            dues = new(value, paidOn, method, null);
+        }
+
+        var result = renewing ? await Members.RenewAsync(Id, dues) : await Members.RecordDuesAsync(Id, dues!);
+        await AfterAsync(result, () => duesOpen = false);
+    }
+
+    private async Task CancelAsync() => await AfterAsync(await Members.CancelAsync(Id, cancelOn, cancelReason), () => cancelOpen = false);
+
+    private async Task SaveEditAsync() =>
+        await AfterAsync(await Members.UpdateAsync(Id, Guid.Parse(editType!), editNote), () => editOpen = false);
+
+    private async Task DeletePaymentAsync(Guid paymentId)
+    {
+        await Members.DeletePaymentAsync(paymentId);
+        await LoadAsync();
+    }
+
+    private async Task AfterAsync(Arma.SharedKernel.Domain.Result<Guid> result, Action close)
+    {
+        if (!result.IsSuccess)
+        {
+            dialogError = result.Error!.Message;
+            return;
+        }
+
+        close();
+        await LoadAsync();
+    }
+}

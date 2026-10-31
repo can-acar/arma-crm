@@ -1,0 +1,81 @@
+using Arma.Infrastructure.Auditing;
+using Arma.Modules.Giving.Domain;
+using Arma.SharedKernel.Tenancy;
+using Microsoft.EntityFrameworkCore;
+
+namespace Arma.Modules.Giving.Infrastructure;
+
+public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, ITenantContext tenant)
+    : DbContext(options)
+{
+    public const string Schema = "giving";
+
+    private readonly Guid tenantId = tenant.TenantId;
+
+    public DbSet<Donation> Donations => Set<Donation>();
+
+    public DbSet<Fund> Funds => Set<Fund>();
+
+    public DbSet<ReceiptSettings> ReceiptSettings => Set<ReceiptSettings>();
+
+    /// <summary>
+    /// Yıl içinde boşluksuz artan makbuz sırası. Satır kilidiyle artırılır; aynı anda kesilen iki makbuz
+    /// aynı numarayı alamaz. Çağıran işlemin içinde çalışmalıdır.
+    /// </summary>
+    public async Task<long> NextReceiptNumberAsync(int year, CancellationToken cancellationToken)
+    {
+        var rows = await Database.SqlQuery<long>($"""
+            INSERT INTO giving.receipt_sequences (tenant_id, year, last_number) VALUES ({tenantId}, {year}, 1)
+            ON CONFLICT (tenant_id, year) DO UPDATE SET last_number = receipt_sequences.last_number + 1
+            RETURNING last_number AS "Value"
+            """).ToListAsync(cancellationToken);
+        return rows[0];
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.MapAuditLog();
+
+        modelBuilder.Entity<Donation>(entity =>
+        {
+            entity.Property(d => d.Amount).HasPrecision(18, 2);
+            entity.Property(d => d.Currency).HasMaxLength(3).IsFixedLength();
+            entity.Property(d => d.Method).HasConversion<short>();
+            entity.Property(d => d.Status).HasConversion<short>();
+            entity.Property(d => d.Reference).HasMaxLength(100);
+            entity.Property(d => d.Note).HasMaxLength(1000);
+            entity.Property(d => d.InKindDescription).HasMaxLength(500);
+            entity.Property(d => d.ReceiptNumber).HasMaxLength(40);
+            entity.Property(d => d.ReceiptVoidReason).HasMaxLength(300);
+            entity.Property(d => d.Provider).HasMaxLength(30);
+            entity.Property(d => d.ProviderPaymentId).HasMaxLength(100);
+            entity.Ignore(d => d.HasReceipt);
+            entity.HasOne<Fund>().WithMany().HasForeignKey(d => d.FundId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(d => new { d.TenantId, d.ContactId });
+            entity.HasIndex(d => new { d.TenantId, d.ReceivedOn });
+            entity.HasIndex(d => new { d.TenantId, d.ReceiptNumber }).IsUnique().HasFilter("receipt_number IS NOT NULL");
+            entity.HasQueryFilter(d => d.TenantId == tenantId && !d.IsDeleted);
+        });
+
+        modelBuilder.Entity<Fund>(entity =>
+        {
+            entity.Property(f => f.Name).HasMaxLength(120).UseCollation("tr-TR-x-icu");
+            entity.Property(f => f.Description).HasMaxLength(500);
+            entity.HasIndex(f => new { f.TenantId, f.Name }).IsUnique().HasFilter("NOT is_deleted");
+            entity.HasQueryFilter(f => f.TenantId == tenantId && !f.IsDeleted);
+        });
+
+        modelBuilder.Entity<ReceiptSettings>(entity =>
+        {
+            entity.ToTable("receipt_settings");
+            entity.Property(s => s.OrganizationName).HasMaxLength(200);
+            entity.Property(s => s.Address).HasMaxLength(500);
+            entity.Property(s => s.LegalInfo).HasMaxLength(500);
+            entity.Property(s => s.Footer).HasMaxLength(1000);
+            entity.Property(s => s.NumberPrefix).HasMaxLength(10);
+            entity.HasIndex(s => s.TenantId).IsUnique();
+            entity.HasQueryFilter(s => s.TenantId == tenantId && !s.IsDeleted);
+        });
+    }
+}

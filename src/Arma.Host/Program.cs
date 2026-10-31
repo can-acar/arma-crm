@@ -1,5 +1,6 @@
 using Arma.Host;
 using Arma.Host.Components;
+using Arma.Infrastructure.Messaging;
 using Arma.Infrastructure.Security;
 using Arma.SharedKernel.Tenancy;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -32,12 +33,19 @@ foreach (var module in ArmaModules.All)
     module.AddServices(builder.Services, builder.Configuration);
 }
 
+builder.AddArmaMessaging(ArmaModules.ModuleAssemblies);
+builder.Services.AddHostedService<Arma.Infrastructure.Jobs.ScheduledJobRunner>();
+
 builder.Services.AddLocalization();
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     string[] cultures = ["tr-TR", "en-US"];
     options.SetDefaultCulture(cultures[0]).AddSupportedCultures(cultures).AddSupportedUICultures(cultures);
 });
+
+// Antiforgery X-Frame-Options, Blazor da frame-ancestors başlığını her yanıta ekler. Web formları (/f/...) başka sitelere
+// gömülebilsin diye ikisini de kapatıp başlıkları aşağıda kendimiz yazıyoruz.
+builder.Services.AddAntiforgery(options => options.SuppressXFrameOptionsHeader = true);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -81,6 +89,16 @@ app.UseWhen(
     context => !context.Request.Path.StartsWithSegments("/api") && !context.Request.Path.StartsWithSegments("/connect"),
     pages => pages.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 app.UseHttpsRedirection();
+app.Use((context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/f"))
+    {
+        context.Response.Headers.XFrameOptions = "SAMEORIGIN";
+        context.Response.Headers.ContentSecurityPolicy = "frame-ancestors 'self'";
+    }
+
+    return next(context);
+});
 app.UseRequestLocalization();
 
 app.UseAuthentication();
@@ -101,7 +119,7 @@ foreach (var module in ArmaModules.All)
 }
 
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode()
+    .AddInteractiveServerRenderMode(options => options.ContentSecurityFrameAncestorsPolicy = null)
     .AddAdditionalAssemblies(ArmaModules.PageAssemblies);
 
 app.Run();

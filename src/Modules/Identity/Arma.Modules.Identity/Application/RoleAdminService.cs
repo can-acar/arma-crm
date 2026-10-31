@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Arma.Modules.Identity.Domain;
 using Arma.Modules.Identity.Infrastructure;
+using Arma.SharedKernel.Auditing;
 using Arma.SharedKernel.Domain;
 using Arma.SharedKernel.Security;
 using Microsoft.AspNetCore.Identity;
@@ -10,7 +11,7 @@ namespace Arma.Modules.Identity.Application;
 
 public sealed record RoleListItem(Guid Id, string Name, string? Description, bool IsSystem, bool RequiresTwoFactor, int UserCount, IReadOnlySet<string> Permissions);
 
-public sealed class RoleAdminService(ArmaIdentityDbContext db, RoleManager<ArmaRole> roles, PermissionCatalog catalog)
+public sealed class RoleAdminService(ArmaIdentityDbContext db, RoleManager<ArmaRole> roles, PermissionCatalog catalog, IAuditLog audit)
 {
     public async Task<IReadOnlyList<RoleListItem>> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -69,6 +70,7 @@ public sealed class RoleAdminService(ArmaIdentityDbContext db, RoleManager<ArmaR
         }
 
         await TouchMembersAsync(role.Id);
+        await audit.WriteAsync(AuditAction.Updated, "Role", role.Id.ToString(), $"{role.Name} izinleri: {string.Join(", ", wanted.Order())}");
         return true;
     }
 

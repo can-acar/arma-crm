@@ -9,30 +9,22 @@
 <div class="mx-auto flex max-w-2xl flex-col gap-6">
     <div>
         <h1 class="text-2xl font-semibold tracking-tight">Yeni kayıt</h1>
-        <p class="text-muted-foreground text-sm">Kişi veya kurum ekleyin</p>
+        <p class="text-muted-foreground text-sm">Kişi, kurum veya hane ekleyin</p>
     </div>
 
     <Card>
         <CardHeader>
-            <div class="flex gap-2">
-                <Button Variant="@(isOrganization ? ButtonVariant.Ghost : ButtonVariant.Secondary)" Size="ButtonSize.Sm" OnClick="() => isOrganization = false">Kişi</Button>
-                <Button Variant="@(isOrganization ? ButtonVariant.Secondary : ButtonVariant.Ghost)" Size="ButtonSize.Sm" OnClick="() => isOrganization = true">Kurum</Button>
-            </div>
+            <Tabs Value="@kind" ValueChanged="v => kind = v ?? Person">
+                <TabsList>
+                    <TabsTrigger Value="@Person">Kişi</TabsTrigger>
+                    <TabsTrigger Value="@Organization">Kurum</TabsTrigger>
+                    <TabsTrigger Value="@Household">Hane</TabsTrigger>
+                </TabsList>
+            </Tabs>
         </CardHeader>
         <CardContent>
             <form class="grid gap-4 sm:grid-cols-2" @onsubmit="SaveAsync" @onsubmit:preventDefault>
-                @if (isOrganization)
-                {
-                    <div class="grid gap-2 sm:col-span-2">
-                        <Label For="name">Kurum adı</Label>
-                        <Input id="name" @bind-Value="name" required />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label For="vkn">Vergi kimlik no</Label>
-                        <Input id="vkn" @bind-Value="nationalId" inputmode="numeric" maxlength="10" />
-                    </div>
-                }
-                else
+                @if (kind == Person)
                 {
                     <div class="grid gap-2">
                         <Label For="first">Ad</Label>
@@ -47,6 +39,20 @@
                         <Input id="tckn" @bind-Value="nationalId" inputmode="numeric" maxlength="11" />
                     </div>
                 }
+                else
+                {
+                    <div class="grid gap-2 sm:col-span-2">
+                        <Label For="name">@(kind == Household ? "Hane adı" : "Kurum adı")</Label>
+                        <Input id="name" @bind-Value="name" placeholder="@(kind == Household ? "Örneğin Yılmaz ailesi" : null)" required />
+                    </div>
+                    @if (kind == Organization)
+                    {
+                        <div class="grid gap-2">
+                            <Label For="vkn">Vergi kimlik no</Label>
+                            <Input id="vkn" @bind-Value="nationalId" inputmode="numeric" maxlength="10" />
+                        </div>
+                    }
+                }
                 <div class="grid gap-2">
                     <Label For="email">E-posta</Label>
                     <Input id="email" Type="email" @bind-Value="email" />
@@ -55,6 +61,22 @@
                     <Label For="phone">Telefon</Label>
                     <Input id="phone" Type="tel" @bind-Value="phone" />
                 </div>
+
+                @if (duplicates.Count > 0)
+                {
+                    <Alert Class="sm:col-span-2">
+                        <AlertTitle>Bu kayıt zaten olabilir</AlertTitle>
+                        <AlertDescription>
+                            <ul class="mt-1 grid gap-1">
+                                @foreach (var d in duplicates)
+                                {
+                                    <li><a class="underline" href="contacts/@d.Id" target="_blank">@d.DisplayName</a> <span class="text-muted-foreground">(@d.Reason)</span></li>
+                                }
+                            </ul>
+                            <p class="mt-2">Yine de yeni kayıt oluşturmak için tekrar Kaydet'e basın.</p>
+                        </AlertDescription>
+                    </Alert>
+                }
 
                 @if (error is not null)
                 {
@@ -74,33 +96,51 @@
 </div>
 
 @code {
-    private bool isOrganization;
+    private const string Person = "person", Organization = "organization", Household = "household";
+
+    private string kind = Person;
     private bool saving;
+    private bool duplicatesConfirmed;
     private string? error;
-    private string? firstName;
-    private string? lastName;
-    private string? name;
-    private string? nationalId;
-    private string? email;
-    private string? phone;
+    private string? firstName, lastName, name, nationalId, email, phone;
+    private IReadOnlyList<DuplicateCandidate> duplicates = [];
 
     private async Task SaveAsync()
     {
         saving = true;
         error = null;
-
-        var result = isOrganization
-            ? await Contacts.CreateOrganizationAsync(new CreateOrganizationRequest(name ?? "", email, phone, nationalId))
-            : await Contacts.CreatePersonAsync(new CreatePersonRequest(firstName ?? "", lastName ?? "", email, phone, nationalId));
-
-        saving = false;
-        if (result.IsSuccess)
+        try
         {
-            Navigation.NavigateTo("contacts");
+            if (!duplicatesConfirmed)
+            {
+                var displayName = kind == Person ? $"{firstName} {lastName}" : name;
+                duplicates = await Contacts.FindDuplicatesAsync(displayName, email, phone, nationalId);
+                if (duplicates.Count > 0)
+                {
+                    duplicatesConfirmed = true;
+                    return;
+                }
+            }
+
+            var result = kind switch
+            {
+                Organization => await Contacts.CreateOrganizationAsync(new CreateOrganizationRequest(name ?? "", email, phone, nationalId)),
+                Household => await Contacts.CreateHouseholdAsync(new CreateHouseholdRequest(name ?? "", email, phone)),
+                _ => await Contacts.CreatePersonAsync(new CreatePersonRequest(firstName ?? "", lastName ?? "", email, phone, nationalId)),
+            };
+
+            if (result.IsSuccess)
+            {
+                Navigation.NavigateTo($"contacts/{result.Value}");
+            }
+            else
+            {
+                error = result.Error!.Message;
+            }
         }
-        else
+        finally
         {
-            error = result.Error!.Message;
+            saving = false;
         }
     }
 }

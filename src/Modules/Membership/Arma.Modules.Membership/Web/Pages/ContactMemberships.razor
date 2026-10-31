@@ -1,0 +1,37 @@
+@inject MembershipService Members
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+@* Kişi kartındaki "Üyelik" sekmesi. *@
+<Card>
+    <CardHeader>
+        <CardTitle>Üyelikler</CardTitle>
+        @if (CurrentUser.HasPermission(MembershipPermissions.Write))
+        {
+            <CardAction><Button Size="ButtonSize.Sm" OnClick="() => joinOpen = true">Üye yap</Button></CardAction>
+        }
+    </CardHeader>
+    <CardContent>
+        @if (items.Count == 0)
+        {
+            <p class="text-muted-foreground text-sm">Üyelik kaydı yok.</p>
+        }
+        else
+        {
+            <MemberTable Items="items" ShowContact="false" />
+        }
+    </CardContent>
+</Card>
+
+<JoinDialog @bind-Open="joinOpen" ContactId="ContactId" OnSaved="_ => LoadAsync()" />
+
+@code {
+    private IReadOnlyList<MemberView> items = [];
+    private bool joinOpen;
+
+    [Parameter] public Guid ContactId { get; set; }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() => items = await Members.ForContactAsync(ContactId);
+}
