@@ -202,8 +202,8 @@ function Copy-Application {
         Start-Sleep -Seconds 3
     }
 
-    # /MIR eski sürümden kalan dosyaları siler; günlükler ve bakım sayfası korunur.
-    robocopy $source $InstallPath /MIR /XD logs /XF app_offline.htm /NFL /NDL /NJH /NJS /NP | Out-Null
+    # /MIR eski sürümden kalan dosyaları siler; günlükler, eklentiler (plugins) ve bakım sayfası korunur.
+    robocopy $source $InstallPath /MIR /XD logs plugins /XF app_offline.htm /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "Dosyalar kopyalanamadı (robocopy çıkış kodu $LASTEXITCODE)." }
     New-Item -ItemType Directory -Force -Path (Join-Path $InstallPath "logs") | Out-Null
     return $offline

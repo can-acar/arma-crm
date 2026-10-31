@@ -1,0 +1,19 @@
+@page "/plugins/ornek"
+@attribute [Authorize(Policy = SampleModule.ReadPermission)]
+@inject MergeCounter Counter
+
+<PageTitle>Örnek eklenti · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Örnek eklenti</h1>
+        <p class="text-muted-foreground text-sm">Bu sayfa bir eklentiden geliyor. Eklentiler Arma'nın bileşenlerini (kart, tablo, düğme) kullanarak uygulamanın geri kalanıyla aynı görünür.</p>
+    </div>
+    <Card>
+        <CardHeader>
+            <CardTitle>Birleştirilen kişi</CardTitle>
+            <CardDescription>Uygulama açıldığından beri birleştirilen mükerrer kişi sayısı. Eklenti bunu kişi modülünün olayını dinleyerek sayar.</CardDescription>
+        </CardHeader>
+        <CardContent><p class="text-3xl font-semibold tabular-nums" data-testid="merge-count">@Counter.Count</p></CardContent>
+    </Card>
+</div>

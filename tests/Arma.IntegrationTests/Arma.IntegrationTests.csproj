@@ -10,7 +10,13 @@
     <PackageReference Include="Shouldly" />
     <PackageReference Include="xunit.v3" />
     <ProjectReference Include="..\..\src\Arma.Host\Arma.Host.csproj" />
+    <!-- Örnek eklenti derlenir ama başvurulmaz; testler onu gerçek bir kurulumdaki gibi plugins klasöründen yükler. -->
+    <ProjectReference Include="..\..\samples\Arma.Plugins.Sample\Arma.Plugins.Sample.csproj" ReferenceOutputAssembly="false" OutputItemType="SamplePlugin" />
   </ItemGroup>
+
+  <Target Name="CopySamplePlugin" AfterTargets="Build">
+    <Copy SourceFiles="@(SamplePlugin);..\..\samples\Arma.Plugins.Sample\plugin.json" DestinationFolder="$(OutDir)plugins\arma.ornek" SkipUnchangedFiles="true" />
+  </Target>
 
   <ItemGroup>
     <Using Include="Shouldly" />
