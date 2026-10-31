@@ -46,6 +46,12 @@ public sealed class Contact : Entity
     /// <summary>KVKK kapsamında anonimleştirildiyse zamanı; kayıt bağış ve makbuz bütünlüğü için silinmez.</summary>
     public DateTimeOffset? AnonymizedAt { get; private set; }
 
+    /// <summary>Ek alan değerleri: alan kimliği → saklama biçimindeki değer (jsonb).</summary>
+    public string CustomFieldsJson { get; private set; } = "{}";
+
+    public IReadOnlyDictionary<string, string> CustomFields =>
+        System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(CustomFieldsJson) ?? [];
+
     public List<Address> Addresses { get; private set; } = [];
 
     public List<Tag> Tags { get; private set; } = [];
@@ -198,6 +204,13 @@ public sealed class Contact : Entity
         NationalId ??= duplicate.NationalId;
         BirthDate ??= duplicate.BirthDate;
         Website ??= duplicate.Website;
+        var fields = new Dictionary<string, string>(CustomFields);
+        foreach (var (key, value) in duplicate.CustomFields)
+        {
+            fields.TryAdd(key, value);
+        }
+
+        SetCustomFields(fields);
 
         foreach (var tag in duplicate.Tags.Where(t => Tags.All(x => x.Id != t.Id)))
         {
@@ -222,7 +235,9 @@ public sealed class Contact : Entity
 
     public ContactSummary ToSummary() => new(Id, Type, DisplayName, Email, Phone);
 
-    /// <summary>Aramada kullanılan normalleştirme: "İSTANBUL" ve "istanbul" aynı sonucu verir.</summary>
+    internal void SetCustomFields(IReadOnlyDictionary<string, string> values) =>
+        CustomFieldsJson = System.Text.Json.JsonSerializer.Serialize(values.OrderBy(v => v.Key, StringComparer.Ordinal).ToDictionary(v => v.Key, v => v.Value));
+
     /// <summary>
     /// Arama için küçük harfe çevirir ve Türkçe harfleri sadeleştirir: "ŞÜKRÜ ÖZ", "Şükrü Öz" ve "SUKRU OZ" aynı aranır.
     /// Banka açıklamaları ve eski sistemlerden gelen veriler çoğunlukla Türkçe karaktersizdir.

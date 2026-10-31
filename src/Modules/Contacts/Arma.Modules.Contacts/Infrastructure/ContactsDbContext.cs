@@ -27,6 +27,8 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
 
     public DbSet<SavedSearch> SavedSearches => Set<SavedSearch>();
 
+    public DbSet<CustomField> CustomFields => Set<CustomField>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -46,6 +48,8 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
             entity.Property(c => c.NationalId).HasMaxLength(11);
             entity.Property(c => c.Website).HasMaxLength(300);
             entity.Property(c => c.SearchText).IsRequired();
+            entity.Property(c => c.CustomFieldsJson).HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb").IsRequired();
+            entity.Ignore(c => c.CustomFields);
             entity.Ignore(c => c.MaskedNationalId);
             entity.Ignore(c => c.PrimaryAddress);
 
@@ -100,6 +104,19 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
             entity.Property(s => s.Criteria).HasColumnType("jsonb");
             entity.HasIndex(s => new { s.TenantId, s.Name }).IsUnique().HasFilter("NOT is_deleted");
             entity.HasQueryFilter(s => s.TenantId == tenantId && !s.IsDeleted);
+        });
+
+        modelBuilder.Entity<CustomField>(entity =>
+        {
+            entity.ToTable("custom_fields");
+            entity.Property(f => f.Label).HasMaxLength(100).UseCollation("tr-TR-x-icu");
+            entity.Property(f => f.Type).HasConversion<short>();
+            entity.Property(f => f.AppliesTo).HasConversion<short?>();
+            entity.Property(f => f.OptionsText).HasMaxLength(5000);
+            entity.Property(f => f.HelpText).HasMaxLength(300);
+            entity.Ignore(f => f.Options);
+            entity.HasIndex(f => new { f.TenantId, f.Label }).IsUnique().HasFilter("NOT is_deleted");
+            entity.HasQueryFilter(f => f.TenantId == tenantId && !f.IsDeleted);
         });
     }
 }

@@ -242,6 +242,16 @@ cd deploy
   etkinliğe kaydolan, toplu iletiyi alan veya formu dolduran tekil kişilerdir; bu kişiler tek tuşla bir gruba eklenir.
 - Kullanıcı yalnızca görme yetkisi olan modüllerin kayıtlarını bağlayabilir.
 
+## Kişi ek alanları
+
+**Yönetim → Kişi ek alanları** sayfasından kişi kartına kurumunuza özgü alanlar eklenir: metin, sayı, tarih, evet/hayır ve seçenekli. Bir alan yalnızca kişilere, kurumlara veya hanelere gösterilecek şekilde sınırlanabilir; kapatılan alan kartta görünmez ama değerleri silinmez.
+
+- Değerler kişi kartındaki **Ek bilgiler** kartından girilir ve kişinin `custom_fields_json` (jsonb) sütununda alan kimliğiyle saklanır. Sayılar "1.250,5" gibi Türkçe biçimde de yazılabilir.
+- Her alan **Gelişmiş arama**da "Ek alanlar" grubunda ölçüt olur (metin içerir, seçenek eşittir, sayı en az, tarihten sonra, evet).
+- CSV dışa aktarma her etkin alan için bir sütun ekler; içe aktarmada başlığı alan adıyla eşleşen sütunlar okunur, geçersiz değerler satır hatası olarak raporlanır.
+- Değeri olan bir alanın türü değiştirilemez. Alan silinince tüm kişilerdeki değeri de silinir. Mükerrer birleştirmede asıl kaydın değerleri korunur, boş olanlar diğer kayıttan doldurulur.
+- KVKK dışa aktarmasında "Ek bilgiler" bölümü yer alır; anonimleştirme tüm ek alan değerlerini siler.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`

@@ -35,6 +35,11 @@ internal sealed class ContactsPersonalData(ContactsDbContext db, TimeProvider cl
             .Where(r => r.FromContactId == contactId || r.ToContactId == contactId)
             .Join(db.Contacts, r => r.FromContactId == contactId ? r.ToContactId : r.FromContactId, c => c.Id, (r, c) => new { r.Type, r.Description, Other = c.DisplayName })
             .ToListAsync(cancellationToken);
+        var values = contact.CustomFields;
+        var fields = await db.CustomFields.AsNoTracking().IgnoreQueryFilters()
+            .Where(f => f.TenantId == contact.TenantId).OrderBy(f => f.Order).ToListAsync(cancellationToken);
+        var extra = fields.Where(f => values.ContainsKey(f.Id.ToString()))
+            .ToDictionary(f => f.Label, f => (string?)f.Display(values[f.Id.ToString()]));
 
         return
         [
@@ -50,6 +55,7 @@ internal sealed class ContactsPersonalData(ContactsDbContext db, TimeProvider cl
                 ["Web"] = contact.Website,
                 ["Kayıt tarihi"] = contact.CreatedAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
             }]),
+            new("Ek bilgiler", extra.Count == 0 ? [] : [extra]),
             new("Adresler", [.. contact.Addresses.Select(a => (IReadOnlyDictionary<string, string?>)new Dictionary<string, string?>
             {
                 ["Tür"] = Address.KindLabel(a.Kind),
@@ -76,7 +82,7 @@ internal sealed class ContactsPersonalData(ContactsDbContext db, TimeProvider cl
                 first_name = CASE WHEN type = 1 THEN 'Anonim' END, last_name = NULL,
                 organization_name = CASE WHEN type <> 1 THEN {label} END,
                 display_name = {label}, email = NULL, phone = NULL, national_id = NULL, birth_date = NULL,
-                website = NULL, addresses = '[]', search_text = 'anonim', anonymized_at = {now}, updated_at = {now}
+                website = NULL, addresses = '[]', custom_fields_json = jsonb_build_object(), search_text = 'anonim', anonymized_at = {now}, updated_at = {now}
             WHERE id = {contactId}
             """, cancellationToken);
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM contacts.contact_tags WHERE contacts_id = {contactId}", cancellationToken);

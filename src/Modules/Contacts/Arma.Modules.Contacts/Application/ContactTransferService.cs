@@ -14,7 +14,7 @@ public sealed record ImportRowError(int Row, string Name, string Reason);
 public sealed record ImportResult(int Created, int Total, IReadOnlyList<ImportRowError> Errors);
 
 /// <summary>Kişileri CSV olarak dışa ve içe aktarır. Her iki işlem de denetim izine yazılır.</summary>
-public sealed class ContactTransferService(ContactsDbContext db, ContactService contacts, IAuditLog audit)
+public sealed class ContactTransferService(ContactsDbContext db, ContactService contacts, CustomFieldService customFields, IAuditLog audit)
 {
     public const int MaxImportRows = 50_000;
 
@@ -24,17 +24,20 @@ public sealed class ContactTransferService(ContactsDbContext db, ContactService 
     public async Task<byte[]> ExportAsync(ContactFilter filter, bool includeNationalId, CancellationToken cancellationToken = default)
     {
         var rows = await contacts.Filter(filter).Include(c => c.Tags).OrderBy(c => c.DisplayName).AsSplitQuery().ToListAsync(cancellationToken);
+        var fields = await customFields.ActiveFieldsAsync(cancellationToken);
 
         var output = new StringBuilder();
-        Csv.WriteRow(output, Header);
+        Csv.WriteRow(output, [.. Header, .. fields.Select(f => f.Label)]);
         foreach (var c in rows)
         {
             var address = c.PrimaryAddress;
+            var values = c.CustomFields;
             Csv.WriteRow(output,
             [
                 TypeName(c.Type), c.FirstName, c.LastName, c.Type == ContactType.Person ? null : c.OrganizationName, c.Email, c.Phone,
                 includeNationalId ? c.NationalId : c.MaskedNationalId, c.BirthDate?.ToString("dd.MM.yyyy"), c.Website,
                 address?.City, address?.District, address?.Line, address?.PostalCode, string.Join(", ", c.Tags.Select(t => t.Name)),
+                .. fields.Select(f => values.TryGetValue(f.Id.ToString(), out var v) ? f.Display(v) : null),
             ]);
         }
 
@@ -64,6 +67,10 @@ public sealed class ContactTransferService(ContactsDbContext db, ContactService 
         var knownNationalIds = (await db.Contacts.Where(c => c.NationalId != null).Select(c => c.NationalId!).ToListAsync(cancellationToken)).ToHashSet();
         var knownEmails = (await db.Contacts.Where(c => c.Email != null).Select(c => c.Email!).ToListAsync(cancellationToken)).ToHashSet();
         var tags = await db.Tags.ToDictionaryAsync(t => t.Name, StringComparer.Create(CultureInfo.GetCultureInfo("tr-TR"), ignoreCase: true), cancellationToken);
+        // Başlığı bir ek alanın adıyla aynı olan sütunlar o alana yazılır.
+        var fieldColumns = (await customFields.ActiveFieldsAsync(cancellationToken))
+            .Select(f => (Field: f, Column: columns.TryGetValue(f.Label.Trim().ToLower(CultureInfo.GetCultureInfo("tr-TR")), out var i) ? i : -1))
+            .Where(x => x.Column >= 0).ToList();
         var created = 0;
 
         foreach (var (row, index) in rows.Skip(1).Select((r, i) => (r, i + 2)))
@@ -119,6 +126,31 @@ public sealed class ContactTransferService(ContactsDbContext db, ContactService 
             {
                 contact.SetAddresses([address]);
             }
+
+            var values = new Dictionary<string, string>();
+            string? fieldError = null;
+            foreach (var (field, column) in fieldColumns.Where(x => x.Field.AppliesToType(type)))
+            {
+                var normalized = field.Normalize(column < row.Length ? row[column] : null);
+                if (!normalized.IsSuccess)
+                {
+                    fieldError = normalized.Error!.Message;
+                    break;
+                }
+
+                if (normalized.Value is { } value)
+                {
+                    values[field.Id.ToString()] = value;
+                }
+            }
+
+            if (fieldError is not null)
+            {
+                errors.Add(new ImportRowError(index, displayName, fieldError));
+                continue;
+            }
+
+            contact.SetCustomFields(values);
 
             foreach (var tagName in (Get("etiketler") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {

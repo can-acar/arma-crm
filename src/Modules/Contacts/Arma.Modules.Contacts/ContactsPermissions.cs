@@ -11,6 +11,7 @@ public static class ContactsPermissions
     public const string Delete = "contacts.delete";
     public const string Export = "contacts.export";
     public const string ViewSensitive = "contacts.sensitive";
+    public const string Fields = "contacts.fields";
 
     public static readonly PermissionDefinition[] All =
     [
@@ -19,5 +20,6 @@ public static class ContactsPermissions
         new(Delete, Group, "Kişi ve kurum silme"),
         new(Export, Group, "Kayıtları dışa aktarma"),
         new(ViewSensitive, Group, "TCKN gibi hassas alanları maskesiz görme"),
+        new(Fields, Group, "Kişi kartına ek alan tanımlama"),
     ];
 }

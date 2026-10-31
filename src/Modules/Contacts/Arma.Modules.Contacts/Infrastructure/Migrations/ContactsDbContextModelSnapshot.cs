@@ -118,6 +118,13 @@ namespace Arma.Modules.Contacts.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("created_by");
 
+                    b.Property<string>("CustomFieldsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("custom_fields_json")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -210,6 +217,81 @@ namespace Arma.Modules.Contacts.Infrastructure.Migrations
                         .HasFilter("national_id IS NOT NULL AND NOT is_deleted");
 
                     b.ToTable("contacts", "contacts");
+                });
+
+            modelBuilder.Entity("Arma.Modules.Contacts.Domain.CustomField", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<short?>("AppliesTo")
+                        .HasColumnType("smallint")
+                        .HasColumnName("applies_to");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("HelpText")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("help_text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("label")
+                        .UseCollation("tr-TR-x-icu");
+
+                    b.Property<string>("OptionsText")
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)")
+                        .HasColumnName("options_text");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("order");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<short>("Type")
+                        .HasColumnType("smallint")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_custom_fields");
+
+                    b.HasIndex("TenantId", "Label")
+                        .IsUnique()
+                        .HasDatabaseName("ix_custom_fields_tenant_id_label")
+                        .HasFilter("NOT is_deleted");
+
+                    b.ToTable("custom_fields", "contacts");
                 });
 
             modelBuilder.Entity("Arma.Modules.Contacts.Domain.Group", b =>
