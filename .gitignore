@@ -485,4 +485,3 @@ $RECYCLE.BIN/
 .tools/
 src/Arma.Host/wwwroot/app.css
 deploy/.env
-deploy/out/

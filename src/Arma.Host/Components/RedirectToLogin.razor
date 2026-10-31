@@ -1,16 +1,25 @@
 @inject NavigationManager Navigation
 
+@if (signedIn)
+{
+    <PageTitle>Yetkiniz yok · Arma CRM</PageTitle>
+    <Alert Variant="AlertVariant.Destructive">
+        <AlertTitle>Yetkiniz yok</AlertTitle>
+        <AlertDescription>Bu sayfayı görüntülemek için gerekli yetkiye sahip değilsiniz.</AlertDescription>
+    </Alert>
+}
+
 @code {
-    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
+    private bool signedIn;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
-        var state = await AuthenticationState;
-        if (state.User.Identity?.IsAuthenticated == true)
-        {
-            Navigation.NavigateTo("account/access-denied", forceLoad: true);
-        }
-        else
+        // Oturum açmış ama yetkisi olmayan kullanıcı giriş sayfasına gönderilmez.
+        signedIn = (await AuthenticationState).User.Identity?.IsAuthenticated == true;
+        if (!signedIn)
         {
             Navigation.NavigateTo($"account/login?returnUrl={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}", forceLoad: true);
         }

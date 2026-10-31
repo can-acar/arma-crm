@@ -1,0 +1,85 @@
+@page "/account/login"
+@attribute [AllowAnonymous]
+@layout EmptyLayout
+@inject SignInManager<ArmaUser> SignIn
+@inject NavigationManager Navigation
+@using Microsoft.AspNetCore.Identity
+
+<PageTitle>Giriş · Arma CRM</PageTitle>
+
+<div class="flex min-h-svh items-center justify-center p-6">
+    <Card Class="w-full max-w-sm">
+        <CardHeader>
+            <CardTitle>Arma CRM</CardTitle>
+            <CardDescription>Devam etmek için giriş yapın</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <form method="post" class="grid gap-4" @formname="login" @onsubmit="SignInAsync">
+                <AntiforgeryToken />
+                <div class="grid gap-2">
+                    <Label For="email">E-posta</Label>
+                    <Input id="email" name="Form.Email" Type="email" Value="@Form.Email" autocomplete="username" required />
+                </div>
+                <div class="grid gap-2">
+                    <Label For="password">Parola</Label>
+                    <Input id="password" name="Form.Password" Type="password" autocomplete="current-password" required />
+                </div>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="Form.RememberMe" value="true" />
+                    Beni hatırla
+                </label>
+
+                @if (error is not null)
+                {
+                    <Alert Variant="AlertVariant.Destructive">
+                        <AlertTitle>Giriş yapılamadı</AlertTitle>
+                        <AlertDescription>@error</AlertDescription>
+                    </Alert>
+                }
+
+                <Button Type="submit">Giriş yap</Button>
+            </form>
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private string? error;
+
+    [SupplyParameterFromForm]
+    private LoginForm Form { get; set; } = default!;
+
+    protected override void OnInitialized() => Form ??= new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private async Task SignInAsync()
+    {
+        var result = await SignIn.PasswordSignInAsync(Form.Email ?? "", Form.Password ?? "", Form.RememberMe, lockoutOnFailure: true);
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo(LocalUrl.OrHome(ReturnUrl), forceLoad: true);
+            return;
+        }
+
+        if (result.RequiresTwoFactor)
+        {
+            Navigation.NavigateTo($"account/login-2fa?returnUrl={Uri.EscapeDataString(LocalUrl.OrHome(ReturnUrl))}&rememberMe={Form.RememberMe}", forceLoad: true);
+            return;
+        }
+
+        error = result.IsLockedOut
+            ? "Çok fazla hatalı deneme yapıldı. Hesap bir süre kilitlendi."
+            : "E-posta veya parola hatalı.";
+    }
+
+    private sealed class LoginForm
+    {
+        public string? Email { get; set; }
+
+        public string? Password { get; set; }
+
+        public bool RememberMe { get; set; }
+    }
+}

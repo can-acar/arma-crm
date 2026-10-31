@@ -1,5 +1,0 @@
-<Badge Variant="Status switch { CampaignStatus.Active => BadgeVariant.Default, CampaignStatus.Planned => BadgeVariant.Secondary, _ => BadgeVariant.Outline }">@CampaignLabels.Status(Status)</Badge>
-
-@code {
-    [Parameter] public CampaignStatus Status { get; set; }
-}

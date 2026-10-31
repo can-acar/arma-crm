@@ -1,5 +1,0 @@
-<Badge Variant="Status switch { MembershipStatus.Current => BadgeVariant.Secondary, MembershipStatus.Grace => BadgeVariant.Destructive, _ => BadgeVariant.Outline }">@MembershipLabels.Status(Status)</Badge>
-
-@code {
-    [Parameter] public MembershipStatus Status { get; set; }
-}

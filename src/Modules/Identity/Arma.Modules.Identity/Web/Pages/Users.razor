@@ -1,0 +1,196 @@
+@page "/admin/users"
+@attribute [Authorize(Roles = UserProvisioning.AdministratorRole)]
+@inject UserAdministration Administration
+@inject UserProvisioning Provisioning
+@inject ICurrentUser CurrentUser
+@using Arma.Modules.Identity.Application
+@using Arma.SharedKernel.Identity
+
+<PageTitle>Kullanıcılar · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Kullanıcılar</h1>
+        <p class="text-muted-foreground text-sm">Uygulamaya giriş yapabilen kişiler ve yetkileri</p>
+    </div>
+
+    @if (message is not null)
+    {
+        <Alert Variant="@(failed ? AlertVariant.Destructive : AlertVariant.Default)">
+            <AlertDescription>@message</AlertDescription>
+        </Alert>
+    }
+
+    <Card>
+        <CardHeader>
+            <CardTitle>Kayıtlı kullanıcılar</CardTitle>
+            <CardDescription>@users.Count kullanıcı</CardDescription>
+        </CardHeader>
+        <CardContent>
+            @* Satır düğmeleri bu tek forma bağlıdır (form="user-actions"); Blazor'da form adları tekil olmalı. *@
+            <form id="user-actions" method="post" @formname="user-action" @onsubmit="RunCommandAsync">
+                <AntiforgeryToken />
+            </form>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Ad</TableHead>
+                        <TableHead>E-posta</TableHead>
+                        <TableHead>Durum</TableHead>
+                        <TableHead><span class="sr-only">İşlemler</span></TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    @foreach (var user in users)
+                    {
+                        var self = user.Id == CurrentUser.UserId;
+                        <TableRow>
+                            <TableCell>@user.DisplayName@(self ? " (siz)" : "")</TableCell>
+                            <TableCell>@user.Email</TableCell>
+                            <TableCell>
+                                <div class="flex flex-wrap gap-1">
+                                    @if (user.IsAdministrator)
+                                    {
+                                        <Badge>Yönetici</Badge>
+                                    }
+                                    @if (user.TwoFactorEnabled)
+                                    {
+                                        <Badge Variant="BadgeVariant.Secondary">2FA</Badge>
+                                    }
+                                    @if (user.IsLocked)
+                                    {
+                                        <Badge Variant="BadgeVariant.Destructive">Kilitli</Badge>
+                                    }
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                <div class="flex justify-end gap-1">
+                                    @if (!self)
+                                    {
+                                        <Button Type="submit" Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" form="user-actions" name="Command.Action" value="@($"{(user.IsAdministrator ? "remove-admin" : "make-admin")}:{user.Id}")">
+                                            @(user.IsAdministrator ? "Yöneticiliği kaldır" : "Yönetici yap")
+                                        </Button>
+                                        <Button Type="submit" Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" form="user-actions" name="Command.Action" value="@($"{(user.IsLocked ? "unlock" : "lock")}:{user.Id}")">
+                                            @(user.IsLocked ? "Kilidi aç" : "Kilitle")
+                                        </Button>
+                                    }
+                                    @if (user.TwoFactorEnabled && !self)
+                                    {
+                                        <Button Type="submit" Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" form="user-actions" name="Command.Action" value="@($"reset-2fa:{user.Id}")">2FA sıfırla</Button>
+                                    }
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    }
+                </TableBody>
+            </Table>
+        </CardContent>
+    </Card>
+
+    <Card>
+        <CardHeader>
+            <CardTitle>Yeni kullanıcı</CardTitle>
+            <CardDescription>Geçici bir parola belirleyin ve kullanıcıya güvenli bir yoldan iletin.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <form method="post" class="grid gap-4 sm:grid-cols-2" @formname="create-user" @onsubmit="CreateAsync">
+                <AntiforgeryToken />
+                <div class="grid gap-2">
+                    <Label For="new-name">Ad soyad</Label>
+                    <Input id="new-name" name="NewUser.DisplayName" Value="@NewUser.DisplayName" required />
+                </div>
+                <div class="grid gap-2">
+                    <Label For="new-email">E-posta</Label>
+                    <Input id="new-email" name="NewUser.Email" Type="email" Value="@NewUser.Email" autocomplete="off" required />
+                </div>
+                <div class="grid gap-2">
+                    <Label For="new-password">Parola</Label>
+                    <Input id="new-password" name="NewUser.Password" Type="password" autocomplete="new-password" minlength="12" required />
+                </div>
+                <label class="flex items-center gap-2 self-end pb-2 text-sm">
+                    <input type="checkbox" name="NewUser.Administrator" value="true" />
+                    Yönetici
+                </label>
+                <div class="flex justify-end sm:col-span-2">
+                    <Button Type="submit">Kullanıcı ekle</Button>
+                </div>
+            </form>
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private IReadOnlyList<UserListItem> users = [];
+    private string? message;
+    private bool failed;
+
+    [SupplyParameterFromForm(FormName = "create-user")]
+    private NewUserForm NewUser { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "user-action")]
+    private CommandForm Command { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        NewUser ??= new();
+        Command ??= new();
+        users = await Administration.ListAsync(CancellationToken.None);
+    }
+
+    private async Task CreateAsync()
+    {
+        var result = await Provisioning.CreateAsync(NewUser.Email ?? "", NewUser.DisplayName ?? "", NewUser.Password ?? "", NewUser.Administrator, CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            Report($"{NewUser.Email} eklendi.", false);
+            NewUser = new();
+        }
+        else
+        {
+            Report(result.Error!.Message, true);
+        }
+
+        users = await Administration.ListAsync(CancellationToken.None);
+    }
+
+    private async Task RunCommandAsync()
+    {
+        // Düğme değeri "işlem:kullanıcı-kimliği" biçimindedir.
+        var parts = (Command.Action ?? "").Split(':', 2);
+        var userId = parts.Length == 2 && Guid.TryParse(parts[1], out var id) ? id : Guid.Empty;
+        var result = parts[0] switch
+        {
+            "lock" => await Administration.SetLockedAsync(userId, true),
+            "unlock" => await Administration.SetLockedAsync(userId, false),
+            "make-admin" => await Administration.SetAdministratorAsync(userId, true),
+            "remove-admin" => await Administration.SetAdministratorAsync(userId, false),
+            "reset-2fa" => await Administration.ResetTwoFactorAsync(userId),
+            _ => new Error("identity.unknown_action", "Bilinmeyen işlem."),
+        };
+
+        Report(result.IsSuccess ? "Değişiklik kaydedildi." : result.Error!.Message, !result.IsSuccess);
+        users = await Administration.ListAsync(CancellationToken.None);
+    }
+
+    private void Report(string text, bool error)
+    {
+        message = text;
+        failed = error;
+    }
+
+    private sealed class NewUserForm
+    {
+        public string? DisplayName { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? Password { get; set; }
+
+        public bool Administrator { get; set; }
+    }
+
+    private sealed class CommandForm
+    {
+        public string? Action { get; set; }
+    }
+}

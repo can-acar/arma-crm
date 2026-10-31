@@ -1,8 +1,0 @@
-@if (Value is not null)
-{
-    <p class="@(Value.Success ? "text-muted-foreground" : "text-destructive") text-sm">@(Value.Success ? "Gönderildi." : Value.Error)</p>
-}
-
-@code {
-    [Parameter] public SendResult? Value { get; set; }
-}
