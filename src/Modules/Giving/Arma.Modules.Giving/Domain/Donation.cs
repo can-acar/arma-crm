@@ -71,6 +71,9 @@ public sealed class Donation : Entity
     /// <summary>Bağış bir taahhüdün ödemesiyse o taahhüt.</summary>
     public Guid? PledgeId { get; private set; }
 
+    /// <summary>Bağış bir düzenli bağışın tahsilatıysa o düzenli bağış.</summary>
+    public Guid? RecurringDonationId { get; private set; }
+
     public bool HasReceipt => ReceiptNumber is not null && ReceiptVoidReason is null;
 
     public static Result<Donation> Record(Guid contactId, decimal amount, string? currency, DateOnly receivedOn, Guid? fundId, PaymentMethod method, string? reference, string? note, string? inKindDescription)
@@ -132,6 +135,8 @@ public sealed class Donation : Entity
     internal void LinkExternal(string key) => ExternalKey = key;
 
     public void AssignPledge(Guid? pledgeId) => PledgeId = pledgeId;
+
+    public void AssignRecurring(Guid recurringDonationId) => RecurringDonationId = recurringDonationId;
 
     public Result<bool> MarkPaid(string providerPaymentId, decimal paidAmount)
     {

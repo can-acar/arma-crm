@@ -4,7 +4,7 @@ using Arma.Modules.Comms.Senders;
 using Arma.Modules.Contacts.Application;
 using Arma.Modules.Giving.Application;
 using Arma.Modules.Giving.Domain;
-using Arma.Modules.Giving.Payments;
+using Arma.Payments.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Arma.IntegrationTests;
@@ -118,7 +118,7 @@ public sealed class GivingTests(ArmaAppFactory factory) : IClassFixture<ArmaAppF
         forged.Headers.Location!.ToString().ShouldContain("/bagis/basarisiz");
         (await StatusAsync(start.Value.DonationId)).ShouldBe(DonationStatus.Pending);
 
-        var signature = await factory.WithScopeAsync(sp => Task.FromResult(((TestPaymentProvider)sp.GetRequiredService<IPaymentProvider>()).Sign(order, "150", "success")));
+        var signature = await factory.WithScopeAsync(sp => Task.FromResult(sp.GetRequiredService<TestPaymentProvider>().Sign(order, "150", "success")));
         var paid = await client.PostAsync("/api/v1/payments/test/callback", Form(order, "150", "success", signature), ct);
         paid.StatusCode.ShouldBe(HttpStatusCode.Redirect);
         paid.Headers.Location!.ToString().ShouldContain("/bagis/tesekkurler");

@@ -331,8 +331,8 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasColumnName("pledge_id");
 
                     b.Property<string>("Provider")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
                         .HasColumnName("provider");
 
                     b.Property<string>("ProviderPaymentId")
@@ -357,6 +357,10 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                     b.Property<DateOnly>("ReceivedOn")
                         .HasColumnType("date")
                         .HasColumnName("received_on");
+
+                    b.Property<Guid?>("RecurringDonationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recurring_donation_id");
 
                     b.Property<string>("Reference")
                         .HasMaxLength(100)
@@ -388,6 +392,9 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                     b.HasIndex("PledgeId")
                         .HasDatabaseName("ix_donations_pledge_id");
 
+                    b.HasIndex("RecurringDonationId")
+                        .HasDatabaseName("ix_donations_recurring_donation_id");
+
                     b.HasIndex("TenantId", "ContactId")
                         .HasDatabaseName("ix_donations_tenant_id_contact_id");
 
@@ -407,6 +414,10 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "ReceivedOn")
                         .HasDatabaseName("ix_donations_tenant_id_received_on");
+
+                    b.HasIndex("TenantId", "RecurringDonationId")
+                        .HasDatabaseName("ix_donations_tenant_id_recurring_donation_id")
+                        .HasFilter("recurring_donation_id IS NOT NULL");
 
                     b.ToTable("donations", "giving");
                 });
@@ -611,6 +622,11 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("organization_name");
 
+                    b.Property<string>("PaymentProviders")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("payment_providers");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -631,6 +647,117 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasDatabaseName("ix_receipt_settings_tenant_id");
 
                     b.ToTable("receipt_settings", "giving");
+                });
+
+            modelBuilder.Entity("Arma.Modules.Giving.Domain.RecurringDonation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<string>("CardLabel")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("card_label");
+
+                    b.Property<string>("CardToken")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("card_token");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("currency")
+                        .IsFixedLength();
+
+                    b.Property<int>("DayOfMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("day_of_month");
+
+                    b.Property<int>("FailureCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failure_count");
+
+                    b.Property<Guid?>("FundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fund_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateOnly?>("LastChargedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("last_charged_on");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateOnly?>("NextChargeOn")
+                        .HasColumnType("date")
+                        .HasColumnName("next_charge_on");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("provider");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_recurring_donations");
+
+                    b.HasIndex("FundId")
+                        .HasDatabaseName("ix_recurring_donations_fund_id");
+
+                    b.HasIndex("TenantId", "ContactId")
+                        .HasDatabaseName("ix_recurring_donations_tenant_id_contact_id");
+
+                    b.HasIndex("TenantId", "Status", "NextChargeOn")
+                        .HasDatabaseName("ix_recurring_donations_tenant_id_status_next_charge_on");
+
+                    b.ToTable("recurring_donations", "giving");
                 });
 
             modelBuilder.Entity("Arma.Modules.Giving.Domain.BankLine", b =>
@@ -656,6 +783,12 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasForeignKey("PledgeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_donations_pledges_pledge_id");
+
+                    b.HasOne("Arma.Modules.Giving.Domain.RecurringDonation", null)
+                        .WithMany()
+                        .HasForeignKey("RecurringDonationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_donations_recurring_donations_recurring_donation_id");
                 });
 
             modelBuilder.Entity("Arma.Modules.Giving.Domain.Pledge", b =>
@@ -665,6 +798,15 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasForeignKey("FundId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_pledges_funds_fund_id");
+                });
+
+            modelBuilder.Entity("Arma.Modules.Giving.Domain.RecurringDonation", b =>
+                {
+                    b.HasOne("Arma.Modules.Giving.Domain.Fund", null)
+                        .WithMany()
+                        .HasForeignKey("FundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_recurring_donations_funds_fund_id");
                 });
 #pragma warning restore 612, 618
         }

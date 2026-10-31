@@ -18,6 +18,8 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
 
     public DbSet<Pledge> Pledges => Set<Pledge>();
 
+    public DbSet<RecurringDonation> RecurringDonations => Set<RecurringDonation>();
+
     public DbSet<ReceiptSettings> ReceiptSettings => Set<ReceiptSettings>();
 
     public DbSet<BankStatement> BankStatements => Set<BankStatement>();
@@ -54,7 +56,7 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
             entity.Property(d => d.InKindDescription).HasMaxLength(500);
             entity.Property(d => d.ReceiptNumber).HasMaxLength(40);
             entity.Property(d => d.ReceiptVoidReason).HasMaxLength(300);
-            entity.Property(d => d.Provider).HasMaxLength(30);
+            entity.Property(d => d.Provider).HasMaxLength(40);
             entity.Property(d => d.ProviderPaymentId).HasMaxLength(100);
             entity.Property(d => d.ExternalKey).HasMaxLength(100);
             entity.HasIndex(d => new { d.TenantId, d.ExternalKey }).IsUnique().HasFilter("external_key IS NOT NULL AND NOT is_deleted");
@@ -65,6 +67,8 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
             entity.HasOne<Pledge>().WithMany().HasForeignKey(d => d.PledgeId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(d => new { d.TenantId, d.PledgeId }).HasFilter("pledge_id IS NOT NULL");
             entity.HasIndex(d => new { d.TenantId, d.ReceiptNumber }).IsUnique().HasFilter("receipt_number IS NOT NULL");
+            entity.HasOne<RecurringDonation>().WithMany().HasForeignKey(d => d.RecurringDonationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(d => new { d.TenantId, d.RecurringDonationId }).HasFilter("recurring_donation_id IS NOT NULL");
             entity.HasQueryFilter(d => d.TenantId == tenantId && !d.IsDeleted);
         });
 
@@ -88,6 +92,22 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
             entity.HasIndex(p => new { p.TenantId, p.ContactId });
             entity.HasIndex(p => new { p.TenantId, p.Status });
             entity.HasQueryFilter(p => p.TenantId == tenantId && !p.IsDeleted);
+        });
+
+        modelBuilder.Entity<RecurringDonation>(entity =>
+        {
+            entity.ToTable("recurring_donations");
+            entity.Property(r => r.Amount).HasPrecision(18, 2);
+            entity.Property(r => r.Currency).HasMaxLength(3).IsFixedLength();
+            entity.Property(r => r.Provider).HasMaxLength(40);
+            entity.Property(r => r.Status).HasConversion<short>();
+            entity.Property(r => r.CardToken).HasMaxLength(2000);
+            entity.Property(r => r.CardLabel).HasMaxLength(60);
+            entity.Property(r => r.LastError).HasMaxLength(300);
+            entity.HasOne<Fund>().WithMany().HasForeignKey(r => r.FundId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(r => new { r.TenantId, r.ContactId });
+            entity.HasIndex(r => new { r.TenantId, r.Status, r.NextChargeOn });
+            entity.HasQueryFilter(r => r.TenantId == tenantId && !r.IsDeleted);
         });
 
         modelBuilder.Entity<BankStatement>(entity =>
@@ -125,6 +145,7 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
             entity.Property(s => s.LegalInfo).HasMaxLength(500);
             entity.Property(s => s.Footer).HasMaxLength(1000);
             entity.Property(s => s.NumberPrefix).HasMaxLength(10);
+            entity.Property(s => s.PaymentProviders).HasMaxLength(500);
             entity.HasIndex(s => s.TenantId).IsUnique();
             entity.HasQueryFilter(s => s.TenantId == tenantId && !s.IsDeleted);
         });

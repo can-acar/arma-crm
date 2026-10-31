@@ -3,7 +3,6 @@ using Arma.Infrastructure.Persistence;
 using Arma.Modules.Contacts.Contracts;
 using Arma.Modules.Giving.Application;
 using Arma.Modules.Giving.Infrastructure;
-using Arma.Modules.Giving.Payments;
 using Arma.Modules.Giving.Web;
 using Arma.SharedKernel.Modules;
 using Arma.SharedKernel.Security;
@@ -30,6 +29,8 @@ public sealed class GivingModule : IModule, INavigationContributor
         services.AddScoped<PledgeService>();
         services.AddScoped<Arma.SharedKernel.Modules.IDataImporter, CivicrmContributionImporter>();
         services.AddScoped<OnlineGivingService>();
+        services.AddScoped<RecurringDonationService>();
+        services.AddScoped<IScheduledJob, RecurringDonationJob>();
         services.AddScoped<Arma.Modules.Giving.Application.Banking.BankService>();
         services.AddScoped<Arma.SharedKernel.Privacy.IPersonalDataSource, GivingPersonalData>();
         services.AddScoped<GivingInsights>();
@@ -39,7 +40,6 @@ public sealed class GivingModule : IModule, INavigationContributor
         services.AddSingleton<Arma.SharedKernel.Portal.IPortalSection, DonationsPortalSection>();
         services.AddScoped<ICampaignSource, FundCampaignSource>();
         services.AddSingleton<INavigationContributor>(this);
-        AddPayments(services, configuration);
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints) => GivingEndpoints.Map(endpoints);
@@ -55,38 +55,10 @@ public sealed class GivingModule : IModule, INavigationContributor
         new("Bağışlar", "donations", 30, GivingPermissions.Read),
         new("Fonlar", "donations/funds", 31, GivingPermissions.Read),
         new("Taahhütler", "donations/pledges", 33, GivingPermissions.Read),
+        new("Düzenli bağışlar", "donations/recurring", 34, GivingPermissions.Read),
         new("Havale eşleştirme", "donations/bank", 32, GivingPermissions.Write),
         new("Makbuz ve ödeme", "admin/giving", 930, GivingPermissions.Settings),
     ];
-
-    private static void AddPayments(IServiceCollection services, IConfiguration configuration)
-    {
-        var section = configuration.GetSection(PaymentOptions.Section);
-        services.Configure<PaymentOptions>(section);
-        var provider = section["Provider"]?.Trim().ToLowerInvariant() ?? "none";
-        switch (provider)
-        {
-            case "iyzico":
-                services.AddHttpClient<IPaymentProvider, IyzicoProvider>(c => c.Timeout = TimeSpan.FromSeconds(30));
-                break;
-            case "paytr":
-                services.AddHttpClient<IPaymentProvider, PayTrProvider>(c => c.Timeout = TimeSpan.FromSeconds(30));
-                break;
-            case "test":
-                var environment = configuration[Microsoft.Extensions.Hosting.HostDefaults.EnvironmentKey];
-                if (string.Equals(environment, "Production", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException("Test ödeme sağlayıcısı canlı ortamda kullanılamaz.");
-                }
-
-                services.AddScoped<IPaymentProvider, TestPaymentProvider>();
-                break;
-            case "none" or "":
-                break;
-            default:
-                throw new InvalidOperationException($"Bilinmeyen ödeme sağlayıcısı: '{provider}'. Geçerli değerler: none, iyzico, paytr.");
-        }
-    }
 
     private sealed class DonationsPortalSection : Arma.SharedKernel.Portal.IPortalSection
     {

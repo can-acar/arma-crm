@@ -1,5 +1,7 @@
 @inject DonationService Donations
 @inject PledgeService Pledges
+@inject RecurringDonationService Recurring
+@inject Arma.SharedKernel.Portal.IPortalSession Portal
 
 @* Bağışçı portalında "Bağışlarım": toplamlar, makbuzlar, yıllık özetler ve açık taahhütler. *@
 <Card>
@@ -56,6 +58,31 @@
             </div>
         }
 
+        @if (recurring.Count > 0)
+        {
+            <div class="grid gap-2">
+                <h3 class="text-sm font-medium">Düzenli bağışlarım</h3>
+                @if (cancelled)
+                {
+                    <Alert><AlertDescription>Düzenli bağışınız durduruldu; kartınızdan yeni çekim yapılmayacak.</AlertDescription></Alert>
+                }
+                @foreach (var plan in recurring)
+                {
+                    <div class="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
+                        <div>
+                            <div>Her ay @Money.Format(plan.Amount, plan.Currency) · @(plan.FundName ?? "Genel")</div>
+                            <div class="text-muted-foreground text-xs">@(plan.CardLabel ?? "Kayıtlı kart")@(plan.NextChargeOn is { } next ? $" · sıradaki çekim {GivingLabels.Date(next)}" : "")</div>
+                        </div>
+                        <form method="post" @formname="portal-recurring-cancel" @onsubmit="CancelAsync">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="CancelId" value="@plan.Id" />
+                            <Button Type="submit" Size="ButtonSize.Sm" Variant="ButtonVariant.Outline">Durdur</Button>
+                        </form>
+                    </div>
+                }
+            </div>
+        }
+
         @if (pledges.Count > 0)
         {
             <div class="grid gap-2">
@@ -80,6 +107,10 @@
     private IReadOnlyList<DonationView> items = [];
     private IReadOnlyList<int> years = [];
     private IReadOnlyList<PledgeView> pledges = [];
+    private IReadOnlyList<RecurringDonationView> recurring = [];
+    private bool cancelled;
+
+    [SupplyParameterFromForm(FormName = "portal-recurring-cancel")] private Guid? CancelId { get; set; }
 
     [Parameter] public Guid ContactId { get; set; }
 
@@ -89,5 +120,21 @@
         items = (await Donations.ListAsync(new DonationFilter(ContactId: ContactId, Status: DonationStatus.Completed, PageSize: 100))).Items;
         years = [.. items.Select(d => d.ReceivedOn.Year).Distinct().OrderByDescending(y => y)];
         pledges = [.. (await Pledges.ListAsync(contactId: ContactId)).Where(p => p.State is PledgeState.Open or PledgeState.Overdue)];
+        recurring = await ActiveRecurringAsync();
     }
+
+    private async Task CancelAsync()
+    {
+        // Form, sayfayı açan kişinin oturumuyla eşleşmeli; yalnızca kendi düzenli bağışı durdurulabilir.
+        if (CancelId is not { } id || await Portal.ContactIdAsync() != ContactId)
+        {
+            return;
+        }
+
+        cancelled = (await Recurring.CancelAsync(id, ContactId)).IsSuccess;
+        recurring = await ActiveRecurringAsync();
+    }
+
+    private async Task<IReadOnlyList<RecurringDonationView>> ActiveRecurringAsync() =>
+        [.. (await Recurring.ListAsync(contactId: ContactId)).Where(r => r.Status is RecurringStatus.Active or RecurringStatus.Paused)];
 }

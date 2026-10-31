@@ -1,3 +1,4 @@
+using Arma.Payments;
 using Arma.Host;
 using Arma.Host.Components;
 using Arma.Infrastructure.Messaging;
@@ -33,6 +34,9 @@ foreach (var module in ArmaModules.All)
 {
     module.AddServices(builder.Services, builder.Configuration);
 }
+
+// Ödeme sağlayıcıları: yerleşik olanlar ve modüllerle eklentilerdeki IPaymentProvider sınıfları kendiliğinden bulunur.
+builder.Services.AddArmaPayments().AddProvidersFrom(ArmaModules.ModuleAssemblies);
 
 builder.AddArmaMessaging(ArmaModules.ModuleAssemblies);
 builder.Services.AddHostedService<Arma.Infrastructure.Jobs.ScheduledJobRunner>();

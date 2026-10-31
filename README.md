@@ -139,11 +139,18 @@ site klasöründe tutulmaz. Güncellemede yeni paketle aynı komut (`-CreateData
 
 - Makbuz numarası kurum başına, her yıl 1'den başlayarak boşluksuz artar (`{önek}{yıl}-000001`).
   Kesilmiş makbuzun tutarı, tarihi ve bağışçısı değişmez; iptal edilen numara tekrar kullanılmaz.
-- Kamuya açık bağış formu `/bagis` adresindedir. Ödeme kuruluşu `Giving:Payments:Provider` ile seçilir
-  (`none`, `iyzico`, `paytr`); anahtarlar ortam değişkeni veya `.env` ile verilir, veritabanına yazılmaz.
+- Kamuya açık bağış formu `/bagis` adresindedir. Ödeme sağlayıcıları (iyzico, PayTR ve eklentiyle gelenler)
+  "Makbuz ve ödeme" ekranında listelenir; formda hangilerinin, hangi sırayla sunulacağı orada seçilir.
+  Anahtarlar `Payments__Providers__<sağlayıcı>__<alan>` ortam değişkenleriyle (`.env`) verilir, veritabanına yazılmaz.
 - Ödeme sonucu yalnızca imzası doğrulanmış (PayTR) veya kuruluştan sorgulanmış (iyzico) bildirimle
   tamamlanır; aynı bildirim tekrar gelirse sonuç değişmez.
-- Geliştirmede `Giving__Payments__Provider=test` sahte ödeme sayfasını açar; canlı ortamda kullanılamaz.
+- Düzenli bağış: bağışçı formda "Her ay tekrarla"yı seçerse kart sağlayıcıda saklanır ve her ay aynı gün
+  kayıtlı karttan çekilir (şu an iyzico; üye işyerinde kart saklama ve 3D'siz ödeme yetkisi açık olmalı).
+  Başarısız tahsilat üç gün sonra yeniden denenir, üst üste üç başarısızlıkta durur ve bağışçıya e-posta gider.
+  Bağışçı portaldan, görevli "Düzenli bağışlar" ekranından durdurabilir.
+- Yeni ödeme sağlayıcısı kod değişikliği gerektirmez: `IPaymentProvider` uygulayan bir sınıf içeren eklenti
+  `plugins` klasörüne konur, sağlayıcı kendiliğinden listelenir. Ayrıntılar: [docs/odeme.md](docs/odeme.md).
+- Geliştirme ve test ortamında "Test ödemesi" sağlayıcısı sahte ödeme sayfasını açar; canlı ortamda listelenmez.
 
 ## E-posta, SMS ve İYS
 

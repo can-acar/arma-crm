@@ -12,15 +12,16 @@ x-arma-env: &arma-env
   ASPNETCORE_ENVIRONMENT: Production
   # Ekranda gösterilen ve formlarda girilen tarih-saatlerin saat dilimi.
   TZ: ${ARMA_TIMEZONE:-Europe/Istanbul}
-  # Çevrim içi bağış: none, iyzico veya paytr. Anahtarlar yalnızca .env dosyasında tutulur.
-  Giving__Payments__Provider: ${ARMA_PAYMENT_PROVIDER:-none}
-  Giving__Payments__Iyzico__ApiKey: ${IYZICO_API_KEY:-}
-  Giving__Payments__Iyzico__SecretKey: ${IYZICO_SECRET_KEY:-}
-  Giving__Payments__Iyzico__BaseUrl: ${IYZICO_BASE_URL:-https://api.iyzipay.com}
-  Giving__Payments__PayTR__MerchantId: ${PAYTR_MERCHANT_ID:-}
-  Giving__Payments__PayTR__MerchantKey: ${PAYTR_MERCHANT_KEY:-}
-  Giving__Payments__PayTR__MerchantSalt: ${PAYTR_MERCHANT_SALT:-}
-  Giving__Payments__PayTR__TestMode: ${PAYTR_TEST_MODE:-false}
+  # Ödeme sağlayıcıları: anahtarları girilen sağlayıcı "Makbuz ve ödeme" ekranında listelenir ve bağış formunda
+  # seçenek olur. Anahtarlar yalnızca .env dosyasında tutulur. Eklentiyle gelen sağlayıcının ayarları da aynı
+  # biçimdedir: Payments__Providers__<anahtar>__<alan>.
+  Payments__Providers__iyzico__ApiKey: ${IYZICO_API_KEY:-}
+  Payments__Providers__iyzico__SecretKey: ${IYZICO_SECRET_KEY:-}
+  Payments__Providers__iyzico__BaseUrl: ${IYZICO_BASE_URL:-https://api.iyzipay.com}
+  Payments__Providers__paytr__MerchantId: ${PAYTR_MERCHANT_ID:-}
+  Payments__Providers__paytr__MerchantKey: ${PAYTR_MERCHANT_KEY:-}
+  Payments__Providers__paytr__MerchantSalt: ${PAYTR_MERCHANT_SALT:-}
+  Payments__Providers__paytr__TestMode: ${PAYTR_TEST_MODE:-false}
   Comms__PublicUrl: ${ARMA_PUBLIC_URL:-}
   Comms__Email__Provider: ${ARMA_EMAIL_PROVIDER:-none}
   Comms__Email__Host: ${SMTP_HOST:-}
