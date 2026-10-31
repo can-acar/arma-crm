@@ -1,0 +1,13 @@
+<span class="@($"inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium {ContactLabels.TagClass(Tag.Color)}")">
+    @Tag.Name
+    @if (OnRemove.HasDelegate)
+    {
+        <button type="button" class="opacity-60 hover:opacity-100" aria-label="@($"{Tag.Name} etiketini kaldır")" @onclick="() => OnRemove.InvokeAsync(Tag)">✕</button>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public TagDto Tag { get; set; } = default!;
+
+    [Parameter] public EventCallback<TagDto> OnRemove { get; set; }
+}

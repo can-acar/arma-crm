@@ -1,0 +1,217 @@
+@page "/contacts/{Id:guid}/edit"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = ContactsPermissions.Write)]
+@inject ContactService Contacts
+@inject NavigationManager Navigation
+
+<PageTitle>Düzenle · Arma CRM</PageTitle>
+
+@if (contact is null)
+{
+    <Skeleton Class="h-40 w-full" />
+}
+else
+{
+    <div class="mx-auto flex max-w-3xl flex-col gap-6">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">@contact.DisplayName</h1>
+            <p class="text-muted-foreground text-sm">@ContactLabels.Type(contact.Type) kaydını düzenle</p>
+        </div>
+
+        <form class="flex flex-col gap-6" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <Card>
+                <CardHeader><CardTitle>Bilgiler</CardTitle></CardHeader>
+                <CardContent class="grid gap-4 sm:grid-cols-2">
+                    @if (contact.Type == ContactType.Person)
+                    {
+                        <div class="grid gap-2">
+                            <Label For="first">Ad</Label>
+                            <Input id="first" @bind-Value="firstName" required />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label For="last">Soyad</Label>
+                            <Input id="last" @bind-Value="lastName" required />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label For="nid">T.C. kimlik no</Label>
+                            <Input id="nid" @bind-Value="nationalId" inputmode="numeric" maxlength="11" placeholder="@(contact.MaskedNationalId is null ? null : "Değiştirmek için yeni numarayı girin")" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label For="birth">Doğum tarihi</Label>
+                            <Input id="birth" Type="date" @bind-Value="birthDate" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="grid gap-2 sm:col-span-2">
+                            <Label For="name">Ad</Label>
+                            <Input id="name" @bind-Value="name" required />
+                        </div>
+                        @if (contact.Type == ContactType.Organization)
+                        {
+                            <div class="grid gap-2">
+                                <Label For="nid">Vergi kimlik no</Label>
+                                <Input id="nid" @bind-Value="nationalId" inputmode="numeric" maxlength="10" placeholder="@(contact.MaskedNationalId is null ? null : "Değiştirmek için yeni numarayı girin")" />
+                            </div>
+                        }
+                        <div class="grid gap-2">
+                            <Label For="web">Web</Label>
+                            <Input id="web" Type="url" @bind-Value="website" />
+                        </div>
+                    }
+                    <div class="grid gap-2">
+                        <Label For="email">E-posta</Label>
+                        <Input id="email" Type="email" @bind-Value="email" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label For="phone">Telefon</Label>
+                        <Input id="phone" Type="tel" @bind-Value="phone" />
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Adresler</CardTitle>
+                    <CardAction><Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" OnClick="AddAddress">Adres ekle</Button></CardAction>
+                </CardHeader>
+                <CardContent class="grid gap-6">
+                    @foreach (var (address, index) in addresses.Select((a, i) => (a, i)))
+                    {
+                        <div class="grid gap-3 sm:grid-cols-4" @key="address">
+                            <div class="grid gap-2">
+                                <Label>Tür</Label>
+                                <NativeSelect @bind-Value="address.Kind">
+                                    @foreach (var kind in Enum.GetValues<AddressKind>())
+                                    {
+                                        <option value="@kind">@Address.KindLabel(kind)</option>
+                                    }
+                                </NativeSelect>
+                            </div>
+                            <div class="grid gap-2">
+                                <Label>İl</Label>
+                                <NativeSelect @bind-Value="address.City">
+                                    <option value="">Seçin</option>
+                                    @foreach (var city in TurkishProvinces.All.Order(StringComparer.Create(new System.Globalization.CultureInfo("tr-TR"), false)))
+                                    {
+                                        <option value="@city">@city</option>
+                                    }
+                                </NativeSelect>
+                            </div>
+                            <div class="grid gap-2">
+                                <Label>İlçe</Label>
+                                <Input @bind-Value="address.District" />
+                            </div>
+                            <div class="grid gap-2">
+                                <Label>Posta kodu</Label>
+                                <Input @bind-Value="address.PostalCode" inputmode="numeric" maxlength="5" />
+                            </div>
+                            <div class="grid gap-2 sm:col-span-3">
+                                <Label>Adres</Label>
+                                <Input @bind-Value="address.Line" placeholder="Mahalle, cadde/sokak, no, daire" />
+                            </div>
+                            <div class="flex items-end gap-2">
+                                <label class="flex h-9 items-center gap-2 text-sm">
+                                    <input type="radio" name="primary" checked="@address.IsPrimary" @onchange="() => SetPrimary(index)" class="accent-primary" /> Birincil
+                                </label>
+                                <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" OnClick="() => addresses.RemoveAt(index)">Kaldır</Button>
+                            </div>
+                        </div>
+                    }
+                    @if (addresses.Count == 0)
+                    {
+                        <p class="text-muted-foreground text-sm">Adres yok.</p>
+                    }
+                </CardContent>
+            </Card>
+
+            <FormAlert Error="@error" />
+
+            <div class="flex justify-end gap-2">
+                <Button Variant="ButtonVariant.Outline" Href="@($"contacts/{Id}")">Vazgeç</Button>
+                <Button Type="submit" Disabled="saving">Kaydet</Button>
+            </div>
+        </form>
+    </div>
+}
+
+@code {
+    private ContactDetail? contact;
+    private string? firstName, lastName, name, nationalId, email, phone, website, birthDate;
+    private List<AddressForm> addresses = [];
+    private string? error;
+    private bool saving;
+
+    [Parameter] public Guid Id { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        contact = await Contacts.GetAsync(Id);
+        if (contact is null)
+        {
+            Navigation.NavigateTo("contacts");
+            return;
+        }
+
+        (firstName, lastName, email, phone, website) = (contact.FirstName, contact.LastName, contact.Email, contact.Phone, contact.Website);
+        name = contact.OrganizationName ?? contact.DisplayName;
+        birthDate = contact.BirthDate?.ToString("yyyy-MM-dd");
+        addresses = contact.Addresses.Select(AddressForm.From).ToList();
+    }
+
+    private void AddAddress() => addresses.Add(new AddressForm { IsPrimary = addresses.Count == 0 });
+
+    private void SetPrimary(int index)
+    {
+        for (var i = 0; i < addresses.Count; i++)
+        {
+            addresses[i].IsPrimary = i == index;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        // Kimlik numarası alanı boş bırakılırsa mevcut değer korunur (maskeli değer formda gösterilmez).
+        var id = string.IsNullOrWhiteSpace(nationalId) ? await CurrentNationalIdAsync() : nationalId;
+        var result = await Contacts.UpdateAsync(Id, new UpdateContactRequest(
+            firstName, lastName, name, email, phone, id,
+            DateOnly.TryParse(birthDate, out var b) ? b : null, website,
+            addresses.Select(a => a.ToAddress()).ToList()));
+        saving = false;
+
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo($"contacts/{Id}");
+        }
+        else
+        {
+            error = result.Error!.Message;
+        }
+    }
+
+    private Task<string?> CurrentNationalIdAsync() => Contacts.CurrentNationalIdAsync(Id);
+
+    private sealed class AddressForm
+    {
+        public string Kind { get; set; } = nameof(AddressKind.Home);
+        public string? City { get; set; }
+        public string? District { get; set; }
+        public string? PostalCode { get; set; }
+        public string? Line { get; set; }
+        public bool IsPrimary { get; set; }
+
+        public static AddressForm From(Address a) => new()
+        {
+            Kind = a.Kind.ToString(), City = a.City, District = a.District, PostalCode = a.PostalCode, Line = a.Line, IsPrimary = a.IsPrimary,
+        };
+
+        public Address ToAddress() => new()
+        {
+            Kind = Enum.TryParse<AddressKind>(Kind, out var k) ? k : AddressKind.Other,
+            City = Clean(City), District = Clean(District), PostalCode = Clean(PostalCode), Line = Clean(Line), IsPrimary = IsPrimary,
+        };
+
+        private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+}

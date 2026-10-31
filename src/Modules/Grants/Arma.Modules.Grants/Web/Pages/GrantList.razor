@@ -1,0 +1,103 @@
+@page "/grants"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = GrantsPermissions.Read)]
+@inject GrantService Grants
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Hibeler · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Hibeler</h1>
+            <p class="text-muted-foreground text-sm">Vakıf, kalkınma ajansı ve kurumlara yapılan hibe başvuruları; rapor teslimleri ve ödeme dilimleri. Toplamlar yalnızca TL hibeleri içerir.</p>
+        </div>
+        @if (canWrite)
+        {
+            <Button OnClick="() => editorOpen = true">Hibe başvurusu ekle</Button>
+        }
+    </div>
+
+    @if (summary is not null)
+    {
+        <div class="grid gap-4 sm:grid-cols-4">
+            <Card><CardHeader><CardDescription>Bekleyen başvuru</CardDescription><CardTitle Class="text-lg">@summary.Pending</CardTitle></CardHeader></Card>
+            <Card><CardHeader><CardDescription>Bekleyen talep</CardDescription><CardTitle Class="text-lg">@GrantLabels.Money(summary.PendingRequestedTry, "TRY")</CardTitle></CardHeader></Card>
+            <Card><CardHeader><CardDescription>@Grants.Today.Year kabul</CardDescription><CardTitle Class="text-lg">@GrantLabels.Money(summary.AwardedThisYearTry, "TRY")</CardTitle></CardHeader></Card>
+            <Card><CardHeader><CardDescription>Beklenen ödeme</CardDescription><CardTitle Class="text-lg">@GrantLabels.Money(summary.ExpectedTry, "TRY")</CardTitle></CardHeader></Card>
+        </div>
+    }
+
+    <div class="grid gap-3 sm:grid-cols-3">
+        <Input Type="search" placeholder="Başlık veya program" Value="@search" ValueChanged="SearchAsync" aria-label="Ara" />
+        <NativeSelect Value="@Status" ValueChanged="v => Go(v, Mine)" aria-label="Durum">
+            <option value="">Tüm durumlar</option>
+            @foreach (var option in Enum.GetValues<GrantStatus>())
+            {
+                <option value="@option">@GrantLabels.Status(option)</option>
+            }
+        </NativeSelect>
+        <NativeSelect Value="@(Mine == 1 ? "1" : "")" ValueChanged="MineChanged" aria-label="Sorumlu">
+            <option value="">Herkesin</option>
+            <option value="1">Bana atanan</option>
+        </NativeSelect>
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (items is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (items.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Henüz hibe kaydı yok.</p>
+            }
+            else
+            {
+                <GrantTable Items="items" />
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<GrantDialog @bind-Open="editorOpen" OnSaved="Opened" />
+
+@code {
+    private IReadOnlyList<GrantListItem>? items;
+    private GrantSummary? summary;
+    private string? search;
+    private bool canWrite, editorOpen;
+
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+
+    [SupplyParameterFromQuery(Name = "mine")] public int? Mine { get; set; }
+
+    protected override void OnInitialized() => canWrite = CurrentUser.HasPermission(GrantsPermissions.Write);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        summary = await Grants.SummaryAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        items = await Grants.ListAsync(new GrantFilter(
+            Status: Enum.TryParse<GrantStatus>(Status, out var status) ? status : null,
+            OwnerId: Mine == 1 && Guid.TryParse(CurrentUser.Id, out var me) ? me : null,
+            Search: search));
+
+    private async Task SearchAsync(string? value)
+    {
+        search = value;
+        await LoadAsync();
+    }
+
+    private void Go(string? status, int? mine) =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters("grants", new Dictionary<string, object?> { ["status"] = string.IsNullOrEmpty(status) ? null : status, ["mine"] = mine }));
+
+    private void MineChanged(string? value) => Go(Status, value == "1" ? 1 : null);
+
+    private void Opened(Guid id) => Navigation.NavigateTo($"grants/{id}");
+}

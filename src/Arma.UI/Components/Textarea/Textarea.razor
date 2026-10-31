@@ -1,0 +1,16 @@
+@namespace Arma.UI
+@inherits ArmaComponentBase
+
+<textarea data-slot="textarea" @oninput="OnInputAsync" class="@Cn(Styles.Textarea, Class)" @attributes="AdditionalAttributes">@Value</textarea>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString();
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

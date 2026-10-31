@@ -1,0 +1,201 @@
+@page "/admin/sales"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = SalesPermissions.Settings)]
+@inject SalesService Sales
+@inject QuoteService Quotes
+
+<PageTitle>Satış ayarları · Arma CRM</PageTitle>
+
+<div class="flex max-w-4xl flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Satış ayarları</h1>
+        <p class="text-muted-foreground text-sm">Satış hattı aşamaları ve teklif çıktısında görünen kurum bilgileri.</p>
+    </div>
+
+    <Card>
+        <CardHeader>
+            <CardTitle>Satış hattı</CardTitle>
+            <CardDescription>Aşamaları sırayla yazın. Olasılık, ağırlıklı tahmini hesaplar. Kazanıldı ve kaybedildi türündeki aşamalar fırsatı kapatır.</CardDescription>
+            @if (pipelines.Count > 0)
+            {
+                <CardAction>
+                    <div class="flex gap-2">
+                        @if (pipelines.Count > 1)
+                        {
+                            <NativeSelect Value="@selectedId" ValueChanged="Select" aria-label="Satış hattı">
+                                @foreach (var item in pipelines)
+                                {
+                                    <option value="@item.Id">@item.Name</option>
+                                }
+                            </NativeSelect>
+                        }
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" OnClick="NewPipeline">Yeni hat</Button>
+                    </div>
+                </CardAction>
+            }
+        </CardHeader>
+        <CardContent Class="flex flex-col gap-3">
+            <FormAlert Error="@pipelineError" />
+            @if (pipelineSaved)
+            {
+                <p class="text-sm text-green-700 dark:text-green-400">Kaydedildi.</p>
+            }
+            <div class="grid gap-2 sm:max-w-sm">
+                <Label for="pipeline-name">Hat adı</Label>
+                <Input id="pipeline-name" @bind-Value="pipelineName" maxlength="100" />
+            </div>
+            <div class="text-muted-foreground hidden grid-cols-[1fr_7rem_9rem_6rem] gap-2 text-xs font-medium sm:grid">
+                <span>Aşama</span><span>Olasılık %</span><span>Tür</span><span></span>
+            </div>
+            @for (var i = 0; i < stages.Count; i++)
+            {
+                var index = i;
+                var stage = stages[i];
+                <div class="grid gap-2 sm:grid-cols-[1fr_7rem_9rem_6rem] sm:items-center" data-stage-row>
+                    <Input @bind-Value="stage.Name" aria-label="Aşama adı" maxlength="60" />
+                    <Input @bind-Value="stage.Probability" inputmode="numeric" aria-label="Olasılık" />
+                    <NativeSelect @bind-Value="stage.Kind" aria-label="Tür">
+                        @foreach (var kind in Enum.GetValues<StageKind>())
+                        {
+                            <option value="@kind">@SalesLabels.Kind(kind)</option>
+                        }
+                    </NativeSelect>
+                    <div class="flex gap-1">
+                        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" aria-label="Yukarı" Disabled="index == 0" OnClick="() => Swap(index, index - 1)">↑</Button>
+                        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" aria-label="Sil" OnClick="() => stages.RemoveAt(index)">×</Button>
+                    </div>
+                </div>
+            }
+            <div class="flex justify-between">
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" OnClick="AddStage">Aşama ekle</Button>
+                <Button OnClick="SavePipelineAsync">Satış hattını kaydet</Button>
+            </div>
+        </CardContent>
+    </Card>
+
+    <Card>
+        <CardHeader>
+            <CardTitle>Teklif</CardTitle>
+            <CardDescription>Teklif çıktısının üst bilgisi ve yeni tekliflere önceden yazılan şartlar.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <form class="grid gap-4" @onsubmit="SaveSettingsAsync" @onsubmit:preventDefault>
+                <FormAlert Error="@settingsError" />
+                @if (settingsSaved)
+                {
+                    <p class="text-sm text-green-700 dark:text-green-400">Kaydedildi.</p>
+                }
+                <div class="grid gap-2">
+                    <Label for="org-name">Kurum adı</Label>
+                    <Input id="org-name" @bind-Value="settings.OrganizationName" maxlength="200" />
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="grid gap-2">
+                        <Label for="org-address">Adres</Label>
+                        <Textarea id="org-address" @bind-Value="settings.Address" rows="3" maxlength="500" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="org-legal">Vergi dairesi, vergi no, MERSİS</Label>
+                        <Textarea id="org-legal" @bind-Value="settings.LegalInfo" rows="3" maxlength="500" />
+                    </div>
+                </div>
+                <div class="grid gap-2">
+                    <Label for="default-terms">Varsayılan şartlar</Label>
+                    <Textarea id="default-terms" @bind-Value="settings.DefaultTerms" rows="4" maxlength="4000" />
+                </div>
+                <div class="grid gap-2 sm:max-w-40">
+                    <Label for="validity">Geçerlilik (gün)</Label>
+                    <input id="validity" type="number" min="1" max="365" class="@Styles.Input" @bind="settings.ValidityDays" />
+                </div>
+                <div class="flex justify-end">
+                    <Button Type="submit">Kaydet</Button>
+                </div>
+            </form>
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private IReadOnlyList<PipelineView> pipelines = [];
+    private List<StageDraft> stages = [];
+    private QuoteSettings settings = new();
+    private string? selectedId, pipelineName, pipelineError, settingsError;
+    private bool pipelineSaved, settingsSaved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        settings = await Quotes.SettingsAsync();
+        await LoadPipelinesAsync(null);
+    }
+
+    private async Task LoadPipelinesAsync(Guid? select)
+    {
+        pipelines = await Sales.PipelinesAsync();
+        Select((pipelines.FirstOrDefault(p => p.Id == select) ?? pipelines.FirstOrDefault(p => p.IsDefault) ?? pipelines.FirstOrDefault())?.Id.ToString());
+    }
+
+    private void Select(string? id)
+    {
+        selectedId = id;
+        var pipeline = pipelines.FirstOrDefault(p => p.Id.ToString() == id);
+        pipelineName = pipeline?.Name;
+        stages = pipeline?.Stages.Select(s => new StageDraft { Id = s.Id, Name = s.Name, Probability = s.Probability.ToString(), Kind = s.Kind.ToString() }).ToList() ?? [];
+        (pipelineError, pipelineSaved) = (null, false);
+    }
+
+    private void NewPipeline()
+    {
+        selectedId = null;
+        pipelineName = "Yeni satış hattı";
+        stages = Pipeline.CreateDefault().Stages.OrderBy(s => s.Position)
+            .Select(s => new StageDraft { Name = s.Name, Probability = s.Probability.ToString(), Kind = s.Kind.ToString() }).ToList();
+        (pipelineError, pipelineSaved) = (null, false);
+    }
+
+    private void AddStage() => stages.Add(new StageDraft { Probability = "50" });
+
+    private void Swap(int a, int b) => (stages[a], stages[b]) = (stages[b], stages[a]);
+
+    private async Task SavePipelineAsync()
+    {
+        pipelineSaved = false;
+        var inputs = new List<StageInput>();
+        foreach (var stage in stages)
+        {
+            if (!int.TryParse(stage.Probability, out var probability))
+            {
+                pipelineError = $"\"{stage.Name}\" aşamasının olasılığını 0-100 arası bir sayı olarak girin.";
+                return;
+            }
+
+            inputs.Add(new StageInput(stage.Id, stage.Name ?? "", probability, Enum.Parse<StageKind>(stage.Kind ?? nameof(StageKind.Open))));
+        }
+
+        var result = await Sales.SavePipelineAsync(Guid.TryParse(selectedId, out var id) ? id : null, pipelineName ?? "", inputs);
+        if (!result.IsSuccess)
+        {
+            pipelineError = result.Error!.Message;
+            return;
+        }
+
+        await LoadPipelinesAsync(result.Value);
+        pipelineSaved = true;
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        var result = await Quotes.SaveSettingsAsync(settings);
+        (settingsError, settingsSaved) = result.IsSuccess ? (null, true) : (result.Error!.Message, false);
+    }
+
+    private sealed class StageDraft
+    {
+        public Guid? Id { get; set; }
+
+        public string? Name { get; set; }
+
+        public string? Probability { get; set; }
+
+        public string? Kind { get; set; } = nameof(StageKind.Open);
+    }
+}

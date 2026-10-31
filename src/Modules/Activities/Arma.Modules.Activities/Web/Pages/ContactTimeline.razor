@@ -1,0 +1,74 @@
+@inherits ActivityPageBase
+@inject IContactDirectory Directory
+
+@* Kişi kartındaki "Zaman çizelgesi" sekmesi. *@
+<div class="grid gap-4">
+    <FormAlert Error="@Error" />
+
+    @if (CanWrite)
+    {
+        <div class="flex flex-wrap gap-2">
+            <Button Size="ButtonSize.Sm" OnClick="() => New(ActivityKind.Note)">Not ekle</Button>
+            <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="() => New(ActivityKind.Call)">Arama kaydet</Button>
+            <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="() => New(ActivityKind.Meeting)">Toplantı kaydet</Button>
+            <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="() => New(ActivityKind.Task)">Görev oluştur</Button>
+        </div>
+    }
+
+    @if (openTasks.Count > 0)
+    {
+        <Card>
+            <CardHeader>
+                <CardTitle>Açık görevler</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <ul class="divide-y">
+                    @foreach (var activity in openTasks)
+                    {
+                        <ActivityItem Activity="activity" ShowContacts="false" CanWrite="CanWrite" CanDelete="CanDelete"
+                                      OnComplete="CompleteAsync" OnReopen="ReopenAsync" OnEdit="Edit" OnDelete="AskDelete" />
+                    }
+                </ul>
+            </CardContent>
+        </Card>
+    }
+
+    <Card>
+        <CardHeader>
+            <CardTitle>Geçmiş</CardTitle>
+            <CardDescription>Notlar, görüşmeler ve diğer modüllerden gelen kayıtlar</CardDescription>
+        </CardHeader>
+        <CardContent>
+            @if (history.Count == 0)
+            {
+                <p class="text-muted-foreground text-sm">Henüz kayıt yok.</p>
+            }
+            else
+            {
+                <ul class="divide-y">
+                    @foreach (var activity in history)
+                    {
+                        <ActivityItem Activity="activity" ShowContacts="false" CanWrite="CanWrite" CanDelete="CanDelete"
+                                      OnComplete="CompleteAsync" OnReopen="ReopenAsync" OnEdit="Edit" OnDelete="AskDelete" />
+                    }
+                </ul>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<ActivityEditor @bind-Open="EditorOpen" Editing="Editing" DefaultKind="NewKind" Contact="contact" OnSaved="ReloadAsync" />
+<DeleteActivityDialog Activity="Deleting" OnConfirm="DeleteAsync" OnCancel="() => Deleting = null" />
+
+@code {
+    private IReadOnlyList<ActivityView> openTasks = [], history = [];
+    private ContactSummary? contact;
+
+    [Parameter] public Guid ContactId { get; set; }
+
+    protected override async Task ReloadAsync()
+    {
+        contact ??= await Directory.FindAsync(ContactId);
+        (openTasks, history) = await Activities.TimelineAsync(ContactId);
+    }
+}

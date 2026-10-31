@@ -1,0 +1,138 @@
+@page "/events/{Id:guid}/checkin"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = EventsPermissions.CheckIn)]
+@implements IAsyncDisposable
+@using Microsoft.JSInterop
+@inject EventService Events
+@inject Microsoft.JSInterop.IJSRuntime JS
+
+<PageTitle>Giriş · @item?.Title · Arma CRM</PageTitle>
+
+<div class="mx-auto flex max-w-xl flex-col gap-6">
+    <div>
+        <a class="text-muted-foreground text-sm hover:underline" href="events/@Id">@item?.Title</a>
+        <h1 class="text-2xl font-semibold tracking-tight">Giriş</h1>
+        <p class="text-muted-foreground text-sm">@checkedIn / @registered katılımcı giriş yaptı. Bilet karekodunu kamerayla veya okuyucuyla okutun ya da kodu yazın.</p>
+    </div>
+
+    <form class="flex gap-2" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+        <Input id="checkin-code" @bind-Value="code" placeholder="Bilet kodu" autocomplete="off" autofocus Class="font-mono uppercase" aria-label="Bilet kodu" />
+        <Button Type="submit">Okut</Button>
+    </form>
+
+    @if (result is not null)
+    {
+        <div class="@($"rounded-lg border p-6 text-center {(result.Ok ? "border-green-600 bg-green-50 dark:bg-green-950" : "border-destructive bg-destructive/10")}")" role="status">
+            <p class="text-2xl font-semibold">@(result.Ok ? "Giriş yapıldı" : "Giriş yapılamadı")</p>
+            <p class="text-lg">@result.Title</p>
+            @if (result.Detail is not null)
+            {
+                <p class="text-sm">@result.Detail</p>
+            }
+        </div>
+    }
+
+    <div class="grid gap-2">
+        @if (cameraOn)
+        {
+            <video @ref="video" class="aspect-video w-full rounded-lg bg-black object-cover" muted playsinline></video>
+            <Button Variant="ButtonVariant.Outline" OnClick="StopCameraAsync">Kamerayı kapat</Button>
+        }
+        else if (cameraSupported)
+        {
+            <Button Variant="ButtonVariant.Outline" OnClick="StartCameraAsync">Kamerayla okut</Button>
+        }
+    </div>
+</div>
+
+@code {
+    private EventView? item;
+    private string? code;
+    private Outcome? result;
+    private int registered, checkedIn;
+    private bool cameraSupported, cameraOn, startPending;
+    private ElementReference video;
+    private Microsoft.JSInterop.DotNetObjectReference<CheckIn>? self;
+
+    [Parameter] public Guid Id { get; set; }
+
+    private sealed record Outcome(bool Ok, string Title, string? Detail);
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            cameraSupported = await JS.InvokeAsync<bool>("armaScanner.supported");
+            StateHasChanged();
+        }
+
+        if (startPending)
+        {
+            startPending = false;
+            self ??= Microsoft.JSInterop.DotNetObjectReference.Create(this);
+            if (!await JS.InvokeAsync<bool>("armaScanner.start", video, self))
+            {
+                cameraOn = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void StartCameraAsync() => (cameraOn, startPending) = (true, true);
+
+    private async Task StopCameraAsync()
+    {
+        await JS.InvokeVoidAsync("armaScanner.stop", video);
+        cameraOn = false;
+    }
+
+    [Microsoft.JSInterop.JSInvokable]
+    public async Task OnScanned(string value)
+    {
+        code = value;
+        await SubmitAsync();
+        StateHasChanged();
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        // Karekod bilet sayfası bağlantısıdır; kodu sondan alırız.
+        var value = code.Trim().TrimEnd('/');
+        value = value[(value.LastIndexOf('/') + 1)..];
+        var outcome = await Events.CheckInAsync(Id, value);
+        result = outcome.IsSuccess
+            ? new(true, outcome.Value!.Name, string.Join(" · ", new[] { outcome.Value.TicketName, outcome.Value.Payment == PaymentState.Unpaid ? $"ÖDEME BEKLENİYOR: {EventLabels.Money(outcome.Value.Amount)}" : null }.Where(s => s is not null)))
+            : new(false, outcome.Error!.Message, value.ToUpperInvariant());
+        code = null;
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        item = await Events.GetAsync(Id);
+        (registered, checkedIn) = (item?.Registered ?? 0, item?.CheckedIn ?? 0);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (cameraOn)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("armaScanner.stop", video);
+            }
+            catch (Microsoft.JSInterop.JSDisconnectedException)
+            {
+            }
+        }
+
+        self?.Dispose();
+    }
+}

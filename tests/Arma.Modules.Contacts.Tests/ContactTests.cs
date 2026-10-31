@@ -20,12 +20,14 @@ public class ContactTests
     }
 
     [Fact]
-    public void Search_text_uses_turkish_casing()
+    public void Search_text_uses_turkish_casing_and_ignores_turkish_letters()
     {
         var contact = Contact.CreatePerson("İsmail", "IŞIK", null, null, null).Value!;
 
-        contact.SearchText.ShouldBe("ismail ışık");
-        Contact.Normalize("IŞIK").ShouldBe("ışık");
+        contact.SearchText.ShouldBe("ismail isik");
+        Contact.Normalize("IŞIK").ShouldBe("isik");
+        Contact.Normalize("ISIK").ShouldBe("isik");
+        Contact.Normalize("Şükrü Öztürk").ShouldBe(Contact.Normalize("SUKRU OZTURK"));
     }
 
     [Theory]

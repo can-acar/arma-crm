@@ -1,0 +1,196 @@
+@page "/sales/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = SalesPermissions.Read)]
+@inject SalesService Sales
+@inject QuoteService Quotes
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>@(item?.Title ?? "Fırsat") · Arma CRM</PageTitle>
+
+@if (loaded && item is null)
+{
+    <Alert><AlertTitle>Fırsat bulunamadı</AlertTitle><AlertDescription>Silinmiş veya hiç oluşturulmamış olabilir.</AlertDescription></Alert>
+}
+else if (item is not null)
+{
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <a class="text-muted-foreground text-sm hover:underline" href="sales">Satış hattı</a>
+                <h1 class="text-2xl font-semibold tracking-tight">@item.Title</h1>
+                <p class="text-muted-foreground text-sm"><a class="hover:underline" href="contacts/@item.ContactId">@item.ContactName</a> · @SalesLabels.Money(item.Amount)</p>
+            </div>
+            @if (CanWrite)
+            {
+                <div class="flex gap-2">
+                    <Button Variant="ButtonVariant.Outline" OnClick="() => editOpen = true">Düzenle</Button>
+                    <Button Variant="ButtonVariant.Outline" Href="@($"sales/quotes/new?opportunity={item.Id}")">Teklif hazırla</Button>
+                    <Button Variant="ButtonVariant.Destructive" OnClick="() => deleteOpen = true">Sil</Button>
+                </div>
+            }
+        </div>
+
+        <FormAlert Error="@error" />
+
+        <div class="grid gap-6 lg:grid-cols-3">
+            <Card Class="lg:col-span-1">
+                <CardHeader><CardTitle>Bilgiler</CardTitle></CardHeader>
+                <CardContent>
+                    <dl class="grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
+                        <dt class="text-muted-foreground">Aşama</dt>
+                        <dd>
+                            @if (CanWrite && pipeline is not null)
+                            {
+                                <NativeSelect Value="@item.StageId.ToString()" ValueChanged="StageChangedAsync" aria-label="Aşama">
+                                    @foreach (var stage in pipeline.Stages)
+                                    {
+                                        <option value="@stage.Id">@stage.Name</option>
+                                    }
+                                </NativeSelect>
+                            }
+                            else
+                            {
+                                @item.StageName
+                            }
+                        </dd>
+                        <dt class="text-muted-foreground">Olasılık</dt>
+                        <dd>%@item.Probability</dd>
+                        <dt class="text-muted-foreground">Beklenen kapanış</dt>
+                        <dd class="@(item.Overdue(Sales.Today) ? "text-destructive font-medium" : "")">@(item.ExpectedCloseOn is { } close ? SalesLabels.Date(close) : "—")</dd>
+                        @if (item.ClosedOn is { } closed)
+                        {
+                            <dt class="text-muted-foreground">Kapanış</dt>
+                            <dd>@SalesLabels.Date(closed)</dd>
+                        }
+                        @if (item.LostReason is not null)
+                        {
+                            <dt class="text-muted-foreground">Kaybetme nedeni</dt>
+                            <dd>@item.LostReason</dd>
+                        }
+                        <dt class="text-muted-foreground">Sorumlu</dt>
+                        <dd>@(item.OwnerName ?? "Atanmamış")</dd>
+                        <dt class="text-muted-foreground">Oluşturma</dt>
+                        <dd>@item.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</dd>
+                    </dl>
+                    @if (item.Note is not null)
+                    {
+                        <p class="mt-4 text-sm whitespace-pre-line">@item.Note</p>
+                    }
+                </CardContent>
+            </Card>
+
+            <Card Class="lg:col-span-2">
+                <CardHeader><CardTitle>Teklifler</CardTitle></CardHeader>
+                <CardContent>
+                    @if (quotes.Count == 0)
+                    {
+                        <p class="text-muted-foreground text-sm">Bu fırsat için teklif hazırlanmadı.</p>
+                    }
+                    else
+                    {
+                        <QuoteTable Items="quotes" ShowContact="false" />
+                    }
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+
+    <OpportunityDialog @bind-Open="editOpen" Existing="item" OnSaved="_ => LoadAsync()" />
+
+    <Dialog Open="deleteOpen" OpenChanged="v => deleteOpen = v" Class="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>Fırsat silinsin mi?</DialogTitle>
+            <DialogDescription>Fırsat panodan kalkar. Hazırlanmış teklifler silinmez.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => deleteOpen = false">Vazgeç</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="DeleteAsync">Sil</Button>
+        </DialogFooter>
+    </Dialog>
+
+    <Dialog Open="lostStage is not null" OpenChanged="v => { if (!v) lostStage = null; }" Class="sm:max-w-md">
+        <DialogHeader><DialogTitle>Fırsat kaybedildi</DialogTitle></DialogHeader>
+        <form id="lost-form" class="grid gap-2" @onsubmit="ConfirmLostAsync" @onsubmit:preventDefault>
+            <Label for="lost-reason">Kaybetme nedeni</Label>
+            <Input id="lost-reason" @bind-Value="lostReason" maxlength="500" />
+        </form>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => lostStage = null">Vazgeç</Button>
+            <Button Type="submit" form="lost-form">Kaydet</Button>
+        </DialogFooter>
+    </Dialog>
+}
+
+@code {
+    private OpportunityView? item;
+    private PipelineView? pipeline;
+    private IReadOnlyList<QuoteView> quotes = [];
+    private Guid? lostStage;
+    private string? lostReason, error;
+    private bool loaded, editOpen, deleteOpen;
+
+    [Parameter] public Guid Id { get; set; }
+
+    private bool CanWrite => CurrentUser.HasPermission(SalesPermissions.Write);
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        item = await Sales.GetAsync(Id);
+        if (item is not null)
+        {
+            pipeline = (await Sales.PipelinesAsync()).FirstOrDefault(p => p.Id == item.PipelineId);
+            quotes = await Quotes.ListAsync(opportunityId: Id);
+        }
+
+        loaded = true;
+    }
+
+    private async Task StageChangedAsync(string? value)
+    {
+        if (!Guid.TryParse(value, out var stageId) || item is null)
+        {
+            return;
+        }
+
+        if (pipeline?.Stages.FirstOrDefault(s => s.Id == stageId)?.Kind == StageKind.Lost)
+        {
+            (lostStage, lostReason) = (stageId, null);
+            return;
+        }
+
+        await MoveAsync(stageId, null);
+    }
+
+    private async Task ConfirmLostAsync()
+    {
+        if (lostStage is { } stage)
+        {
+            lostStage = null;
+            await MoveAsync(stage, lostReason);
+        }
+    }
+
+    private async Task MoveAsync(Guid stageId, string? reason)
+    {
+        var result = await Sales.MoveAsync(Id, stageId, null, reason);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        var result = await Sales.DeleteAsync(Id);
+        deleteOpen = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("sales");
+        }
+        else
+        {
+            error = result.Error!.Message;
+        }
+    }
+}

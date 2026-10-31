@@ -1,0 +1,60 @@
+@page "/portal"
+@layout PortalLayout
+@attribute [AllowAnonymous]
+@inject PortalService Portal
+@inject NavigationManager Navigation
+
+<PageTitle>Bağışçı portalı</PageTitle>
+
+<Card Class="mx-auto max-w-md">
+    <CardHeader>
+        <CardTitle><h1 class="text-xl">Bağışçı portalı</h1></CardTitle>
+        <CardDescription>Bağış geçmişinizi, makbuzlarınızı, üyeliğinizi ve iletişim tercihlerinizi görün. Parola gerekmez: kayıtlı e-posta adresinize bir giriş bağlantısı göndeririz.</CardDescription>
+    </CardHeader>
+    <CardContent>
+        @if (sent)
+        {
+            <Alert data-testid="portal-sent">
+                <AlertTitle>E-postanızı kontrol edin</AlertTitle>
+                <AlertDescription>Adres kayıtlarımızda varsa giriş bağlantısı birkaç dakika içinde gelir. Bağlantı 30 dakika geçerlidir.</AlertDescription>
+            </Alert>
+        }
+        else
+        {
+            @if (Hata is not null)
+            {
+                <Alert Variant="AlertVariant.Destructive" Class="mb-4"><AlertDescription>Giriş bağlantısı geçersiz, süresi dolmuş veya kullanılmış. Yeni bir bağlantı isteyin.</AlertDescription></Alert>
+            }
+            <form method="post" class="grid gap-4" @formname="portal-login" @onsubmit="SendAsync">
+                <AntiforgeryToken />
+                <div class="grid gap-2">
+                    <Label for="portal-email">E-posta adresiniz</Label>
+                    <input id="portal-email" name="Email" type="email" required autocomplete="email" class="@Styles.Input" value="@Email" />
+                </div>
+                <Button Type="submit">Giriş bağlantısı gönder</Button>
+            </form>
+        }
+    </CardContent>
+</Card>
+
+@code {
+    private bool sent;
+
+    [SupplyParameterFromForm] public string? Email { get; set; }
+
+    [SupplyParameterFromQuery] public string? Hata { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Email is null && await Portal.ContactIdAsync() is not null)
+        {
+            Navigation.NavigateTo("portal/hesap");
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        await Portal.RequestLinkAsync(Email);
+        sent = true;
+    }
+}
