@@ -282,6 +282,16 @@ site klasöründe tutulmaz. Güncellemede yeni paketle aynı komut (`-CreateData
 
 Kayıtlar CiviCRM kimlikleriyle (`external_key`, örn. `civicrm:42`) saklanır; aynı dosya yeniden yüklenirse yalnızca yeni satırlar eklenir. Bağış ve üyelikler kişiyi bu kimlikle bulduğu için önce kişiler aktarılmalıdır; birleştirilmiş kişiler asıl kayda çözülür. Bir dosya en fazla 50 MB / 200.000 satır olabilir. Yeni bir kaynak eklemek için modül `IDataImporter` uygular.
 
+## Vaka yönetimi
+
+**Vakalar** menüsü sosyal yardım başvurusu, hukuki destek, şikâyet gibi bir kişi için yürütülen işleri izler. Vaka türleri **Yönetim → Vaka türleri** sayfasında adım şablonuyla tanımlanır ("Ev ziyareti, 3 gün sonra"); vaka açılınca adımlar son günleriyle birlikte oluşur, sonradan adım eklenebilir.
+
+- Vakalar yıl bazında numaralanır (`V2026-0001`), bir sorumluya atanır ve Açık, Beklemede, Kapalı durumlarından geçer. Kapatırken sonuç yazmak zorunludur; kapalı vakada değişiklik için önce yeniden açılır.
+- Kişi kartındaki **Vakalar** sekmesinden vaka açılır. Açılış, kapanış ve gizli olmayan notlar kişinin zaman çizelgesine düşer.
+- **Gizli notlar** yalnızca `cases.confidential` izni olanlara gösterilir ve zaman çizelgesine yazılmaz. Personel rolü vakaları görür ve düzenler, gizli notları göremez.
+- Panoda "Açık vaka" ve "Bana atanan vaka" kutucukları, gelişmiş aramada "Açık vakası var" ve "Vaka türü" ölçütleri bulunur. `GET /api/v1/cases` vaka listesini salt okunur verir.
+- Mükerrer birleştirmede vakalar asıl kişiye taşınır. KVKK dışa aktarması gizli notlar dahil vakaları içerir; anonimleştirme konu, açıklama ve not metinlerini siler.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`

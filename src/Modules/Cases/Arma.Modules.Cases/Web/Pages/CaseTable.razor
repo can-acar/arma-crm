@@ -1,0 +1,55 @@
+@* Vaka listesi tablosu: vaka listesinde ve kişi kartında kullanılır. *@
+<Table>
+    <TableHeader>
+        <TableRow>
+            <TableHead>Vaka</TableHead>
+            @if (ShowContact)
+            {
+                <TableHead>Kişi</TableHead>
+            }
+            <TableHead>Tür</TableHead>
+            <TableHead>Durum</TableHead>
+            <TableHead>Öncelik</TableHead>
+            <TableHead>Sorumlu</TableHead>
+            <TableHead>Adımlar</TableHead>
+            <TableHead>Açılış</TableHead>
+        </TableRow>
+    </TableHeader>
+    <TableBody>
+        @foreach (var item in Items)
+        {
+            <TableRow>
+                <TableCell Class="whitespace-normal">
+                    <a class="font-medium hover:underline" href="cases/@item.Id">@item.Subject</a>
+                    <div class="text-muted-foreground text-xs">@item.Number</div>
+                </TableCell>
+                @if (ShowContact)
+                {
+                    <TableCell><a class="hover:underline" href="contacts/@item.ContactId">@item.ContactName</a></TableCell>
+                }
+                <TableCell>@item.TypeName</TableCell>
+                <TableCell><Badge Variant="CaseLabels.StatusVariant(item.Status)">@CaseLabels.Status(item.Status)</Badge></TableCell>
+                <TableCell><span class="@CaseLabels.PriorityClass(item.Priority)">@CaseLabels.Priority(item.Priority)</span></TableCell>
+                <TableCell>@(item.AssigneeName ?? "—")</TableCell>
+                <TableCell>
+                    <span class="tabular-nums">@item.StepsDone/@item.StepsTotal</span>
+                    @if (item.IsOverdue)
+                    {
+                        <span class="text-destructive ml-2 text-xs font-medium">Gecikti</span>
+                    }
+                    else if (item.NextDueOn is { } due && item.Status != CaseStatus.Closed)
+                    {
+                        <span class="text-muted-foreground ml-2 text-xs">@due.ToString("dd.MM")</span>
+                    }
+                </TableCell>
+                <TableCell class="tabular-nums">@item.OpenedOn.ToString("dd.MM.yyyy")</TableCell>
+            </TableRow>
+        }
+    </TableBody>
+</Table>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<CaseListItem> Items { get; set; } = [];
+
+    [Parameter] public bool ShowContact { get; set; } = true;
+}
