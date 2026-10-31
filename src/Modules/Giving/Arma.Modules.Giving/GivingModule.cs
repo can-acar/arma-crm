@@ -33,6 +33,7 @@ public sealed class GivingModule : IModule, INavigationContributor
         services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<GivingInsights>());
         services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<GivingInsights>());
         services.AddSingleton<IContactPanel, DonationsPanel>();
+        services.AddScoped<ICampaignSource, FundCampaignSource>();
         services.AddSingleton<INavigationContributor>(this);
         AddPayments(services, configuration);
     }

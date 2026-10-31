@@ -33,6 +33,7 @@ public sealed class EventsModule : IModule, INavigationContributor
         services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<EventsInsights>());
         services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<EventsInsights>());
         services.AddSingleton<IContactPanel, EventsPanel>();
+        services.AddScoped<ICampaignSource, EventCampaignSource>();
         services.AddSingleton<INavigationContributor>(this);
     }
 
