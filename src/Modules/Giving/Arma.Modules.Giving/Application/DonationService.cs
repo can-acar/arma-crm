@@ -61,6 +61,9 @@ public sealed record SaveDonationRequest(
     string? Note,
     string? InKindDescription);
 
+/// <summary>Bağışçının bir yıldaki tamamlanmış bağışları; vergi indirimi için yıllık özet.</summary>
+public sealed record AnnualStatement(int Year, IReadOnlyList<DonationView> Donations, IReadOnlyList<CurrencyTotal> Totals);
+
 public sealed record DonorSummary(IReadOnlyList<CurrencyTotal> Lifetime, IReadOnlyList<CurrencyTotal> ThisYear, DateOnly? FirstGift, DateOnly? LastGift, decimal? LargestTry);
 
 public sealed class DonationService(
@@ -103,7 +106,11 @@ public sealed class DonationService(
             first, last, largest);
     }
 
-    public async Task<Result<Guid>> RecordAsync(SaveDonationRequest request, CancellationToken cancellationToken = default)
+    public Task<Result<Guid>> RecordAsync(SaveDonationRequest request, CancellationToken cancellationToken = default) =>
+        RecordAsync(request, cancellationToken, null);
+
+    /// <param name="beforeSave">Bağışla aynı kayıt işleminde yapılacak değişiklik (banka hareketini eşleşti işaretlemek gibi).</param>
+    internal async Task<Result<Guid>> RecordAsync(SaveDonationRequest request, CancellationToken cancellationToken, Func<Donation, Result<bool>>? beforeSave)
     {
         var check = await ValidateAsync(request.ContactId, request.FundId, null, cancellationToken);
         if (check is not null)
@@ -116,6 +123,11 @@ public sealed class DonationService(
         if (!created.IsSuccess)
         {
             return created.Error!;
+        }
+
+        if (beforeSave?.Invoke(created.Value!) is { IsSuccess: false } failed)
+        {
+            return failed.Error!;
         }
 
         db.Donations.Add(created.Value!);
@@ -216,6 +228,44 @@ public sealed class DonationService(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return number;
+    }
+
+    /// <summary>Yıl içinde tamamlanmış ama makbuzu kesilmemiş bağış sayısı.</summary>
+    public Task<int> PendingReceiptCountAsync(int year, CancellationToken cancellationToken = default) =>
+        PendingReceipts(year).CountAsync(cancellationToken);
+
+    /// <summary>Yıl sonu toplu makbuz: makbuzu kesilmemiş tüm bağışlara bağış tarihine göre sırayla makbuz keser. Kesilen sayıyı döner.</summary>
+    public async Task<int> IssuePendingReceiptsAsync(int year, CancellationToken cancellationToken = default)
+    {
+        var ids = await PendingReceipts(year).OrderBy(d => d.ReceivedOn).ThenBy(d => d.CreatedAt).Select(d => d.Id).ToListAsync(cancellationToken);
+        var count = 0;
+        foreach (var id in ids)
+        {
+            db.ChangeTracker.Clear();
+            count += (await IssueReceiptAsync(id, cancellationToken)).IsSuccess ? 1 : 0;
+        }
+
+        if (count > 0)
+        {
+            await audit.WriteAsync(AuditAction.Updated, nameof(Donation), year.ToString(System.Globalization.CultureInfo.InvariantCulture), $"{year} yılı için {count} bağışa toplu makbuz kesildi", cancellationToken);
+        }
+
+        return count;
+    }
+
+    public async Task<AnnualStatement> AnnualStatementAsync(Guid contactId, int year, CancellationToken cancellationToken = default)
+    {
+        var (start, end) = (new DateOnly(year, 1, 1), new DateOnly(year, 12, 31));
+        var query = db.Donations.AsNoTracking().Where(d => d.ContactId == contactId && d.Status == DonationStatus.Completed && d.ReceivedOn >= start && d.ReceivedOn <= end);
+        var rows = await query.OrderBy(d => d.ReceivedOn).ToListAsync(cancellationToken);
+        return new(year, await ToViewsAsync(rows, cancellationToken), await Totals(query, cancellationToken));
+    }
+
+    private IQueryable<Donation> PendingReceipts(int year)
+    {
+        var (start, end) = (new DateOnly(year, 1, 1), new DateOnly(year, 12, 31));
+        return db.Donations.Where(d => d.Status == DonationStatus.Completed && d.ReceivedOn >= start && d.ReceivedOn <= end
+            && (d.ReceiptNumber == null || d.ReceiptVoidReason != null));
     }
 
     public async Task<Result<Guid>> VoidReceiptAsync(Guid id, string reason, CancellationToken cancellationToken = default)

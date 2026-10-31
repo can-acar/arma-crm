@@ -223,7 +223,32 @@ public sealed class Contact : Entity
     public ContactSummary ToSummary() => new(Id, Type, DisplayName, Email, Phone);
 
     /// <summary>Aramada kullanılan normalleştirme: "İSTANBUL" ve "istanbul" aynı sonucu verir.</summary>
-    public static string Normalize(string value) => value.Trim().ToLower(Turkish);
+    /// <summary>
+    /// Arama için küçük harfe çevirir ve Türkçe harfleri sadeleştirir: "ŞÜKRÜ ÖZ", "Şükrü Öz" ve "SUKRU OZ" aynı aranır.
+    /// Banka açıklamaları ve eski sistemlerden gelen veriler çoğunlukla Türkçe karaktersizdir.
+    /// </summary>
+    public static string Normalize(string value)
+    {
+        var chars = value.Trim().ToLower(Turkish).ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            chars[i] = chars[i] switch
+            {
+                'ı' => 'i',
+                'ş' => 's',
+                'ğ' => 'g',
+                'ü' => 'u',
+                'ö' => 'o',
+                'ç' => 'c',
+                'â' => 'a',
+                'î' => 'i',
+                'û' => 'u',
+                _ => chars[i],
+            };
+        }
+
+        return new string(chars);
+    }
 
     private Result<Contact> SetChannels(string? email, string? phone)
     {

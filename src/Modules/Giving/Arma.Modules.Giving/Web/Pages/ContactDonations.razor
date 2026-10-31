@@ -32,10 +32,15 @@
     <Card>
         <CardHeader>
             <CardTitle>Bağış geçmişi</CardTitle>
-            @if (canWrite)
-            {
-                <CardAction><Button Size="ButtonSize.Sm" OnClick="() => editorOpen = true">Bağış kaydet</Button></CardAction>
-            }
+            <CardAction>
+                <div class="flex gap-2">
+                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" Href="@($"donations/annual/{ContactId}/{DateTime.Today.Year}")">Yıllık özet</Button>
+                    @if (canWrite)
+                    {
+                        <Button Size="ButtonSize.Sm" OnClick="() => editorOpen = true">Bağış kaydet</Button>
+                    }
+                </div>
+            </CardAction>
         </CardHeader>
         <CardContent>
             @if (items.Count == 0)

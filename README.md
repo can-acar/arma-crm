@@ -219,6 +219,19 @@ cd deploy
 - Bir kural aynı kişiye aynı olay için bir kez uygulanır. Kayıtlı arama kuralı açılırken aramaya zaten uyan kişiler
   istenirse atlanır. Kural ekranında son 100 çalışma görünür.
 
+## Havale/EFT eşleştirme ve yıl sonu makbuzları
+
+- Bağışlar > Havale eşleştirme sayfasına internet şubesinden indirilen ekstre yüklenir: Excel (.xlsx), CSV
+  (UTF-8 veya Windows-1254) ya da MT940. Excel ve CSV'de başlık satırı "Tarih", "Tutar"/"Alacak", "Açıklama"
+  sözcükleriyle bulunur. Yalnızca gelen hareketler alınır; aynı hareket ikinci kez yüklenirse atlanır.
+- Bağışçı önerisi önce aynı IBAN'dan daha önce onaylanmış havaleye, sonra açıklamadaki ada bakar (tam ad
+  eşleşmesi, Türkçe karaktersiz yazımlar dahil). Açıklamada fon adı geçiyorsa fon da önerilir. Öneriler tek tek
+  veya topluca onaylanır; onaylanan hareket "Havale / EFT" yöntemli bağış olur.
+- Kişi araması artık Türkçe karakterlere duyarsızdır: "SUKRU OZTURK" araması "Şükrü Öztürk"ü bulur.
+- Bağışlar sayfasındaki "Toplu makbuz" seçilen yılda makbuzu kesilmemiş tamamlanmış bağışlara bağış tarihi
+  sırasıyla makbuz keser. Kişi kartındaki "Yıllık özet" bağışçının o yılki bağışlarını yazdırılabilir
+  dökümde gösterir.
+
 ## Kampanyalar
 
 - Kampanya bir amaç altında yürütülen çalışmayı toplar (yardım kampanyası, üye kazanımı gibi): tarih aralığı,

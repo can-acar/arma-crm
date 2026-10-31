@@ -94,6 +94,180 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Arma.Modules.Giving.Domain.BankLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("BankReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("bank_reference");
+
+                    b.Property<DateOnly>("BookedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("booked_on");
+
+                    b.Property<Guid?>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<string>("Counterparty")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("counterparty");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid?>("DonationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donation_id");
+
+                    b.Property<string>("Iban")
+                        .HasMaxLength(34)
+                        .HasColumnType("character varying(34)")
+                        .HasColumnName("iban");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("key");
+
+                    b.Property<Guid>("StatementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("statement_id");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("SuggestedContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggested_contact_id");
+
+                    b.Property<Guid?>("SuggestedFundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggested_fund_id");
+
+                    b.Property<string>("SuggestionReason")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("suggestion_reason");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bank_lines");
+
+                    b.HasIndex("StatementId")
+                        .HasDatabaseName("ix_bank_lines_statement_id");
+
+                    b.HasIndex("TenantId", "ContactId")
+                        .HasDatabaseName("ix_bank_lines_tenant_id_contact_id");
+
+                    b.HasIndex("TenantId", "Iban")
+                        .HasDatabaseName("ix_bank_lines_tenant_id_iban");
+
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bank_lines_tenant_id_key");
+
+                    b.HasIndex("TenantId", "Status", "BookedOn")
+                        .HasDatabaseName("ix_bank_lines_tenant_id_status_booked_on");
+
+                    b.ToTable("bank_lines", "giving");
+                });
+
+            modelBuilder.Entity("Arma.Modules.Giving.Domain.BankStatement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("CreditCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("credit_count");
+
+                    b.Property<int>("DuplicateCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("duplicate_count");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("file_name");
+
+                    b.Property<string>("Format")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("format");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bank_statements");
+
+                    b.ToTable("bank_statements", "giving");
+                });
+
             modelBuilder.Entity("Arma.Modules.Giving.Domain.Donation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -344,6 +518,16 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasDatabaseName("ix_receipt_settings_tenant_id");
 
                     b.ToTable("receipt_settings", "giving");
+                });
+
+            modelBuilder.Entity("Arma.Modules.Giving.Domain.BankLine", b =>
+                {
+                    b.HasOne("Arma.Modules.Giving.Domain.BankStatement", null)
+                        .WithMany()
+                        .HasForeignKey("StatementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_bank_lines_bank_statements_statement_id");
                 });
 
             modelBuilder.Entity("Arma.Modules.Giving.Domain.Donation", b =>

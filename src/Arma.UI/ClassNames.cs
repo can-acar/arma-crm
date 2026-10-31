@@ -97,6 +97,6 @@ public static partial class ClassNames
         return variant + prefix;
     }
 
-    [GeneratedRegex(@"^(?<prefix>min-w|max-w|min-h|max-h|w|h|size|px|py|pt|pr|pb|pl|p|mx|my|mt|mr|mb|ml|m|gap-x|gap-y|gap|text|bg|rounded|shadow|font|leading|tracking|grid-cols|col-span|z|opacity)-(?<value>.+)$")]
+    [GeneratedRegex(@"^(?<prefix>min-w|max-w|min-h|max-h|w|h|size|px|py|pt|pr|pb|pl|p|mx|my|mt|mr|mb|ml|m|gap-x|gap-y|gap|text|bg|rounded|shadow|font|leading|tracking|grid-cols|col-span|z|opacity|whitespace)-(?<value>.+)$")]
     private static partial Regex UtilityPattern();
 }
