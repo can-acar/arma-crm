@@ -1,0 +1,206 @@
+@inject PledgeService Pledges
+@inject FundService Funds
+@inject TimeProvider Clock
+
+@* Taahhüt ekleme ve düzenleme penceresi. Taahhüt listesi, ayrıntısı ve kişi kartı kullanır. *@
+<Dialog Open="Open" OpenChanged="OpenChanged" Class="sm:max-w-xl">
+    <DialogHeader>
+        <DialogTitle>@(Editing is null ? "Taahhüt ekle" : "Taahhüdü düzenle")</DialogTitle>
+        <DialogDescription>Toplam tutar taksitlere eşit bölünür; bağlanan ödemeler vade sırasıyla taksitlere düşer.</DialogDescription>
+    </DialogHeader>
+
+    <FormAlert Error="@error" />
+
+    <form id="pledge-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="grid gap-2">
+            <Label>Bağışçı</Label>
+            <ContactPicker @bind-Selected="contact" />
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-3">
+            <div class="grid gap-2 sm:col-span-2">
+                <Label for="pledge-amount">Toplam tutar</Label>
+                <Input id="pledge-amount" inputmode="decimal" @bind-Value="amount" placeholder="12.000,00" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="pledge-currency">Para birimi</Label>
+                <NativeSelect id="pledge-currency" @bind-Value="currency">
+                    @foreach (var currencyCode in GivingLabels.Currencies)
+                    {
+                        <option value="@currencyCode">@currencyCode</option>
+                    }
+                </NativeSelect>
+            </div>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-3">
+            <div class="grid gap-2">
+                <Label for="pledge-frequency">Ödeme</Label>
+                <NativeSelect id="pledge-frequency" @bind-Value="frequency">
+                    @foreach (var option in Enum.GetValues<PledgeFrequency>())
+                    {
+                        <option value="@option">@GivingLabels.Frequency(option)</option>
+                    }
+                </NativeSelect>
+            </div>
+            <div class="grid gap-2">
+                <Label for="pledge-count">Taksit sayısı</Label>
+                <Input id="pledge-count" inputmode="numeric" @bind-Value="count" disabled="@(frequency == nameof(PledgeFrequency.Once))" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="pledge-start">İlk vade</Label>
+                <input id="pledge-start" type="date" class="@Styles.Input" @bind="startOn" />
+            </div>
+        </div>
+
+        @if (InstallmentText() is { } text)
+        {
+            <p class="text-muted-foreground -mt-2 text-sm">@text</p>
+        }
+
+        <div class="grid gap-2">
+            <Label for="pledge-fund">Fon</Label>
+            <NativeSelect id="pledge-fund" @bind-Value="fund">
+                <option value="">Genel (fon seçilmedi)</option>
+                @foreach (var item in funds)
+                {
+                    <option value="@item.Id">@item.Name</option>
+                }
+            </NativeSelect>
+        </div>
+
+        <div class="grid gap-2">
+            <Label for="pledge-note">Not</Label>
+            <Textarea id="pledge-note" @bind-Value="note" rows="2" maxlength="1000" />
+        </div>
+    </form>
+
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="CloseAsync">Vazgeç</Button>
+        <Button Type="submit" form="pledge-form" Disabled="saving">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Turkish = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+    private ContactSummary? contact;
+    private string? amount, note, error, fund, count;
+    private string? currency = "TRY", frequency = nameof(PledgeFrequency.Monthly);
+    private DateOnly startOn;
+    private IReadOnlyList<FundView> funds = [];
+    private bool saving, wasOpen;
+
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    [Parameter] public PledgeView? Editing { get; set; }
+
+    /// <summary>Yeni kayıtta önceden seçili bağışçı.</summary>
+    [Parameter] public ContactSummary? Contact { get; set; }
+
+    [Parameter] public EventCallback<Guid> OnSaved { get; set; }
+
+    [Inject] private IContactDirectory Directory { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Open && !wasOpen)
+        {
+            funds = await Funds.ListAsync(activeOnly: true);
+            await ResetAsync();
+        }
+
+        wasOpen = Open;
+    }
+
+    private async Task ResetAsync()
+    {
+        error = null;
+        if (Editing is { } p)
+        {
+            contact = await Directory.FindAsync(p.ContactId);
+            amount = p.Amount.ToString("N2", Turkish);
+            currency = p.Currency;
+            frequency = p.Frequency.ToString();
+            count = p.InstallmentCount.ToString(Turkish);
+            startOn = p.StartOn;
+            fund = p.FundId?.ToString();
+            note = p.Note;
+            if (p.FundId is { } fundId && funds.All(f => f.Id != fundId))
+            {
+                funds = [.. funds, new FundView(fundId, p.FundName ?? "(pasif fon)", null, false, false, 0, 0)];
+            }
+
+            return;
+        }
+
+        contact = Contact;
+        amount = note = fund = null;
+        currency = "TRY";
+        frequency = nameof(PledgeFrequency.Monthly);
+        count = "12";
+        startOn = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    }
+
+    private string? InstallmentText()
+    {
+        if (frequency == nameof(PledgeFrequency.Once)
+            || !decimal.TryParse(amount, System.Globalization.NumberStyles.Number, Turkish, out var total)
+            || !int.TryParse(count, out var n) || n < 1 || total <= 0)
+        {
+            return null;
+        }
+
+        var share = decimal.Floor(total / n * 100) / 100;
+        return $"{n} taksit × {Money.Format(share, currency ?? "TRY")}, son taksit {GivingLabels.Date(startOn.AddMonths((n - 1) * (int)Enum.Parse<PledgeFrequency>(frequency!)))}";
+    }
+
+    private async Task SaveAsync()
+    {
+        if (contact is null)
+        {
+            error = "Bağışçı seçin.";
+            return;
+        }
+
+        if (!decimal.TryParse(amount, System.Globalization.NumberStyles.Number, Turkish, out var value))
+        {
+            error = "Tutarı 12.000,00 biçiminde girin.";
+            return;
+        }
+
+        var plan = Enum.Parse<PledgeFrequency>(frequency!);
+        if (!int.TryParse(count, out var installments) && plan != PledgeFrequency.Once)
+        {
+            error = "Taksit sayısını girin.";
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            var request = new SavePledgeRequest(contact.Id, value, currency, Guid.TryParse(fund, out var fundId) ? fundId : null,
+                plan, plan == PledgeFrequency.Once ? 1 : installments, startOn, note);
+            var result = Editing is null ? await Pledges.CreateAsync(request) : await Pledges.UpdateAsync(Editing.Id, request);
+            if (!result.IsSuccess)
+            {
+                error = result.Error!.Message;
+                return;
+            }
+
+            await CloseAsync();
+            await OnSaved.InvokeAsync(result.Value);
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task CloseAsync()
+    {
+        Open = wasOpen = false;
+        await OpenChanged.InvokeAsync(false);
+    }
+}

@@ -1,0 +1,142 @@
+@page "/cases"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = CasesPermissions.Read)]
+@inject CaseService Cases
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Vakalar · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Vakalar</h1>
+            <p class="text-muted-foreground text-sm">@result.Total.ToString("N0") vaka</p>
+        </div>
+        @if (CurrentUser.HasPermission(CasesPermissions.Write))
+        {
+            <Button OnClick="() => dialogOpen = true" Disabled="@(types.Count == 0)">Vaka aç</Button>
+        }
+    </div>
+
+    @if (loaded && types.Count == 0)
+    {
+        <Alert>
+            <AlertTitle>Henüz vaka türü yok</AlertTitle>
+            <AlertDescription>
+                Vaka açmak için önce bir tür ve adımlarını tanımlayın (sosyal yardım başvurusu, hukuki destek gibi).
+                @if (CurrentUser.HasPermission(CasesPermissions.Settings))
+                {
+                    <a class="font-medium underline" href="admin/cases">Vaka türleri</a>
+                }
+            </AlertDescription>
+        </Alert>
+    }
+
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Input Value="@search" ValueChanged="SearchAsync" placeholder="Konu, numara veya kişi" aria-label="Ara" />
+        <NativeSelect Value="@status" ValueChanged="v => FilterAsync(() => status = v)" aria-label="Durum">
+            <option value="open">Açık ve beklemede</option>
+            @foreach (var option in Enum.GetValues<CaseStatus>())
+            {
+                <option value="@option">@CaseLabels.Status(option)</option>
+            }
+            <option value="">Tümü</option>
+        </NativeSelect>
+        <NativeSelect Value="@typeId" ValueChanged="v => FilterAsync(() => typeId = v)" aria-label="Tür">
+            <option value="">Tüm türler</option>
+            @foreach (var type in types)
+            {
+                <option value="@type.Id">@type.Name</option>
+            }
+        </NativeSelect>
+        <NativeSelect Value="@assignee" ValueChanged="v => FilterAsync(() => assignee = v)" aria-label="Sorumlu">
+            <option value="">Tüm sorumlular</option>
+            <option value="me">Bana atanan</option>
+            <option value="none">Atanmamış</option>
+            @foreach (var user in users)
+            {
+                <option value="@user.Id">@user.FullName</option>
+            }
+        </NativeSelect>
+        <label class="flex items-center gap-2 text-sm">
+            <Checkbox Checked="overdue" CheckedChanged="v => FilterAsync(() => overdue = v)" />
+            Yalnızca gecikenler
+        </label>
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (!loaded)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (result.Items.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Vaka yok.</p>
+            }
+            else
+            {
+                <CaseTable Items="result.Items" />
+                @if (result.Total > result.Items.Count)
+                {
+                    <p class="text-muted-foreground mt-3 text-xs">İlk @result.Items.Count vaka gösteriliyor; aramayı daraltın.</p>
+                }
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<CaseDialog @bind-Open="dialogOpen" OnSaved="Opened" />
+
+@code {
+    private CasePage result = new([], 0);
+    private IReadOnlyList<CaseTypeView> types = [];
+    private IReadOnlyList<UserSummary> users = [];
+    private string? search, typeId, assignee;
+    private string? status = "open";
+    private void Opened(Guid id) => Navigation.NavigateTo(Navigation.BaseUri + "cases/" + id);
+
+    private bool overdue, loaded, dialogOpen;
+
+    [SupplyParameterFromQuery(Name = "mine")] public int? Mine { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Mine == 1)
+        {
+            assignee = "me";
+        }
+
+        types = await Cases.TypesAsync();
+        users = await Cases.AssignableUsersAsync();
+        await LoadAsync();
+    }
+
+    private Task SearchAsync(string? value) => FilterAsync(() => search = value);
+
+    private Task FilterAsync(Action change)
+    {
+        change();
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Guid? assigneeId = assignee switch
+        {
+            "me" => Guid.TryParse(CurrentUser.Id, out var me) ? me : Guid.Empty,
+            _ => Guid.TryParse(assignee, out var id) ? id : null,
+        };
+        result = await Cases.ListAsync(new CaseFilter(
+            Status: Enum.TryParse<CaseStatus>(status, out var s) ? s : null,
+            OpenOnly: status == "open",
+            TypeId: Guid.TryParse(typeId, out var t) ? t : null,
+            AssigneeId: assigneeId,
+            Unassigned: assignee == "none",
+            OverdueOnly: overdue,
+            Search: search,
+            PageSize: 200));
+        loaded = true;
+    }
+}

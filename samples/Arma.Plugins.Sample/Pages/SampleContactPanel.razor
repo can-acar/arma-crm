@@ -1,0 +1,20 @@
+@inject IContactDirectory Directory
+
+@* Kişi kartına eklenen sekme. Arma bileşene ContactId parametresini verir. *@
+<Card>
+    <CardHeader>
+        <CardTitle>Örnek eklenti</CardTitle>
+        <CardDescription>Eklentiler kişi kartına kendi sekmelerini ekleyebilir.</CardDescription>
+    </CardHeader>
+    <CardContent>
+        <p class="text-sm">@(contact is null ? "Kişi bulunamadı." : $"{contact.DisplayName} için eklenti verisi burada gösterilir.")</p>
+    </CardContent>
+</Card>
+
+@code {
+    private ContactSummary? contact;
+
+    [Parameter] public Guid ContactId { get; set; }
+
+    protected override async Task OnParametersSetAsync() => contact = await Directory.FindAsync(ContactId);
+}

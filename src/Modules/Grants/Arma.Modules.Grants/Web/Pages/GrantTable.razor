@@ -1,0 +1,64 @@
+@* Hibe listesi ve kişi kartındaki hibeler. *@
+<Table>
+    <TableHeader>
+        <TableRow>
+            <TableHead>Hibe</TableHead>
+            @if (ShowFunder)
+            {
+                <TableHead>Hibe veren</TableHead>
+            }
+            <TableHead Class="text-right">Talep</TableHead>
+            <TableHead Class="text-right">Kabul / alınan</TableHead>
+            <TableHead>Sıradaki</TableHead>
+            <TableHead>Durum</TableHead>
+        </TableRow>
+    </TableHeader>
+    <TableBody>
+        @foreach (var grant in Items)
+        {
+            <TableRow>
+                <TableCell>
+                    <a class="font-medium hover:underline" href="@($"grants/{grant.Id}")">@grant.Title</a>
+                    @if (grant.Program is not null)
+                    {
+                        <div class="text-muted-foreground text-xs">@grant.Program</div>
+                    }
+                </TableCell>
+                @if (ShowFunder)
+                {
+                    <TableCell><a class="hover:underline" href="@($"contacts/{grant.FunderId}")">@grant.FunderName</a></TableCell>
+                }
+                <TableCell Class="text-right tabular-nums">@GrantLabels.Money(grant.Requested, grant.Currency)</TableCell>
+                <TableCell Class="text-right tabular-nums">
+                    @if (grant.Awarded is { } awarded)
+                    {
+                        @GrantLabels.Money(awarded, grant.Currency)
+                        <div class="text-muted-foreground text-xs">Alınan @GrantLabels.Money(grant.Received, grant.Currency)</div>
+                    }
+                    else
+                    {
+                        <span class="text-muted-foreground">-</span>
+                    }
+                </TableCell>
+                <TableCell Class="@(grant.HasOverdue ? "text-destructive text-sm" : "text-sm")">
+                    @if (grant.NextDueOn is { } due)
+                    {
+                        @GrantLabels.Date(due)
+                        <div class="text-muted-foreground text-xs">@grant.NextDueTitle</div>
+                    }
+                    else
+                    {
+                        <span class="text-muted-foreground">-</span>
+                    }
+                </TableCell>
+                <TableCell><Badge Variant="GrantLabels.StatusVariant(grant.Status)">@GrantLabels.Status(grant.Status)</Badge></TableCell>
+            </TableRow>
+        }
+    </TableBody>
+</Table>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<GrantListItem> Items { get; set; } = [];
+
+    [Parameter] public bool ShowFunder { get; set; } = true;
+}

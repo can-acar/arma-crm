@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- Diğer modüllerin kayıt geçmişini göstermek için kullandığı bileşenler. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Arma.SharedKernel\Arma.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\..\Arma.UI\Arma.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
+
+</Project>

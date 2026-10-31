@@ -1,0 +1,67 @@
+@page "/memberships/{Id:guid}/card"
+@page "/portal/uye-karti/{Id:guid}"
+@layout PlainLayout
+@* Bağışçı portalından da açılır; yetki kodla denetlenir: üyelik izni ya da üyeliğin sahibi portal oturumu. *@
+@attribute [AllowAnonymous]
+@inject MembershipService Members
+@inject ICurrentUser CurrentUser
+@inject Arma.SharedKernel.Portal.IPortalSession Portal
+@inject NavigationManager Navigation
+@using QRCoder
+
+<PageTitle>Üye kartı · Arma CRM</PageTitle>
+
+@if (member is null)
+{
+    <div class="mx-auto max-w-md p-6"><Alert><AlertTitle>Üyelik bulunamadı</AlertTitle></Alert></div>
+}
+else
+{
+    <div class="mx-auto flex max-w-md flex-col gap-4 p-6 print:p-0">
+        <div class="flex justify-end gap-2 print:hidden">
+            <button type="button" class="@ButtonVariants.For(ButtonVariant.Default, ButtonSize.Default)" onclick="window.print()">Yazdır</button>
+        </div>
+        @* Kredi kartı boyutu: 85,6 × 54 mm. *@
+        <article class="bg-background flex h-[54mm] w-[85.6mm] gap-4 rounded-lg border p-4 print:rounded-lg">
+            <div class="flex flex-1 flex-col justify-between">
+                <div>
+                    <p class="text-muted-foreground text-[10px] tracking-widest uppercase">Üye kartı</p>
+                    <p class="text-base leading-tight font-semibold">@member.ContactName</p>
+                    <p class="text-xs">@member.TypeName</p>
+                </div>
+                <div class="text-xs">
+                    <p>Üye no <span class="font-mono font-semibold">@member.Number</span></p>
+                    <p>Geçerlilik: @(member.EndOn is { } end ? MembershipLabels.Date(end) : "süresiz")</p>
+                </div>
+            </div>
+            <div class="w-[24mm] self-center [&>svg]:h-auto [&>svg]:w-full">@qr</div>
+        </article>
+        @if (member.Status != MembershipStatus.Current)
+        {
+            <Alert Class="print:hidden"><AlertDescription>Bu üyelik şu an @MembershipLabels.Status(member.Status).ToLowerInvariant() durumunda.</AlertDescription></Alert>
+        }
+    </div>
+}
+
+@code {
+    private MemberView? member;
+    private MarkupString qr;
+
+    [Parameter] public Guid Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        member = await Members.GetAsync(Id);
+        if (member is not null && !CurrentUser.HasPermission(MembershipPermissions.Read) && await Portal.ContactIdAsync() != member.ContactId)
+        {
+            member = null;
+        }
+
+        if (member is not null)
+        {
+            // Okutan görevli üyelik kaydına gider; kartta kişisel veri kodlanmaz.
+            using var data = QRCodeGenerator.GenerateQrCode($"{Navigation.BaseUri}memberships/{member.Id}", QRCodeGenerator.ECCLevel.M);
+            qr = new MarkupString(new SvgQRCode(data).GetGraphic(4));
+        }
+    }
+}

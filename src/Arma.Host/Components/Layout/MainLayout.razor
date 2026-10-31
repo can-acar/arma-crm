@@ -8,21 +8,13 @@
         </div>
         <Separator />
         <NavMenu />
-        <div class="mt-auto p-2">
-            <AuthorizeView>
-                <div class="text-muted-foreground truncate px-2 pb-2 text-xs">@context.User.Identity?.Name</div>
-                <Button Href="account/security" Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" Class="w-full justify-start">Hesap güvenliği</Button>
-                <form method="post" action="account/logout">
-                    <AntiforgeryToken />
-                    <Button Type="submit" Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" Class="w-full justify-start">Çıkış yap</Button>
-                </form>
-            </AuthorizeView>
-        </div>
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">
-        <header class="flex h-14 items-center border-b px-6 md:hidden">
-            <span class="font-semibold">Arma CRM</span>
+        <header class="flex h-14 items-center justify-between gap-4 border-b px-6">
+            <span class="font-semibold md:hidden">Arma CRM</span>
+            <span class="hidden md:block"></span>
+            <UserMenu />
         </header>
         <main class="flex-1 p-6">
             @Body

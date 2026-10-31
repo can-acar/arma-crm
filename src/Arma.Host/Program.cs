@@ -1,34 +1,69 @@
-using Microsoft.AspNetCore.Authorization;
 using Arma.Host;
 using Arma.Host.Components;
-using Arma.Host.Identity;
-using Arma.Modules.Identity.Application;
+using Arma.Infrastructure.Messaging;
+using Arma.Infrastructure.Security;
 using Arma.SharedKernel.Tenancy;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+ArmaModules.LoadPlugins(builder.Configuration, builder.Environment.ContentRootPath);
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITenantContext, ConfiguredTenantContext>();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+builder.Services.AddArmaAuthorization(ArmaModules.All.SelectMany(m => m.Permissions));
+
+// Ters vekil (nginx, IIS ARR, Caddy) arkasında HTTPS bilgisinin doğru görünmesi için.
+// Yalnızca uygulamaya doğrudan erişim kapalıysa açılmalı.
+var trustForwardedHeaders = builder.Configuration.GetValue<bool>("Arma:Security:TrustForwardedHeaders");
+if (trustForwardedHeaders)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
+}
 
 foreach (var module in ArmaModules.All)
 {
     module.AddServices(builder.Services, builder.Configuration);
 }
 
-// Varsayılan olarak her sayfa ve uç nokta oturum ister; istisnalar AllowAnonymous ile açılır.
-builder.Services.AddAuthorizationBuilder()
-    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
-builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddCurrentUser();
+builder.AddArmaMessaging(ArmaModules.ModuleAssemblies);
+builder.Services.AddHostedService<Arma.Infrastructure.Jobs.ScheduledJobRunner>();
+
+builder.Services.AddLocalization();
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    string[] cultures = ["tr-TR", "en-US"];
+    options.SetDefaultCulture(cultures[0]).AddSupportedCultures(cultures).AddSupportedUICultures(cultures);
+});
+
+// Antiforgery X-Frame-Options, Blazor da frame-ancestors başlığını her yanıta ekler. Web formları (/f/...) başka sitelere
+// gömülebilsin diye ikisini de kapatıp başlıkları aşağıda kendimiz yazıyoruz.
+builder.Services.AddAntiforgery(options => options.SuppressXFrameOptionsHeader = true);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+foreach (var plugin in ArmaModules.Plugins)
+{
+    if (plugin.State == Arma.Infrastructure.Plugins.PluginState.Failed)
+    {
+        app.Logger.LogError("Eklenti yüklenemedi ({Plugin}): {Error}", plugin.Id, plugin.Error);
+    }
+    else
+    {
+        app.Logger.LogInformation("Eklenti {Plugin} {Version}: {State}", plugin.Id, plugin.Manifest?.Version, plugin.State);
+    }
+}
 
 // Kurulum ve güncellemede şema, uygulama açılışında değil ayrı bir komutla güncellenir:
 //   dotnet Arma.Host.dll migrate
@@ -47,26 +82,9 @@ if (migrateOnly || app.Configuration.GetValue<bool>("Arma:MigrateOnStartup"))
     }
 }
 
-// İlk yönetici: dotnet Arma.Host.dll create-admin <e-posta> [görünen ad]
-// Parola komut satırında görünmemesi için standart girişten okunur.
-if (args is ["create-admin", var adminEmail, ..])
+if (trustForwardedHeaders)
 {
-    Console.Error.Write("Parola: ");
-    var password = Console.ReadLine() ?? "";
-    await using var scope = app.Services.CreateAsyncScope();
-    var provisioning = scope.ServiceProvider.GetRequiredService<UserProvisioning>();
-    var created = await provisioning.CreateAsync(adminEmail, args.ElementAtOrDefault(2) ?? adminEmail, password, administrator: true, CancellationToken.None);
-    if (!created.IsSuccess)
-    {
-        Console.Error.WriteLine(created.Error!.Message);
-        Environment.ExitCode = 1;
-    }
-    else
-    {
-        Console.Error.WriteLine("Yönetici oluşturuldu.");
-    }
-
-    return;
+    app.UseForwardedHeaders();
 }
 
 if (!app.Environment.IsDevelopment())
@@ -76,14 +94,33 @@ if (!app.Environment.IsDevelopment())
 }
 else
 {
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
 }
 
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+// API yanıtları (401, 403, 404) olduğu gibi döner; yalnızca sayfa isteklerinde "bulunamadı" sayfası gösterilir.
+app.UseWhen(
+    context => !context.Request.Path.StartsWithSegments("/api") && !context.Request.Path.StartsWithSegments("/connect"),
+    pages => pages.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 app.UseHttpsRedirection();
+app.Use((context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/f"))
+    {
+        context.Response.Headers.XFrameOptions = "SAMEORIGIN";
+        context.Response.Headers.ContentSecurityPolicy = "frame-ancestors 'self'";
+    }
+
+    return next(context);
+});
+app.UseRequestLocalization();
+
 app.UseAuthentication();
+foreach (var module in ArmaModules.All)
+{
+    module.UseMiddleware(app);
+}
+
 app.UseAuthorization();
-app.UseCurrentUser();
 app.UseAntiforgery();
 
 app.MapStaticAssets().AllowAnonymous();
@@ -95,9 +132,10 @@ foreach (var module in ArmaModules.All)
 }
 
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode()
+    .AddInteractiveServerRenderMode(options => options.ContentSecurityFrameAncestorsPolicy = null)
     .AddAdditionalAssemblies(ArmaModules.PageAssemblies);
 
 app.Run();
 
+/// <summary>Entegrasyon testlerinin <c>WebApplicationFactory</c> ile uygulamayı başlatabilmesi için.</summary>
 public partial class Program;

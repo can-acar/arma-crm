@@ -1,0 +1,429 @@
+@page "/contacts/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = ContactsPermissions.Read)]
+@inject ContactService Contacts
+@inject TaxonomyService Taxonomy
+@inject IAuditLog Audit
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+@inject IEnumerable<IContactPanel> Panels
+
+<PageTitle>@(contact?.DisplayName ?? "Kayıt") · Arma CRM</PageTitle>
+
+@if (contact is null)
+{
+    @if (loaded)
+    {
+        <Alert><AlertTitle>Kayıt bulunamadı</AlertTitle><AlertDescription>Silinmiş veya başka bir kayıtla birleştirilmiş olabilir.</AlertDescription></Alert>
+    }
+    else
+    {
+        <Skeleton Class="h-40 w-full" />
+    }
+}
+else
+{
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <h1 class="text-2xl font-semibold tracking-tight">@contact.DisplayName</h1>
+                    <Badge Variant="BadgeVariant.Outline">@ContactLabels.Type(contact.Type)</Badge>
+                </div>
+                <div class="flex flex-wrap items-center gap-1">
+                    @foreach (var tag in contact.Tags)
+                    {
+                        @if (canWrite)
+                        {
+                            <TagBadge Tag="tag" OnRemove="RemoveTagAsync" />
+                        }
+                        else
+                        {
+                            <TagBadge Tag="tag" />
+                        }
+                    }
+                    @if (canWrite)
+                    {
+                        <form class="flex items-center gap-1" @onsubmit="AddTagAsync" @onsubmit:preventDefault>
+                            <Input Class="h-7 w-36 text-xs" placeholder="Etiket ekle" list="tag-options" @bind-Value="newTag" aria-label="Etiket ekle" />
+                            <datalist id="tag-options">
+                                @foreach (var tag in allTags)
+                                {
+                                    <option value="@tag.Name"></option>
+                                }
+                            </datalist>
+                        </form>
+                    }
+                </div>
+            </div>
+            <div class="flex gap-2">
+                @if (canWrite)
+                {
+                    <Button Variant="ButtonVariant.Outline" Href="@($"contacts/{Id}/edit")">Düzenle</Button>
+                }
+                @if (canDelete)
+                {
+                    <Button Variant="ButtonVariant.Outline" OnClick="() => mergeOpen = true">Mükerrer birleştir</Button>
+                    <Button Variant="ButtonVariant.Destructive" OnClick="() => deleteOpen = true">Sil</Button>
+                }
+            </div>
+        </div>
+
+        <FormAlert Error="@error" Info="@info" />
+
+        <Tabs @bind-Value="tab">
+            <TabsList>
+                <TabsTrigger Value="general">Genel</TabsTrigger>
+                @foreach (var panel in VisiblePanels)
+                {
+                    <TabsTrigger Value="@panel.Key">@panel.Title</TabsTrigger>
+                }
+                <TabsTrigger Value="history">Geçmiş</TabsTrigger>
+            </TabsList>
+
+            <TabsContent Value="general">
+                <div class="grid gap-6 lg:grid-cols-2">
+                    <Card>
+                        <CardHeader><CardTitle>Bilgiler</CardTitle></CardHeader>
+                        <CardContent>
+                            <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                                <dt class="text-muted-foreground">E-posta</dt>
+                                <dd>@(contact.Email is null ? "—" : contact.Email)</dd>
+                                <dt class="text-muted-foreground">Telefon</dt>
+                                <dd>@(contact.Phone ?? "—")</dd>
+                                <dt class="text-muted-foreground">@(contact.Type == ContactType.Person ? "T.C. kimlik no" : "Vergi no")</dt>
+                                <dd class="flex items-center gap-2 font-mono">
+                                    @(revealed ?? contact.MaskedNationalId ?? "—")
+                                    @if (contact.MaskedNationalId is not null && revealed is null && CurrentUser.HasPermission(ContactsPermissions.ViewSensitive))
+                                    {
+                                        <Button Variant="ButtonVariant.Link" Size="ButtonSize.Sm" Class="h-auto p-0" OnClick="RevealAsync">Göster</Button>
+                                    }
+                                </dd>
+                                @if (contact.Type == ContactType.Person)
+                                {
+                                    <dt class="text-muted-foreground">Doğum tarihi</dt>
+                                    <dd>@(contact.BirthDate?.ToString("dd.MM.yyyy") ?? "—")</dd>
+                                }
+                                else
+                                {
+                                    <dt class="text-muted-foreground">Web</dt>
+                                    <dd>@(contact.Website ?? "—")</dd>
+                                }
+                                <dt class="text-muted-foreground">Kayıt tarihi</dt>
+                                <dd>@contact.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd>
+                            </dl>
+                        </CardContent>
+                    </Card>
+
+                    <ContactCustomFields ContactId="contact.Id" CanWrite="canWrite" OnSaved="RefreshAsync" />
+
+                    <Card>
+                        <CardHeader><CardTitle>Adresler</CardTitle></CardHeader>
+                        <CardContent>
+                            @if (contact.Addresses.Count == 0)
+                            {
+                                <p class="text-muted-foreground text-sm">Adres yok.</p>
+                            }
+                            <ul class="grid gap-3 text-sm">
+                                @foreach (var address in contact.Addresses)
+                                {
+                                    <li>
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-medium">@Address.KindLabel(address.Kind)</span>
+                                            @if (address.IsPrimary)
+                                            {
+                                                <Badge Variant="BadgeVariant.Secondary">Birincil</Badge>
+                                            }
+                                        </div>
+                                        <div class="text-muted-foreground">@address</div>
+                                    </li>
+                                }
+                            </ul>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>İlişkiler</CardTitle>
+                            <CardDescription>Çalıştığı kurum, hane, aile bağları</CardDescription>
+                        </CardHeader>
+                        <CardContent class="grid gap-4">
+                            @if (contact.Relationships.Count == 0)
+                            {
+                                <p class="text-muted-foreground text-sm">İlişki yok.</p>
+                            }
+                            <ul class="grid gap-2 text-sm">
+                                @foreach (var r in contact.Relationships)
+                                {
+                                    <li class="flex items-center justify-between gap-2">
+                                        <span class="@(r.EndDate is null ? "" : "text-muted-foreground line-through")">
+                                            <span class="text-muted-foreground">@r.Label:</span>
+                                            <a class="font-medium hover:underline" href="contacts/@r.OtherContactId">@r.OtherName</a>
+                                            @if (r.Description is not null)
+                                            {
+                                                <span class="text-muted-foreground"> (@r.Description)</span>
+                                            }
+                                        </span>
+                                        @if (canWrite)
+                                        {
+                                            <span class="flex gap-1">
+                                                @if (r.EndDate is null)
+                                                {
+                                                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" OnClick="() => EndRelationshipAsync(r.Id)">Bitir</Button>
+                                                }
+                                                <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" OnClick="() => RemoveRelationshipAsync(r.Id)">Kaldır</Button>
+                                            </span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                            @if (canWrite)
+                            {
+                                <Separator />
+                                <form class="grid gap-2" @onsubmit="AddRelationshipAsync" @onsubmit:preventDefault>
+                                    <NativeSelect @bind-Value="relationshipType" aria-label="İlişki türü">
+                                        @foreach (var type in Enum.GetValues<RelationshipType>())
+                                        {
+                                            <option value="@type">@contact.DisplayName @Relationship.TypeLabel(type)</option>
+                                        }
+                                    </NativeSelect>
+                                    <ContactPicker @bind-Selected="relationshipTarget" Exclude="Id" />
+                                    <Input placeholder="Açıklama (görev, unvan)" @bind-Value="relationshipNote" />
+                                    <div><Button Type="submit" Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="relationshipTarget is null">İlişki ekle</Button></div>
+                                </form>
+                            }
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Gruplar</CardTitle></CardHeader>
+                        <CardContent class="grid gap-3">
+                            @if (contact.Groups.Count == 0)
+                            {
+                                <p class="text-muted-foreground text-sm">Hiçbir grupta değil.</p>
+                            }
+                            <ul class="grid gap-1 text-sm">
+                                @foreach (var g in contact.Groups)
+                                {
+                                    <li class="flex items-center justify-between">
+                                        <a class="hover:underline" href="contacts?group=@g.Id">@g.Name</a>
+                                        @if (canWrite)
+                                        {
+                                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Sm" OnClick="() => LeaveGroupAsync(g.Id)">Çıkar</Button>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                            @if (canWrite && availableGroups.Any())
+                            {
+                                <div class="flex gap-2">
+                                    <NativeSelect @bind-Value="groupToJoin" aria-label="Grup seç">
+                                        <option value="">Gruba ekle…</option>
+                                        @foreach (var g in availableGroups)
+                                        {
+                                            <option value="@g.Id">@g.Name</option>
+                                        }
+                                    </NativeSelect>
+                                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Class="h-9" OnClick="JoinGroupAsync" Disabled="string.IsNullOrEmpty(groupToJoin)">Ekle</Button>
+                                </div>
+                            }
+                        </CardContent>
+                    </Card>
+                </div>
+            </TabsContent>
+
+            @foreach (var panel in VisiblePanels)
+            {
+                <TabsContent Value="@panel.Key">
+                    <DynamicComponent Type="panel.ComponentType" Parameters="@(new Dictionary<string, object> { ["ContactId"] = Id })" />
+                </TabsContent>
+            }
+
+            <TabsContent Value="history">
+                <Card>
+                    <CardContent>
+                        @if (history is null)
+                        {
+                            <Skeleton Class="h-24 w-full" />
+                        }
+                        else if (history.Count == 0)
+                        {
+                            <p class="text-muted-foreground text-sm">Geçmiş kaydı yok.</p>
+                        }
+                        else
+                        {
+                            <AuditTable Records="history" />
+                        }
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
+    </div>
+
+    <Dialog @bind-Open="deleteOpen">
+        <DialogHeader>
+            <DialogTitle>@contact.DisplayName silinsin mi?</DialogTitle>
+            <DialogDescription>Kayıt listelerden kalkar. Denetim izi ve bağlı kayıtlar (bağış, aktivite) korunur.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => deleteOpen = false">Vazgeç</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="DeleteAsync">Sil</Button>
+        </DialogFooter>
+    </Dialog>
+
+    <Dialog @bind-Open="mergeOpen">
+        <DialogHeader>
+            <DialogTitle>Mükerrer kaydı birleştir</DialogTitle>
+            <DialogDescription>Seçtiğiniz kaydın boş olmayan bilgileri, etiketleri, grupları, adresleri ve ilişkileri bu kayda taşınır; o kayıt silinir.</DialogDescription>
+        </DialogHeader>
+        <ContactPicker @bind-Selected="mergeTarget" Exclude="Id" Placeholder="Mükerrer kaydı ara" />
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => mergeOpen = false">Vazgeç</Button>
+            <Button OnClick="MergeAsync" Disabled="mergeTarget is null">Bu kayda birleştir</Button>
+        </DialogFooter>
+    </Dialog>
+}
+
+@code {
+    private ContactDetail? contact;
+    private bool loaded;
+    private string tab = "general";
+    private string? revealed;
+    private string? error, info;
+    private string? newTag;
+    private IReadOnlyList<TagDto> allTags = [];
+    private IReadOnlyList<GroupDto> allGroups = [];
+    private IReadOnlyList<AuditRecord>? history;
+    private string? groupToJoin;
+    private string relationshipType = nameof(RelationshipType.EmployeeOf);
+    private ContactSummary? relationshipTarget;
+    private string? relationshipNote;
+    private ContactSummary? mergeTarget;
+    private bool deleteOpen, mergeOpen;
+    private bool canWrite, canDelete;
+
+    [Parameter] public Guid Id { get; set; }
+
+    private IEnumerable<IContactPanel> VisiblePanels =>
+        Panels.Where(p => p.Permission is null || CurrentUser.HasPermission(p.Permission)).OrderBy(p => p.Order);
+
+    private IEnumerable<GroupDto> availableGroups => allGroups.Where(g => contact?.Groups.All(x => x.Id != g.Id) == true);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        canWrite = CurrentUser.HasPermission(ContactsPermissions.Write);
+        canDelete = CurrentUser.HasPermission(ContactsPermissions.Delete);
+        revealed = null;
+        await LoadAsync();
+        allTags = await Taxonomy.TagsAsync();
+        allGroups = await Taxonomy.GroupsAsync();
+        history = await Audit.ForEntityAsync(nameof(Contact), Id.ToString());
+    }
+
+    private async Task LoadAsync()
+    {
+        contact = await Contacts.GetAsync(Id);
+        loaded = true;
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync();
+        history = await Audit.ForEntityAsync(nameof(Contact), Id.ToString());
+    }
+
+    private async Task RevealAsync() => revealed = await Contacts.RevealNationalIdAsync(Id);
+
+    private async Task AddTagAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newTag))
+        {
+            return;
+        }
+
+        var result = await Taxonomy.TagContactAsync(Id, newTag);
+        (error, newTag) = (result.IsSuccess ? null : result.Error!.Message, null);
+        allTags = await Taxonomy.TagsAsync();
+        await LoadAsync();
+    }
+
+    private async Task RemoveTagAsync(TagDto tag)
+    {
+        await Taxonomy.UntagContactAsync(Id, tag.Id);
+        await LoadAsync();
+    }
+
+    private async Task JoinGroupAsync()
+    {
+        if (Guid.TryParse(groupToJoin, out var groupId))
+        {
+            await Taxonomy.AddMembersAsync(groupId, [Id]);
+            groupToJoin = null;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LeaveGroupAsync(Guid groupId)
+    {
+        await Taxonomy.RemoveMemberAsync(groupId, Id);
+        await LoadAsync();
+    }
+
+    private async Task AddRelationshipAsync()
+    {
+        if (relationshipTarget is null || !Enum.TryParse<RelationshipType>(relationshipType, out var type))
+        {
+            return;
+        }
+
+        var result = await Contacts.AddRelationshipAsync(Id, new CreateRelationshipRequest(relationshipTarget.Id, type, true, relationshipNote, null));
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        (relationshipTarget, relationshipNote, error) = (null, null, null);
+        await RefreshAsync();
+    }
+
+    private async Task EndRelationshipAsync(Guid relationshipId)
+    {
+        await Contacts.EndRelationshipAsync(relationshipId);
+        await RefreshAsync();
+    }
+
+    private async Task RemoveRelationshipAsync(Guid relationshipId)
+    {
+        await Contacts.RemoveRelationshipAsync(relationshipId);
+        await RefreshAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        var result = await Contacts.DeleteAsync(Id);
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("contacts");
+        }
+        else
+        {
+            (error, deleteOpen) = (result.Error!.Message, false);
+        }
+    }
+
+    private async Task MergeAsync()
+    {
+        var result = await Contacts.MergeAsync(Id, mergeTarget!.Id);
+        mergeOpen = false;
+        if (result.IsSuccess)
+        {
+            (info, error, mergeTarget) = ($"{mergeTarget.DisplayName} bu kayda birleştirildi.", null, null);
+            await RefreshAsync();
+        }
+        else
+        {
+            error = result.Error!.Message;
+        }
+    }
+}

@@ -1,0 +1,113 @@
+@page "/memberships"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = MembershipPermissions.Read)]
+@inject MembershipService Members
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Üyeler · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Üyeler</h1>
+            <p class="text-muted-foreground text-sm">@(result?.Total ?? 0) üyelik</p>
+        </div>
+        @if (CurrentUser.HasPermission(MembershipPermissions.Write))
+        {
+            <Button OnClick="() => joinOpen = true">Üye kaydet</Button>
+        }
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-3">
+        <NativeSelect Value="@status" ValueChanged="v => FilterAsync(() => status = v)" aria-label="Durum">
+            <option value="">Tüm durumlar</option>
+            @foreach (var option in MembershipLabels.Statuses)
+            {
+                <option value="@option">@MembershipLabels.Status(option)</option>
+            }
+        </NativeSelect>
+        <NativeSelect Value="@type" ValueChanged="v => FilterAsync(() => type = v)" aria-label="Tür">
+            <option value="">Tüm türler</option>
+            @foreach (var item in types)
+            {
+                <option value="@item.Id">@item.Name</option>
+            }
+        </NativeSelect>
+        <label class="flex items-center gap-2 text-sm"><Checkbox Checked="soon" CheckedChanged="v => FilterAsync(() => soon = v)" /> 30 gün içinde bitenler</label>
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (result is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (result.Items.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Aramanıza uyan üyelik yok.</p>
+            }
+            else
+            {
+                <MemberTable Items="result.Items" />
+            }
+        </CardContent>
+    </Card>
+
+    @if (result is not null && result.Total > PageSize)
+    {
+        <div class="flex items-center justify-between text-sm">
+            <span class="text-muted-foreground">Sayfa @currentPage / @PageCount</span>
+            <div class="flex gap-2">
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="currentPage <= 1" OnClick="() => GoAsync(currentPage - 1)">Önceki</Button>
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="currentPage >= PageCount" OnClick="() => GoAsync(currentPage + 1)">Sonraki</Button>
+            </div>
+        </div>
+    }
+</div>
+
+<JoinDialog @bind-Open="joinOpen" OnSaved='id => Navigation.NavigateTo($"memberships/{id}")' />
+
+@code {
+    private const int PageSize = 50;
+    private MemberPage? result;
+    private IReadOnlyList<MembershipTypeView> types = [];
+    private string? status, type;
+    private bool soon, joinOpen;
+    private int currentPage = 1;
+
+    [SupplyParameterFromQuery(Name = "status")] public string? StatusQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "type")] public string? TypeQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "soon")] public string? SoonQuery { get; set; }
+
+    private int PageCount => Math.Max(1, (int)Math.Ceiling((result?.Total ?? 0) / (double)PageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        (status, type, soon) = (StatusQuery, TypeQuery, SoonQuery == "1");
+        types = await Members.TypesAsync();
+        await LoadAsync();
+    }
+
+    private Task FilterAsync(Action change)
+    {
+        change();
+        currentPage = 1;
+        return LoadAsync();
+    }
+
+    private Task GoAsync(int target)
+    {
+        currentPage = target;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        result = await Members.ListAsync(new MemberFilter(
+            Enum.TryParse<MembershipStatus>(status, out var s) ? s : null,
+            Guid.TryParse(type, out var t) ? t : null,
+            EndsBefore: soon ? Members.Today.AddDays(30) : null,
+            Page: currentPage, PageSize: PageSize));
+}

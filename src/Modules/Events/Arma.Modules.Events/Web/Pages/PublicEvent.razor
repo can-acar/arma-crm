@@ -1,0 +1,126 @@
+@page "/e/{Slug}"
+@layout PlainLayout
+@attribute [AllowAnonymous]
+@inject EventService Events
+@inject NavigationManager Navigation
+
+<PageTitle>@(item?.Title ?? "Etkinlik")</PageTitle>
+
+<div class="mx-auto flex max-w-lg flex-col gap-6 p-6">
+    @if (item is null)
+    {
+        <Alert><AlertTitle>Etkinlik bulunamadı</AlertTitle></Alert>
+    }
+    else
+    {
+        <div class="text-center">
+            <h1 class="text-2xl font-semibold tracking-tight">@item.Title</h1>
+            <p class="text-sm">@EventLabels.When(item.StartsAt, item.EndsAt)</p>
+            @if (item.Location is not null)
+            {
+                <p class="text-muted-foreground text-sm">@item.Location</p>
+            }
+        </div>
+
+        @if (item.Description is not null)
+        {
+            <p class="text-sm whitespace-pre-line">@item.Description</p>
+        }
+
+        <Card>
+            <CardContent>
+                @if (item.Status == EventStatus.Cancelled)
+                {
+                    <Alert><AlertDescription>Bu etkinlik iptal edildi.</AlertDescription></Alert>
+                }
+                else if (!item.RegistrationOpen)
+                {
+                    <Alert><AlertDescription>Bu etkinliğe kayıt kapandı.</AlertDescription></Alert>
+                }
+                else
+                {
+                    <form method="post" @formname="event-register" @onsubmit="SubmitAsync" class="grid gap-4">
+                        <AntiforgeryToken />
+                        <FormAlert Error="@error" />
+                        @if (item.Full)
+                        {
+                            <Alert><AlertDescription>Kontenjan doldu. Kayıt olursanız yedek listeye alınırsınız; yer açılırsa e-postayla haber veririz.</AlertDescription></Alert>
+                        }
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="grid gap-2">
+                                <Label For="first">Ad *</Label>
+                                <input id="first" name="first" class="@Styles.Input" value="@Posted("first")" autocomplete="given-name" maxlength="100" required />
+                            </div>
+                            <div class="grid gap-2">
+                                <Label For="last">Soyad *</Label>
+                                <input id="last" name="last" class="@Styles.Input" value="@Posted("last")" autocomplete="family-name" maxlength="100" required />
+                            </div>
+                        </div>
+                        <div class="grid gap-2">
+                            <Label For="email">E-posta *</Label>
+                            <input id="email" name="email" type="email" class="@Styles.Input" value="@Posted("email")" autocomplete="email" maxlength="200" required />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label For="phone">Telefon</Label>
+                            <input id="phone" name="phone" type="tel" class="@Styles.Input" value="@Posted("phone")" autocomplete="tel" maxlength="32" />
+                        </div>
+                        @if (item.Tickets.Count > 0)
+                        {
+                            <fieldset class="grid gap-2">
+                                <legend class="mb-2 text-sm font-medium">Bilet *</legend>
+                                @foreach (var ticket in item.Tickets)
+                                {
+                                    <label class="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                                        <span class="flex items-center gap-2">
+                                            <input type="radio" name="ticket" value="@ticket.Id" checked="@(Posted("ticket") == ticket.Id.ToString() || (Posted("ticket") is null && ticket == item.Tickets[0]))" required />
+                                            @ticket.Name @(ticket.SoldOut ? "(dolu, yedek liste)" : "")
+                                        </span>
+                                        <span class="tabular-nums">@EventLabels.Money(ticket.Price)</span>
+                                    </label>
+                                }
+                                @if (item.Tickets.Any(t => t.Price > 0))
+                                {
+                                    <p class="text-muted-foreground text-xs">Ücretli biletlerin ödemesi etkinlik girişinde veya kurumun bildirdiği yolla alınır.</p>
+                                }
+                            </fieldset>
+                        }
+                        <div class="hidden" aria-hidden="true"><input name="website" tabindex="-1" autocomplete="off" /></div>
+                        <Button Type="submit" Class="w-full">Kayıt ol</Button>
+                    </form>
+                }
+            </CardContent>
+        </Card>
+    }
+</div>
+
+@code {
+    private EventView? item;
+    private string? error;
+
+    [CascadingParameter] private Microsoft.AspNetCore.Http.HttpContext HttpContext { get; set; } = default!;
+
+    [Parameter] public string Slug { get; set; } = "";
+
+    protected override async Task OnInitializedAsync() => item = await Events.PublishedAsync(Slug);
+
+    private string? Posted(string name) =>
+        HttpContext.Request.HasFormContentType ? HttpContext.Request.Form[name].FirstOrDefault() : null;
+
+    private async Task SubmitAsync()
+    {
+        if (item is null || !string.IsNullOrEmpty(Posted("website")))
+        {
+            return;
+        }
+
+        var result = await Events.RegisterPublicAsync(Slug, new PublicRegistration(Posted("first") ?? "", Posted("last") ?? "", Posted("email") ?? "", Posted("phone"),
+            Guid.TryParse(Posted("ticket"), out var t) ? t : null));
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        Navigation.NavigateTo($"e/bilet/{result.Value}?yeni=1");
+    }
+}

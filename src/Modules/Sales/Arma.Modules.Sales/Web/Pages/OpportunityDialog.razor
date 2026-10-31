@@ -1,0 +1,140 @@
+@inject SalesService Sales
+@inject IContactDirectory Directory
+@inject IUserDirectory Users
+@inject ICurrentUser CurrentUser
+
+@* Fırsat ekleme ve düzenleme penceresi. *@
+<Dialog Open="Open" OpenChanged="OpenChanged" Class="sm:max-w-lg">
+    <DialogHeader>
+        <DialogTitle>@(Existing is null ? "Yeni fırsat" : "Fırsatı düzenle")</DialogTitle>
+    </DialogHeader>
+
+    <FormAlert Error="@error" />
+
+    <form id="opportunity-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="grid gap-2">
+            <Label for="opp-title">Başlık</Label>
+            <Input id="opp-title" @bind-Value="title" maxlength="200" placeholder="Örnek: Yıllık bakım sözleşmesi" />
+        </div>
+        <div class="grid gap-2">
+            <Label>Müşteri</Label>
+            <ContactPicker @bind-Selected="contact" />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="opp-amount">Tutar (TL)</Label>
+                <Input id="opp-amount" @bind-Value="amount" inputmode="decimal" placeholder="0,00" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="opp-close">Beklenen kapanış</Label>
+                <input id="opp-close" type="date" class="@Styles.Input" @bind="closeOn" />
+            </div>
+        </div>
+        @if (Existing is null && Pipeline is not null)
+        {
+            <div class="grid gap-2">
+                <Label for="opp-stage">Aşama</Label>
+                <NativeSelect id="opp-stage" @bind-Value="stageId">
+                    @foreach (var stage in Pipeline.Stages.Where(s => s.Kind == StageKind.Open))
+                    {
+                        <option value="@stage.Id">@stage.Name</option>
+                    }
+                </NativeSelect>
+            </div>
+        }
+        <div class="grid gap-2">
+            <Label for="opp-owner">Sorumlu</Label>
+            <NativeSelect id="opp-owner" @bind-Value="ownerId">
+                <option value="">Atanmamış</option>
+                @foreach (var user in users)
+                {
+                    <option value="@user.Id">@user.FullName</option>
+                }
+            </NativeSelect>
+        </div>
+        <div class="grid gap-2">
+            <Label for="opp-note">Not</Label>
+            <Textarea id="opp-note" @bind-Value="note" rows="3" maxlength="2000" />
+        </div>
+    </form>
+
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => OpenChanged.InvokeAsync(false)">Vazgeç</Button>
+        <Button Type="submit" form="opportunity-form" Disabled="saving">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private IReadOnlyList<UserSummary> users = [];
+    private ContactSummary? contact;
+    private string? title, amount, note, stageId, ownerId, error;
+    private DateOnly? closeOn;
+    private bool saving, wasOpen;
+
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    [Parameter] public OpportunityView? Existing { get; set; }
+
+    [Parameter] public PipelineView? Pipeline { get; set; }
+
+    [Parameter] public Guid? ContactId { get; set; }
+
+    [Parameter] public EventCallback<Guid> OnSaved { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Open && !wasOpen)
+        {
+            users = await Users.ActiveUsersAsync();
+            (error, saving) = (null, false);
+            if (Existing is { } item)
+            {
+                (title, amount, closeOn, note) = (item.Title, item.Amount.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("tr-TR")), item.ExpectedCloseOn, item.Note);
+                ownerId = item.OwnerUserId?.ToString();
+                contact = await Directory.FindAsync(item.ContactId);
+            }
+            else
+            {
+                (title, amount, closeOn, note) = (null, null, null, null);
+                ownerId = users.Any(u => u.Id.ToString() == CurrentUser.Id) ? CurrentUser.Id : null;
+                stageId = Pipeline?.Stages.FirstOrDefault(s => s.Kind == StageKind.Open)?.Id.ToString();
+                contact = ContactId is { } id ? await Directory.FindAsync(id) : null;
+            }
+        }
+
+        wasOpen = Open;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (contact is null || string.IsNullOrWhiteSpace(title))
+        {
+            error = "Başlık ve müşteri gerekli.";
+            return;
+        }
+
+        var value = 0m;
+        if (!string.IsNullOrWhiteSpace(amount) && !SalesLabels.TryParse(amount, out value))
+        {
+            error = "Tutarı 1.250,00 biçiminde girin.";
+            return;
+        }
+
+        var input = new OpportunityInput(title, contact.Id, value, closeOn, Guid.TryParse(ownerId, out var owner) ? owner : null, note);
+        saving = true;
+        var result = Existing is null
+            ? await Sales.CreateAsync(input, Pipeline?.Id, Guid.TryParse(stageId, out var stage) ? stage : null)
+            : await Sales.UpdateAsync(Existing.Id, input);
+        saving = false;
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        await OpenChanged.InvokeAsync(false);
+        await OnSaved.InvokeAsync(result.Value);
+    }
+}

@@ -1,0 +1,193 @@
+@page "/account/manage/2fa"
+@using System.Text
+@using QRCoder
+@inject UserManager<ArmaUser> Users
+@inject SignInManager<ArmaUser> SignIn
+@inject NavigationManager Navigation
+@inject RoleManager<ArmaRole> Roles
+
+<PageTitle>İki adımlı doğrulama · Arma CRM</PageTitle>
+
+<div class="mx-auto flex max-w-2xl flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">İki adımlı doğrulama</h1>
+        <p class="text-muted-foreground text-sm">Parolanıza ek olarak telefonunuzdaki doğrulama uygulamasından bir kod istenir.</p>
+    </div>
+
+    @if (required && !enabled)
+    {
+        <Alert>
+            <AlertTitle>Devam etmek için 2FA'yı açın</AlertTitle>
+            <AlertDescription>Rolünüz iki adımlı doğrulama gerektiriyor. Açana kadar diğer sayfalara erişemezsiniz.</AlertDescription>
+        </Alert>
+    }
+
+    @if (recoveryCodes is not null)
+    {
+        <Card>
+            <CardHeader>
+                <CardTitle>Kurtarma kodlarınız</CardTitle>
+                <CardDescription>Bu kodları güvenli bir yere kaydedin; bir daha gösterilmeyecek. Telefonunuzu kaybederseniz her biri bir kez giriş için kullanılabilir.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div class="grid grid-cols-2 gap-2 font-mono text-sm">
+                    @foreach (var recoveryCode in recoveryCodes)
+                    {
+                        <span class="bg-muted rounded px-2 py-1">@recoveryCode</span>
+                    }
+                </div>
+            </CardContent>
+            <CardFooter><Button Href="/">Devam et</Button></CardFooter>
+        </Card>
+    }
+    else if (!enabled)
+    {
+        <Card>
+            <CardHeader>
+                <CardTitle>Doğrulama uygulamasını bağlayın</CardTitle>
+                <CardDescription>Google Authenticator, Microsoft Authenticator veya benzeri bir uygulamayla QR kodunu okutun.</CardDescription>
+            </CardHeader>
+            <CardContent class="grid gap-6 sm:grid-cols-[200px_1fr]">
+                <div class="rounded-md border bg-white p-2 [&_svg]:h-auto [&_svg]:w-full">@qrSvg</div>
+                <div class="grid content-start gap-4">
+                    <div class="grid gap-1">
+                        <span class="text-muted-foreground text-sm">QR okutamıyorsanız bu anahtarı girin:</span>
+                        <code class="bg-muted rounded px-2 py-1 font-mono text-sm break-all">@formattedKey</code>
+                    </div>
+                    <EditForm Model="Input" FormName="enable-2fa" OnValidSubmit="EnableAsync" method="post" class="grid gap-4">
+                        <DataAnnotationsValidator />
+                        <FormAlert Error="@error" />
+                        <div class="grid gap-2">
+                            <Label For="code">Uygulamadaki kod</Label>
+                            <InputText id="code" autocomplete="one-time-code" inputmode="numeric" @bind-Value="Input.Code" class="@Styles.Input" required />
+                        </div>
+                        <div><Button Type="submit">Doğrula ve aç</Button></div>
+                    </EditForm>
+                </div>
+            </CardContent>
+        </Card>
+    }
+    else
+    {
+        <Card>
+            <CardHeader>
+                <CardTitle>2FA açık</CardTitle>
+                <CardDescription>@remainingCodes kurtarma kodunuz kaldı.</CardDescription>
+            </CardHeader>
+            <CardFooter class="flex flex-wrap gap-2">
+                <form method="post" @formname="regenerate" @onsubmit="RegenerateAsync">
+                    <AntiforgeryToken />
+                    <Button Type="submit" Variant="ButtonVariant.Outline">Yeni kurtarma kodları üret</Button>
+                </form>
+                @if (!required)
+                {
+                    <form method="post" @formname="disable" @onsubmit="DisableAsync">
+                        <AntiforgeryToken />
+                        <Button Type="submit" Variant="ButtonVariant.Destructive">2FA'yı kapat</Button>
+                    </form>
+                }
+            </CardFooter>
+        </Card>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+    }
+
+    private ArmaUser user = default!;
+    private bool enabled;
+    private bool required;
+    private int remainingCodes;
+    private string? formattedKey;
+    private MarkupString qrSvg;
+    private string? error;
+    private IEnumerable<string>? recoveryCodes;
+
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "enable-2fa")] private EnableModel Input { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await Users.GetUserAsync(HttpContext.User) ?? throw new InvalidOperationException("Kullanıcı bulunamadı.");
+        enabled = user.TwoFactorEnabled;
+        required = HttpContext.User.HasClaim(ArmaClaimTypes.TwoFactorSetupRequired, "true") || await RoleRequiresTwoFactorAsync();
+        remainingCodes = await Users.CountRecoveryCodesAsync(user);
+        if (!enabled)
+        {
+            await LoadKeyAsync();
+        }
+    }
+
+    private async Task LoadKeyAsync()
+    {
+        var key = await Users.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrEmpty(key))
+        {
+            await Users.ResetAuthenticatorKeyAsync(user);
+            key = await Users.GetAuthenticatorKeyAsync(user);
+        }
+
+        formattedKey = string.Join(" ", key!.ToLowerInvariant().Chunk(4).Select(c => new string(c)));
+        var uri = $"otpauth://totp/{Uri.EscapeDataString("Arma CRM")}:{Uri.EscapeDataString(user.Email!)}?secret={key}&issuer={Uri.EscapeDataString("Arma CRM")}&digits=6";
+        using var data = QRCodeGenerator.GenerateQrCode(uri, QRCodeGenerator.ECCLevel.Q);
+        qrSvg = new MarkupString(new SvgQRCode(data).GetGraphic(4));
+    }
+
+    private async Task EnableAsync()
+    {
+        var code = Input.Code.Replace(" ", "").Replace("-", "");
+        var valid = await Users.VerifyTwoFactorTokenAsync(user, Users.Options.Tokens.AuthenticatorTokenProvider, code);
+        if (!valid)
+        {
+            error = "Kod doğrulanamadı. Telefonunuzun saatinin doğru olduğundan emin olun.";
+            await LoadKeyAsync();
+            return;
+        }
+
+        await Users.SetTwoFactorEnabledAsync(user, true);
+        recoveryCodes = await Users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+        await SignIn.RefreshSignInAsync(user);
+        enabled = true;
+    }
+
+    private async Task RegenerateAsync()
+    {
+        recoveryCodes = await Users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+    }
+
+    private async Task DisableAsync()
+    {
+        if (required)
+        {
+            return;
+        }
+
+        await Users.SetTwoFactorEnabledAsync(user, false);
+        await Users.ResetAuthenticatorKeyAsync(user);
+        await SignIn.RefreshSignInAsync(user);
+        Navigation.NavigateTo("account/manage", forceLoad: true);
+    }
+
+    private async Task<bool> RoleRequiresTwoFactorAsync()
+    {
+        foreach (var name in await Users.GetRolesAsync(user))
+        {
+            if (await Roles.FindByNameAsync(name) is { RequiresTwoFactor: true })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private sealed class EnableModel
+    {
+        [Required(ErrorMessage = "Kod gerekli.")]
+        public string Code { get; set; } = "";
+    }
+}

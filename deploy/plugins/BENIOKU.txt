@@ -1,0 +1,7 @@
+Eklentiler bu klasöre, her biri kendi alt klasörüne kopyalanır:
+
+  plugins/kurum.eklenti/plugin.json
+  plugins/kurum.eklenti/Kurum.Eklenti.dll
+
+Ardından "docker compose up -d --force-recreate arma" ile uygulama yeniden başlatılır.
+Ayrıntılar: docs/eklentiler.md

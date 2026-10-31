@@ -1,0 +1,93 @@
+@page "/setup"
+@layout AuthLayout
+@attribute [AllowAnonymous]
+@inject SetupService Installer
+@inject SignInManager<ArmaUser> SignIn
+@inject NavigationManager Navigation
+
+<PageTitle>Kurulum · Arma CRM</PageTitle>
+
+<Card>
+    <CardHeader>
+        <CardTitle><h1 class="text-xl">Arma CRM'e hoş geldiniz</h1></CardTitle>
+        <CardDescription>İlk yönetici hesabını oluşturun. Bu hesap tüm izinlere sahip olur ve iki adımlı doğrulama ister.</CardDescription>
+    </CardHeader>
+    <CardContent>
+        <EditForm Model="Input" FormName="setup" OnValidSubmit="CreateAsync" method="post" class="grid gap-4">
+            <DataAnnotationsValidator />
+            <FormAlert Error="@error" />
+            <div class="grid gap-2">
+                <Label For="name">Ad soyad</Label>
+                <InputText id="name" autocomplete="name" @bind-Value="Input.FullName" class="@Styles.Input" required />
+                <ValidationMessage For="() => Input.FullName" class="text-destructive text-sm" />
+            </div>
+            <div class="grid gap-2">
+                <Label For="email">E-posta</Label>
+                <InputText id="email" type="email" autocomplete="username" @bind-Value="Input.Email" class="@Styles.Input" required />
+                <ValidationMessage For="() => Input.Email" class="text-destructive text-sm" />
+            </div>
+            <div class="grid gap-2">
+                <Label For="password">Parola</Label>
+                <InputText id="password" type="password" autocomplete="new-password" @bind-Value="Input.Password" class="@Styles.Input" required />
+                <p class="text-muted-foreground text-xs">En az 10 karakter; büyük harf, küçük harf ve rakam içermeli.</p>
+                <ValidationMessage For="() => Input.Password" class="text-destructive text-sm" />
+            </div>
+            <div class="grid gap-2">
+                <Label For="confirm">Parola (tekrar)</Label>
+                <InputText id="confirm" type="password" autocomplete="new-password" @bind-Value="Input.ConfirmPassword" class="@Styles.Input" required />
+                <ValidationMessage For="() => Input.ConfirmPassword" class="text-destructive text-sm" />
+            </div>
+            <Button Type="submit" Class="w-full">Yöneticiyi oluştur</Button>
+        </EditForm>
+    </CardContent>
+</Card>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+    }
+
+    private string? error;
+
+    [SupplyParameterFromForm] private SetupModel Input { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Installer.IsSetupRequiredAsync())
+        {
+            Navigation.NavigateTo("account/login");
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        var result = await Installer.CreateAdministratorAsync(new CreateAdministratorRequest(Input.FullName, Input.Email, Input.Password));
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        await SignIn.SignInAsync(result.Value!, isPersistent: false);
+        Navigation.NavigateTo(IdentityMiddleware.TwoFactorSetupPath, forceLoad: true);
+    }
+
+    private sealed class SetupModel
+    {
+        [Required(ErrorMessage = "Ad soyad gerekli.")]
+        [StringLength(200)]
+        public string FullName { get; set; } = "";
+
+        [Required(ErrorMessage = "E-posta gerekli.")]
+        [EmailAddress(ErrorMessage = "Geçerli bir e-posta girin.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Parola gerekli.")]
+        [StringLength(128, MinimumLength = 10, ErrorMessage = "Parola en az 10 karakter olmalı.")]
+        public string Password { get; set; } = "";
+
+        [Compare(nameof(Password), ErrorMessage = "Parolalar aynı değil.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

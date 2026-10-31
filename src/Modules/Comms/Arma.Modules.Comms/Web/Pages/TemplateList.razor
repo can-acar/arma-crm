@@ -1,0 +1,131 @@
+@page "/comms/templates"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = CommsPermissions.Mailings)]
+@inject MailingService Mailings
+
+<PageTitle>İleti şablonları · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">İleti şablonları</h1>
+            <p class="text-muted-foreground text-sm">Sık kullanılan e-posta ve SMS metinleri. Gönderirken seçilir, gerekirse değiştirilir.</p>
+        </div>
+        <Button OnClick="() => Edit(null)">Şablon ekle</Button>
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (templates.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Henüz şablon yok.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Şablon</TableHead>
+                            <TableHead>Kanal</TableHead>
+                            <TableHead></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var template in templates)
+                        {
+                            <TableRow>
+                                <TableCell>
+                                    <div class="font-medium">@template.Name</div>
+                                    <div class="text-muted-foreground text-xs">@(template.Subject ?? Shorten(template.Body))</div>
+                                </TableCell>
+                                <TableCell>@CommsLabels.Channel(template.Channel)</TableCell>
+                                <TableCell Class="text-right">
+                                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => Edit(template)">Düzenle</Button>
+                                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => DeleteAsync(template.Id)">Sil</Button>
+                                </TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<Dialog @bind-Open="editorOpen">
+    <DialogHeader>
+        <DialogTitle>@(editing is null ? "Şablon ekle" : "Şablonu düzenle")</DialogTitle>
+    </DialogHeader>
+    <FormAlert Error="@error" />
+    <form id="template-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="grid gap-4 sm:grid-cols-[1fr_10rem]">
+            <div class="grid gap-2">
+                <Label for="t-name">Ad</Label>
+                <Input id="t-name" @bind-Value="name" maxlength="120" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="t-channel">Kanal</Label>
+                <NativeSelect id="t-channel" @bind-Value="channel">
+                    <option value="1">E-posta</option>
+                    <option value="2">SMS</option>
+                </NativeSelect>
+            </div>
+        </div>
+        @if (channel == "1")
+        {
+            <div class="grid gap-2">
+                <Label for="t-subject">Konu</Label>
+                <Input id="t-subject" @bind-Value="subject" maxlength="300" />
+            </div>
+        }
+        <div class="grid gap-2">
+            <Label for="t-body">Metin</Label>
+            <Textarea id="t-body" @bind-Value="body" rows="8" maxlength="20000" />
+            <span class="text-muted-foreground text-xs">Kullanılabilir alanlar: @string.Join(", ", MessageText.Fields.Select(f => f.Field))</span>
+        </div>
+    </form>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => editorOpen = false">Vazgeç</Button>
+        <Button Type="submit" form="template-form">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private IReadOnlyList<TemplateView> templates = [];
+    private TemplateView? editing;
+    private string? name, subject, body, error;
+    private string? channel = "1";
+    private bool editorOpen;
+
+    protected override async Task OnInitializedAsync() => templates = await Mailings.TemplatesAsync();
+
+    private void Edit(TemplateView? template)
+    {
+        editing = template;
+        (name, subject, body, error) = (template?.Name, template?.Subject, template?.Body, null);
+        channel = ((int)(template?.Channel ?? Channel.Email)).ToString();
+        editorOpen = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        var target = channel == "2" ? Channel.Sms : Channel.Email;
+        var result = await Mailings.SaveTemplateAsync(editing?.Id, new SaveTemplateRequest(name ?? "", target, target == Channel.Email ? subject : null, body ?? ""));
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        editorOpen = false;
+        templates = await Mailings.TemplatesAsync();
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        await Mailings.DeleteTemplateAsync(id);
+        templates = await Mailings.TemplatesAsync();
+    }
+
+    private static string Shorten(string text) => text.Length <= 80 ? text : text[..79] + "…";
+}

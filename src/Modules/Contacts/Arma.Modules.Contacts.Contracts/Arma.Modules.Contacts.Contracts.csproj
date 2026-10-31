@@ -1,3 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- Diğer modüllerin kişilere eriştiği okuma arayüzü ve kişi seçici bileşeni. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Arma.UI\Arma.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
 
 </Project>

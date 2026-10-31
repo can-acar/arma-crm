@@ -1,0 +1,195 @@
+@inject ActivityService Activities
+@inject IUserDirectory Users
+@inject ICurrentUser CurrentUser
+
+@* Aktivite ekleme ve düzenleme penceresi. Kişi kartı, aktivite listesi ve görevlerim sayfası kullanır. *@
+<Dialog Open="Open" OpenChanged="OpenChanged" Class="sm:max-w-xl">
+    <DialogHeader>
+        <DialogTitle>@(Editing is null ? "Yeni aktivite" : "Aktiviteyi düzenle")</DialogTitle>
+    </DialogHeader>
+
+    <FormAlert Error="@error" />
+
+    <form id="activity-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        @if (Editing is null)
+        {
+            <div class="flex flex-wrap gap-2" role="radiogroup" aria-label="Tür">
+                @foreach (var option in ActivityLabels.UserKinds)
+                {
+                    <Button Size="ButtonSize.Sm" Variant="@(kind == option ? ButtonVariant.Default : ButtonVariant.Outline)"
+                            OnClick="() => kind = option" role="radio" aria-checked="@(kind == option ? "true" : "false")">@ActivityLabels.Kind(option)</Button>
+                }
+            </div>
+        }
+
+        <div class="grid gap-2">
+            <Label for="activity-subject">Konu</Label>
+            <Input id="activity-subject" @bind-Value="subject" maxlength="@Activity.SubjectMaxLength" placeholder="@SubjectHint" />
+        </div>
+
+        <div class="grid gap-2">
+            <Label for="activity-body">Açıklama</Label>
+            <Textarea id="activity-body" @bind-Value="body" rows="4" maxlength="@Activity.BodyMaxLength" />
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+            @if (kind == ActivityKind.Task)
+            {
+                <div class="grid gap-2">
+                    <Label for="activity-due">Son tarih</Label>
+                    <input id="activity-due" type="datetime-local" class="@Styles.Input" @bind="dueAt" />
+                </div>
+            }
+            else
+            {
+                <div class="grid gap-2">
+                    <Label for="activity-when">Tarih</Label>
+                    <input id="activity-when" type="datetime-local" class="@Styles.Input" @bind="occurredAt" />
+                </div>
+            }
+
+            <div class="grid gap-2">
+                <Label for="activity-assignee">@(kind == ActivityKind.Task ? "Sorumlu" : "İlgili kullanıcı")</Label>
+                <NativeSelect id="activity-assignee" @bind-Value="assignee">
+                    <option value="">Seçilmedi</option>
+                    @foreach (var user in users)
+                    {
+                        <option value="@user.Id">@user.FullName</option>
+                    }
+                </NativeSelect>
+            </div>
+        </div>
+
+        <div class="grid gap-2">
+            <Label>İlgili kişiler</Label>
+            @if (contacts.Count > 0)
+            {
+                <ul class="flex flex-wrap gap-2">
+                    @foreach (var contact in contacts)
+                    {
+                        <li class="bg-secondary flex items-center gap-1 rounded-md px-2 py-1 text-sm">
+                            @contact.DisplayName
+                            <button type="button" class="text-muted-foreground hover:text-foreground" aria-label="@($"{contact.DisplayName} kaldır")" @onclick="() => contacts.Remove(contact)">✕</button>
+                        </li>
+                    }
+                </ul>
+            }
+            <ContactPicker Selected="null" SelectedChanged="AddContact" Placeholder="Kişi veya kurum ekle" />
+        </div>
+    </form>
+
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="CloseAsync">Vazgeç</Button>
+        <Button Type="submit" form="activity-form" Disabled="saving">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private ActivityKind kind = ActivityKind.Note;
+    private string? subject, body, assignee, error;
+    private DateTime? occurredAt, dueAt;
+    private List<ContactSummary> contacts = [];
+    private IReadOnlyList<UserSummary> users = [];
+    private bool saving, wasOpen;
+
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    /// <summary>Düzenlenecek kayıt; null ise yeni kayıt açılır.</summary>
+    [Parameter] public ActivityView? Editing { get; set; }
+
+    /// <summary>Yeni kayıtta önceden eklenecek kişi (kişi kartından açıldığında).</summary>
+    [Parameter] public ContactSummary? Contact { get; set; }
+
+    [Parameter] public ActivityKind DefaultKind { get; set; } = ActivityKind.Note;
+
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private string SubjectHint => kind switch
+    {
+        ActivityKind.Call => "Örnek: Bağış teşekkür araması",
+        ActivityKind.Meeting => "Örnek: Yıllık plan toplantısı",
+        ActivityKind.Task => "Örnek: Makbuzu e-postayla gönder",
+        _ => "Kısa bir başlık",
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Pencere her açıldığında form, verilen kayıtla (veya boş) yeniden doldurulur.
+        if (Open && !wasOpen)
+        {
+            users = await Users.ActiveUsersAsync();
+            Reset();
+        }
+
+        wasOpen = Open;
+    }
+
+    private void Reset()
+    {
+        error = null;
+        if (Editing is { } a)
+        {
+            kind = a.Kind;
+            subject = a.Subject;
+            body = a.Body;
+            occurredAt = a.OccurredAt?.ToLocalTime().DateTime;
+            dueAt = a.DueAt?.ToLocalTime().DateTime;
+            assignee = a.AssignedToUserId?.ToString();
+            contacts = a.Contacts.ToList();
+            return;
+        }
+
+        kind = DefaultKind;
+        subject = body = null;
+        occurredAt = TruncateToMinute(DateTime.Now);
+        dueAt = null;
+        var me = Guid.TryParse(CurrentUser.Id, out var id) && users.Any(u => u.Id == id) ? id.ToString() : null;
+        assignee = DefaultKind == ActivityKind.Task ? me : null;
+        contacts = Contact is null ? [] : [Contact];
+    }
+
+    private void AddContact(ContactSummary? contact)
+    {
+        if (contact is not null && contacts.All(c => c.Id != contact.Id))
+        {
+            contacts.Add(contact);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        try
+        {
+            var request = new SaveActivityRequest(
+                kind, subject ?? "", body,
+                kind == ActivityKind.Task ? null : ActivityLabels.FromLocal(occurredAt),
+                kind == ActivityKind.Task ? ActivityLabels.FromLocal(dueAt) : null,
+                Guid.TryParse(assignee, out var userId) ? userId : null,
+                contacts.Select(c => c.Id).ToList());
+            var result = Editing is null ? await Activities.CreateAsync(request) : await Activities.UpdateAsync(Editing.Id, request);
+            if (!result.IsSuccess)
+            {
+                error = result.Error!.Message;
+                return;
+            }
+
+            await CloseAsync();
+            await OnSaved.InvokeAsync();
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private static DateTime TruncateToMinute(DateTime value) => value.AddTicks(-(value.Ticks % TimeSpan.TicksPerMinute));
+
+    private async Task CloseAsync()
+    {
+        Open = wasOpen = false;
+        await OpenChanged.InvokeAsync(false);
+    }
+}
