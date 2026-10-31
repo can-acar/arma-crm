@@ -13,6 +13,7 @@ internal sealed class GivingPersonalData(GivingDbContext db) : IPersonalDataSour
     [
         new("Bağışlar", "Bağış tutarı, tarihi, ödeme yöntemi, makbuz", "Finans", "Bağış kabulü, makbuz ve muhasebe", "Kanuni yükümlülük (VUK, 5253)", "Makbuz yılından itibaren 10 yıl"),
         new("Bağışlar", "Kart ödemesi işlem numarası", "Finans", "Ödeme mutabakatı ve iade", "Sözleşmenin ifası", "10 yıl; kart numarası tutulmaz"),
+        new("Bağışlar", "Bağış taahhüdü: tutar, taksit planı, not", "Finans", "Taahhüt edilen bağışların takibi", "Meşru menfaat", "Taahhüt bittikten sonra 10 yıl"),
         new("Bağışlar", "Havale/EFT hareketi: gönderen adı, IBAN, açıklama", "Finans", "Gelen havalenin bağışçıyla eşleştirilmesi", "Kanuni yükümlülük (VUK, 5253)", "10 yıl"),
     ];
 
@@ -23,8 +24,19 @@ internal sealed class GivingPersonalData(GivingDbContext db) : IPersonalDataSour
             .ToListAsync(cancellationToken);
         var transfers = await db.BankLines.AsNoTracking().Where(l => l.ContactId == contactId).OrderBy(l => l.BookedOn)
             .Select(l => new { l.BookedOn, l.Amount, l.Counterparty, l.Iban, l.Description }).ToListAsync(cancellationToken);
+        var pledges = await db.Pledges.AsNoTracking().Where(p => p.ContactId == contactId).OrderBy(p => p.StartOn)
+            .Select(p => new { p.StartOn, p.Amount, p.Currency, p.Frequency, p.InstallmentCount, p.Status, p.Note, p.CancelReason }).ToListAsync(cancellationToken);
         return
         [
+            new("Bağış taahhütleri", [.. pledges.Select(p => (IReadOnlyDictionary<string, string?>)new Dictionary<string, string?>
+            {
+                ["Başlangıç"] = GivingLabels.Date(p.StartOn),
+                ["Tutar"] = Money.Format(p.Amount, p.Currency),
+                ["Plan"] = GivingLabels.Plan(p.Frequency, p.InstallmentCount),
+                ["Durum"] = p.Status == Domain.PledgeStatus.Cancelled ? "İptal" : "Etkin",
+                ["Not"] = p.Note,
+                ["İptal nedeni"] = p.CancelReason,
+            })]),
             new("Havale/EFT hareketleri", [.. transfers.Select(l => (IReadOnlyDictionary<string, string?>)new Dictionary<string, string?>
             {
                 ["Tarih"] = GivingLabels.Date(l.BookedOn),
@@ -46,11 +58,13 @@ internal sealed class GivingPersonalData(GivingDbContext db) : IPersonalDataSour
         ];
     }
 
-    /// <summary>Bağış ve makbuz kanunen saklanır; yalnızca serbest metin notu ve havalenin gönderen bilgileri silinir. Bağışçı adı kişi kaydından geldiği için anonim görünür.</summary>
+    /// <summary>Bağış ve makbuz kanunen saklanır; yalnızca serbest metin notları ve havalenin gönderen bilgileri silinir. Bağışçı adı kişi kaydından geldiği için anonim görünür.</summary>
     public async Task AnonymizeAsync(Guid contactId, CancellationToken cancellationToken)
     {
         await db.Donations.Where(d => d.ContactId == contactId && d.Note != null)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.Note, (string?)null), cancellationToken);
+        await db.Pledges.Where(p => p.ContactId == contactId)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Note, (string?)null).SetProperty(p => p.CancelReason, (string?)null), cancellationToken);
         await db.BankLines.Where(l => l.ContactId == contactId || l.SuggestedContactId == contactId)
             .ExecuteUpdateAsync(s => s.SetProperty(l => l.Description, (string?)null).SetProperty(l => l.Counterparty, (string?)null)
                 .SetProperty(l => l.Iban, (string?)null).SetProperty(l => l.SuggestedContactId, (Guid?)null), cancellationToken);

@@ -68,6 +68,9 @@ public sealed class Donation : Entity
     /// <summary>Eski sistemden aktarıldıysa oradaki kimliği ("civicrm:42"). Makbuzu eski sistemde kesildiği için toplu makbuza girmez.</summary>
     public string? ExternalKey { get; private set; }
 
+    /// <summary>Bağış bir taahhüdün ödemesiyse o taahhüt.</summary>
+    public Guid? PledgeId { get; private set; }
+
     public bool HasReceipt => ReceiptNumber is not null && ReceiptVoidReason is null;
 
     public static Result<Donation> Record(Guid contactId, decimal amount, string? currency, DateOnly receivedOn, Guid? fundId, PaymentMethod method, string? reference, string? note, string? inKindDescription)
@@ -127,6 +130,8 @@ public sealed class Donation : Entity
     public void ChangeContact(Guid contactId) => ContactId = contactId;
 
     internal void LinkExternal(string key) => ExternalKey = key;
+
+    public void AssignPledge(Guid? pledgeId) => PledgeId = pledgeId;
 
     public Result<bool> MarkPaid(string providerPaymentId, decimal paidAmount)
     {

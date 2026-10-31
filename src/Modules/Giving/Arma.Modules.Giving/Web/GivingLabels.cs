@@ -39,4 +39,30 @@ public static class GivingLabels
     };
 
     public static string Date(DateOnly date) => date.ToString("dd.MM.yyyy");
+
+    public static string Frequency(PledgeFrequency frequency) => frequency switch
+    {
+        PledgeFrequency.Once => "Tek sefer",
+        PledgeFrequency.Monthly => "Aylık",
+        PledgeFrequency.Quarterly => "Üç ayda bir",
+        _ => "Yıllık",
+    };
+
+    public static string Plan(PledgeFrequency frequency, int count) =>
+        frequency == PledgeFrequency.Once ? "Tek sefer" : $"{Frequency(frequency)}, {count} taksit";
+
+    public static string State(Application.PledgeState state) => state switch
+    {
+        Application.PledgeState.Open => "Açık",
+        Application.PledgeState.Overdue => "Gecikmiş",
+        Application.PledgeState.Fulfilled => "Tamamlandı",
+        _ => "İptal",
+    };
+
+    public static BadgeVariant StateVariant(Application.PledgeState state) => state switch
+    {
+        Application.PledgeState.Overdue => BadgeVariant.Destructive,
+        Application.PledgeState.Fulfilled => BadgeVariant.Secondary,
+        _ => BadgeVariant.Outline,
+    };
 }

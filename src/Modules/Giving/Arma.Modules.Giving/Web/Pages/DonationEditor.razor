@@ -1,5 +1,6 @@
 @inject DonationService Donations
 @inject FundService Funds
+@inject PledgeService Pledges
 @inject TimeProvider Clock
 
 @* Bağış ekleme ve düzenleme penceresi. Bağış listesi, bağış ayrıntısı ve kişi kartı kullanır. *@
@@ -17,7 +18,7 @@
     <form id="donation-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
         <div class="grid gap-2">
             <Label>Bağışçı</Label>
-            <ContactPicker @bind-Selected="contact" />
+            <ContactPicker Selected="contact" SelectedChanged="ContactChangedAsync" />
         </div>
 
         <div class="grid gap-4 sm:grid-cols-3">
@@ -69,6 +70,20 @@
             </div>
         </div>
 
+        @if (pledges.Count > 0)
+        {
+            <div class="grid gap-2">
+                <Label for="donation-pledge">Taahhüt ödemesi</Label>
+                <NativeSelect id="donation-pledge" @bind-Value="pledge">
+                    <option value="">Taahhüde bağlı değil</option>
+                    @foreach (var item in pledges)
+                    {
+                        <option value="@item.Id">@Money.Format(item.Amount, item.Currency) · @GivingLabels.Plan(item.Frequency, item.InstallmentCount) · kalan @Money.Format(item.Remaining, item.Currency)</option>
+                    }
+                </NativeSelect>
+            </div>
+        }
+
         @if (method == nameof(PaymentMethod.InKind))
         {
             <div class="grid gap-2">
@@ -92,7 +107,8 @@
 @code {
     private static readonly System.Globalization.CultureInfo Turkish = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
     private ContactSummary? contact;
-    private string? amount, reference, note, inKind, error, fund;
+    private string? amount, reference, note, inKind, error, fund, pledge;
+    private IReadOnlyList<PledgeView> pledges = [];
     private string? currency = "TRY", method = nameof(PaymentMethod.BankTransfer);
     private DateOnly receivedOn;
     private IReadOnlyList<FundView> funds = [];
@@ -106,6 +122,9 @@
 
     /// <summary>Yeni kayıtta önceden seçili bağışçı.</summary>
     [Parameter] public ContactSummary? Contact { get; set; }
+
+    /// <summary>Yeni kayıtta önceden seçili taahhüt; tutar sıradaki taksitle, fon taahhüdün fonuyla dolar.</summary>
+    [Parameter] public PledgeView? Pledge { get; set; }
 
     [Parameter] public EventCallback<Guid> OnSaved { get; set; }
 
@@ -136,6 +155,8 @@
             reference = d.Reference;
             note = d.Note;
             inKind = d.InKindDescription;
+            pledge = d.PledgeId?.ToString();
+            await LoadPledgesAsync(d.PledgeId);
 
             // Pasif fona bağlı eski kayıt düzenlenirken fon listede görünsün.
             if (d.FundId is { } fundId && funds.All(f => f.Id != fundId))
@@ -147,10 +168,33 @@
         }
 
         contact = Contact;
-        amount = reference = note = inKind = fund = null;
+        amount = reference = note = inKind = fund = pledge = null;
         currency = "TRY";
         method = nameof(PaymentMethod.BankTransfer);
         receivedOn = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+        await LoadPledgesAsync(null);
+        if (Pledge is { } p)
+        {
+            pledge = p.Id.ToString();
+            currency = p.Currency;
+            fund = p.FundId?.ToString();
+            var next = (await Pledges.GetAsync(p.Id))?.Schedule.FirstOrDefault(i => !i.IsPaid);
+            amount = next is null ? null : (next.Amount - next.Paid).ToString("N2", Turkish);
+        }
+    }
+
+    private async Task ContactChangedAsync(ContactSummary? value)
+    {
+        contact = value;
+        pledge = null;
+        await LoadPledgesAsync(null);
+    }
+
+    /// <summary>Bağışçının ödeme bekleyen taahhütleri; düzenlenen bağışın mevcut taahhüdü kapanmış olsa da listede kalır.</summary>
+    private async Task LoadPledgesAsync(Guid? keep)
+    {
+        pledges = contact is null ? [] : (await Pledges.ListAsync(contactId: contact.Id))
+            .Where(p => p.Id == keep || p.State is PledgeState.Open or PledgeState.Overdue).ToList();
     }
 
     private async Task SaveAsync()
@@ -171,7 +215,8 @@
         try
         {
             var request = new SaveDonationRequest(contact.Id, value, currency, receivedOn,
-                Guid.TryParse(fund, out var fundId) ? fundId : null, Enum.Parse<PaymentMethod>(method!), reference, note, inKind);
+                Guid.TryParse(fund, out var fundId) ? fundId : null, Enum.Parse<PaymentMethod>(method!), reference, note, inKind,
+                Guid.TryParse(pledge, out var pledgeId) ? pledgeId : null);
             var result = Editing is null ? await Donations.RecordAsync(request) : await Donations.UpdateAsync(Editing.Id, request);
             if (!result.IsSuccess)
             {

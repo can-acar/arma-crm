@@ -16,6 +16,8 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
 
     public DbSet<Fund> Funds => Set<Fund>();
 
+    public DbSet<Pledge> Pledges => Set<Pledge>();
+
     public DbSet<ReceiptSettings> ReceiptSettings => Set<ReceiptSettings>();
 
     public DbSet<BankStatement> BankStatements => Set<BankStatement>();
@@ -60,6 +62,8 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
             entity.HasOne<Fund>().WithMany().HasForeignKey(d => d.FundId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(d => new { d.TenantId, d.ContactId });
             entity.HasIndex(d => new { d.TenantId, d.ReceivedOn });
+            entity.HasOne<Pledge>().WithMany().HasForeignKey(d => d.PledgeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(d => new { d.TenantId, d.PledgeId }).HasFilter("pledge_id IS NOT NULL");
             entity.HasIndex(d => new { d.TenantId, d.ReceiptNumber }).IsUnique().HasFilter("receipt_number IS NOT NULL");
             entity.HasQueryFilter(d => d.TenantId == tenantId && !d.IsDeleted);
         });
@@ -70,6 +74,20 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
             entity.Property(f => f.Description).HasMaxLength(500);
             entity.HasIndex(f => new { f.TenantId, f.Name }).IsUnique().HasFilter("NOT is_deleted");
             entity.HasQueryFilter(f => f.TenantId == tenantId && !f.IsDeleted);
+        });
+
+        modelBuilder.Entity<Pledge>(entity =>
+        {
+            entity.Property(p => p.Amount).HasPrecision(18, 2);
+            entity.Property(p => p.Currency).HasMaxLength(3).IsFixedLength();
+            entity.Property(p => p.Frequency).HasConversion<short>();
+            entity.Property(p => p.Status).HasConversion<short>();
+            entity.Property(p => p.Note).HasMaxLength(1000);
+            entity.Property(p => p.CancelReason).HasMaxLength(300);
+            entity.HasOne<Fund>().WithMany().HasForeignKey(p => p.FundId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(p => new { p.TenantId, p.ContactId });
+            entity.HasIndex(p => new { p.TenantId, p.Status });
+            entity.HasQueryFilter(p => p.TenantId == tenantId && !p.IsDeleted);
         });
 
         modelBuilder.Entity<BankStatement>(entity =>

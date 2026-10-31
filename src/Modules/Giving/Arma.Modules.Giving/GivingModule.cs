@@ -27,6 +27,7 @@ public sealed class GivingModule : IModule, INavigationContributor
         services.AddModuleDbContext<GivingDbContext>(configuration, GivingDbContext.Schema);
         services.AddScoped<DonationService>();
         services.AddScoped<FundService>();
+        services.AddScoped<PledgeService>();
         services.AddScoped<Arma.SharedKernel.Modules.IDataImporter, CivicrmContributionImporter>();
         services.AddScoped<OnlineGivingService>();
         services.AddScoped<Arma.Modules.Giving.Application.Banking.BankService>();
@@ -52,6 +53,7 @@ public sealed class GivingModule : IModule, INavigationContributor
     [
         new("Bağışlar", "donations", 30, GivingPermissions.Read),
         new("Fonlar", "donations/funds", 31, GivingPermissions.Read),
+        new("Taahhütler", "donations/pledges", 33, GivingPermissions.Read),
         new("Havale eşleştirme", "donations/bank", 32, GivingPermissions.Write),
         new("Makbuz ve ödeme", "admin/giving", 930, GivingPermissions.Settings),
     ];
