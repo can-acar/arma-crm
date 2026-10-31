@@ -38,6 +38,10 @@
   <Folder Name="/src/Modules/Sales/">
     <Project Path="src/Modules/Sales/Arma.Modules.Sales/Arma.Modules.Sales.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Invoicing/">
+    <Project Path="src/Modules/Invoicing/Arma.Modules.Invoicing.Contracts/Arma.Modules.Invoicing.Contracts.csproj" />
+    <Project Path="src/Modules/Invoicing/Arma.Modules.Invoicing/Arma.Modules.Invoicing.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Automation/">
     <Project Path="src/Modules/Automation/Arma.Modules.Automation/Arma.Modules.Automation.csproj" />
   </Folder>

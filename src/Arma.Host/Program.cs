@@ -1,4 +1,5 @@
 using Arma.Payments;
+using Arma.Modules.Invoicing.Pipeline;
 using Arma.Host;
 using Arma.Host.Components;
 using Arma.Infrastructure.Messaging;
@@ -37,6 +38,9 @@ foreach (var module in ArmaModules.All)
 
 // Ödeme sağlayıcıları: yerleşik olanlar ve modüllerle eklentilerdeki IPaymentProvider sınıfları kendiliğinden bulunur.
 builder.Services.AddArmaPayments().AddProvidersFrom(ArmaModules.ModuleAssemblies);
+
+// e-Fatura entegratörleri: yerleşik olanlar ve eklentilerdeki IEInvoiceProvider sınıfları kendiliğinden bulunur.
+builder.Services.AddArmaEInvoicing().AddProvidersFrom(ArmaModules.ModuleAssemblies);
 
 builder.AddArmaMessaging(ArmaModules.ModuleAssemblies);
 builder.Services.AddHostedService<Arma.Infrastructure.Jobs.ScheduledJobRunner>();

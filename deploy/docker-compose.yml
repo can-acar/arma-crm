@@ -22,6 +22,7 @@ x-arma-env: &arma-env
   Payments__Providers__paytr__MerchantKey: ${PAYTR_MERCHANT_KEY:-}
   Payments__Providers__paytr__MerchantSalt: ${PAYTR_MERCHANT_SALT:-}
   Payments__Providers__paytr__TestMode: ${PAYTR_TEST_MODE:-false}
+  # e-Fatura entegratörü eklentiyle gelirse ayarları buraya eklenir: EInvoicing__Providers__<anahtar>__<alan>.
   Comms__PublicUrl: ${ARMA_PUBLIC_URL:-}
   Comms__Email__Provider: ${ARMA_EMAIL_PROVIDER:-none}
   Comms__Email__Host: ${SMTP_HOST:-}

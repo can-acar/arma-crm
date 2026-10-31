@@ -1,0 +1,77 @@
+@page "/invoices"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = InvoicingPermissions.Read)]
+@inject InvoiceService Invoices
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Faturalar · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Faturalar</h1>
+            <p class="text-muted-foreground text-sm">Kabul edilen tekliflerden ve alınan aidatlardan açılan e-Arşiv ve e-Fatura belgeleri. Taslaklar gönderilince numaralanır.</p>
+        </div>
+        @if (canSettings)
+        {
+            <Button Variant="ButtonVariant.Outline" Href="admin/invoicing">Fatura ayarları</Button>
+        }
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-3">
+        <Input Type="search" placeholder="Numara, alıcı veya kaynak" Value="@search" ValueChanged="SearchAsync" aria-label="Ara" />
+        <NativeSelect Value="@Status" ValueChanged="Go" aria-label="Durum">
+            <option value="">Tüm faturalar</option>
+            @foreach (var option in Enum.GetValues<InvoiceStatus>())
+            {
+                <option value="@option">@InvoiceLabels.Status(option)</option>
+            }
+            <option value="pending">Portala yüklenmeyi bekleyen</option>
+        </NativeSelect>
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (items is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (items.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Henüz fatura yok. Teklif kabul edildiğinde ya da aidat alındığında taslak fatura burada açılır.</p>
+            }
+            else
+            {
+                <InvoiceTable Items="items" />
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private IReadOnlyList<InvoiceListItem>? items;
+    private string? search;
+    private bool canSettings;
+
+    [SupplyParameterFromQuery(Name = "status")] public string? Status { get; set; }
+
+    protected override void OnInitialized() => canSettings = CurrentUser.HasPermission(InvoicingPermissions.Settings);
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync() =>
+        items = await Invoices.ListAsync(new InvoiceFilter(
+            Status: Enum.TryParse<InvoiceStatus>(Status, out var status) ? status : null,
+            Search: search,
+            PendingTransmission: Status == "pending" ? true : null));
+
+    private async Task SearchAsync(string? value)
+    {
+        search = value;
+        await LoadAsync();
+    }
+
+    private void Go(string? status) =>
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters("invoices", new Dictionary<string, object?> { ["status"] = string.IsNullOrEmpty(status) ? null : status }));
+}

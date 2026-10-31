@@ -1,0 +1,320 @@
+@page "/invoices/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = InvoicingPermissions.Read)]
+@inject InvoiceService Invoices
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Fatura @invoice?.Number · Arma CRM</PageTitle>
+
+@if (invoice is null)
+{
+    @if (loaded)
+    {
+        <Alert><AlertTitle>Fatura bulunamadı</AlertTitle><AlertDescription>Silinmiş olabilir.</AlertDescription></Alert>
+    }
+}
+else
+{
+    var draft = invoice.Status == InvoiceStatus.Draft;
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <p class="text-muted-foreground text-sm"><a class="hover:underline" href="invoices">Faturalar</a></p>
+                <h1 class="font-mono text-2xl font-semibold tracking-tight">@(invoice.Number ?? "Taslak fatura")</h1>
+                <p class="text-sm">
+                    <a class="hover:underline" href="contacts/@invoice.ContactId">@invoice.BuyerName</a>
+                    <span class="text-muted-foreground"> · @InvoiceLabels.Profile(invoice.Profile) · @invoice.IssuedOn.ToString("dd.MM.yyyy")</span>
+                    <Badge Variant="InvoiceLabels.StatusVariant(invoice.Status, invoice.TransmittedAt is not null, invoice.LastError is not null)" Class="ml-1">@InvoiceLabels.Status(invoice.Status)</Badge>
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                @if (canWrite && draft)
+                {
+                    <Button OnClick="IssueAsync" Disabled="busy" data-testid="invoice-issue">@(invoice.Number is null ? "Faturayı gönder" : "Yeniden gönder")</Button>
+                }
+                @if (canWrite && invoice.Status == InvoiceStatus.Issued && invoice.TransmittedAt is null)
+                {
+                    <Button OnClick="MarkTransmittedAsync">GİB'e iletildi olarak işaretle</Button>
+                }
+                @if (invoice.Status != InvoiceStatus.Cancelled)
+                {
+                    <Button Variant="ButtonVariant.Outline" Href="@($"api/v1/invoices/{invoice.Id}/xml")" target="_blank">@(draft ? "XML önizleme" : "XML indir")</Button>
+                    <Button Variant="ButtonVariant.Outline" Href="@($"invoices/{invoice.Id}/print")">Görüntüle</Button>
+                }
+                @if (canWrite && invoice.Status != InvoiceStatus.Cancelled)
+                {
+                    <Button Variant="ButtonVariant.Ghost" OnClick="() => cancelOpen = true">@(invoice.Number is null ? "Taslağı sil" : "İptal et")</Button>
+                }
+            </div>
+        </div>
+
+        <FormAlert Error="@error" />
+        @if (notice is not null)
+        {
+            <Alert><AlertDescription>@notice</AlertDescription></Alert>
+        }
+        @if (invoice.Status == InvoiceStatus.Issued && invoice.TransmittedAt is null)
+        {
+            <Alert>
+                <AlertTitle>Fatura GİB'e henüz iletilmedi</AlertTitle>
+                <AlertDescription>XML dosyasını indirip GİB e-Arşiv portalına yükleyin ve orada onaylayın. Sonra bu faturayı "iletildi" olarak işaretleyin.</AlertDescription>
+            </Alert>
+        }
+        @if (draft && invoice.LastError is not null)
+        {
+            <Alert Variant="AlertVariant.Destructive"><AlertTitle>Son gönderim başarısız</AlertTitle><AlertDescription>@invoice.LastError</AlertDescription></Alert>
+        }
+
+        <div class="grid gap-6 lg:grid-cols-3">
+            <Card Class="lg:col-span-2">
+                <CardHeader><CardTitle>Kalemler</CardTitle></CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Açıklama</TableHead>
+                                <TableHead Class="text-right">Miktar</TableHead>
+                                <TableHead Class="text-right">Birim fiyat</TableHead>
+                                <TableHead Class="text-right">KDV</TableHead>
+                                <TableHead Class="text-right">Tutar</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            @foreach (var line in invoice.Lines.OrderBy(l => l.Position))
+                            {
+                                <TableRow>
+                                    <TableCell>
+                                        @line.Description
+                                        @if (line.DiscountRate > 0)
+                                        {
+                                            <div class="text-muted-foreground text-xs">%@line.DiscountRate.ToString("0.##") iskonto</div>
+                                        }
+                                    </TableCell>
+                                    <TableCell Class="text-right tabular-nums">@line.Quantity.ToString("0.###") @line.Unit</TableCell>
+                                    <TableCell Class="text-right tabular-nums">@InvoiceService.Money(line.UnitPrice)</TableCell>
+                                    <TableCell Class="text-right tabular-nums">%@line.VatRate</TableCell>
+                                    <TableCell Class="text-right tabular-nums">@InvoiceService.Money(line.Net)</TableCell>
+                                </TableRow>
+                            }
+                        </TableBody>
+                    </Table>
+                    <dl class="ml-auto mt-4 grid max-w-xs grid-cols-2 gap-1 text-sm">
+                        <dt class="text-muted-foreground">Ara toplam</dt><dd class="text-right tabular-nums">@InvoiceService.Money(invoice.Subtotal)</dd>
+                        <dt class="text-muted-foreground">KDV</dt><dd class="text-right tabular-nums">@InvoiceService.Money(invoice.VatTotal)</dd>
+                        <dt class="font-medium">Ödenecek</dt><dd class="text-right font-medium tabular-nums" data-testid="invoice-total">@InvoiceService.Money(invoice.Total)</dd>
+                    </dl>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader><CardTitle>Bilgiler</CardTitle></CardHeader>
+                <CardContent>
+                    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                        <dt class="text-muted-foreground">Kaynak</dt><dd>@InvoiceLabels.Source(invoice.SourceKind) @invoice.SourceLabel</dd>
+                        <dt class="text-muted-foreground">ETTN</dt><dd class="break-all font-mono text-xs">@invoice.Uuid</dd>
+                        <dt class="text-muted-foreground">Entegratör</dt><dd>@(invoice.Provider ?? "-")</dd>
+                        <dt class="text-muted-foreground">Referans</dt><dd class="break-all">@(invoice.ProviderReference ?? "-")</dd>
+                        <dt class="text-muted-foreground">GİB'e iletildi</dt><dd>@(invoice.TransmittedAt is { } at ? at.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "-")</dd>
+                        @if (invoice.CancelReason is not null)
+                        {
+                            <dt class="text-muted-foreground">İptal nedeni</dt><dd>@invoice.CancelReason</dd>
+                        }
+                    </dl>
+                    @if (invoice.Note is not null)
+                    {
+                        <Separator Class="my-4" />
+                        <p class="whitespace-pre-line text-sm">@invoice.Note</p>
+                    }
+                </CardContent>
+            </Card>
+        </div>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Alıcı</CardTitle>
+                <CardDescription>
+                    @if (draft)
+                    {
+                        <text>Faturaya yazılacak bilgiler. Kimlik numarası bilinmeyen kişi alıcı için e-Arşiv faturada 11111111111 kullanılır.</text>
+                    }
+                    else
+                    {
+                        <text>Faturaya yazılan bilgiler; kesilmiş fatura değiştirilemez.</text>
+                    }
+                </CardDescription>
+                @if (canWrite && draft)
+                {
+                    <CardAction><Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="RefreshBuyerAsync">Kişi kaydından yenile</Button></CardAction>
+                }
+            </CardHeader>
+            <CardContent>
+                <form id="buyer-form" class="grid gap-4 sm:grid-cols-2" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                    <fieldset class="contents" disabled="@(!(canWrite && draft))">
+                        <div class="grid gap-2 sm:col-span-2">
+                            <Label for="buyer-name">Ad / unvan</Label>
+                            <Input id="buyer-name" @bind-Value="form.Name" maxlength="200" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="buyer-tax">VKN / TCKN</Label>
+                            <Input id="buyer-tax" @bind-Value="form.TaxId" inputmode="numeric" maxlength="11" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="buyer-office">Vergi dairesi</Label>
+                            <Input id="buyer-office" @bind-Value="form.TaxOffice" maxlength="100" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="buyer-first">Ad (kişi alıcı)</Label>
+                            <Input id="buyer-first" @bind-Value="form.FirstName" maxlength="100" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="buyer-last">Soyad (kişi alıcı)</Label>
+                            <Input id="buyer-last" @bind-Value="form.LastName" maxlength="100" />
+                        </div>
+                        <div class="grid gap-2 sm:col-span-2">
+                            <Label for="buyer-street">Adres</Label>
+                            <Input id="buyer-street" @bind-Value="form.Street" maxlength="500" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="buyer-district">İlçe</Label>
+                            <Input id="buyer-district" @bind-Value="form.District" maxlength="100" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="buyer-city">İl</Label>
+                            <Input id="buyer-city" @bind-Value="form.City" maxlength="100" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="buyer-email">E-posta</Label>
+                            <Input id="buyer-email" Type="email" @bind-Value="form.Email" maxlength="320" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="buyer-profile">Senaryo</Label>
+                            <NativeSelect id="buyer-profile" @bind-Value="form.ProfileText">
+                                <option value="@EInvoiceProfiles.EArsiv">e-Arşiv (alıcı e-Fatura mükellefi değil)</option>
+                                <option value="@EInvoiceProfiles.EFatura">e-Fatura (alıcı e-Fatura mükellefi)</option>
+                            </NativeSelect>
+                        </div>
+                        <div class="grid gap-2 sm:col-span-2">
+                            <Label for="buyer-note">Fatura notu</Label>
+                            <Textarea id="buyer-note" @bind-Value="form.Note" maxlength="2000" rows="2" />
+                        </div>
+                    </fieldset>
+                </form>
+            </CardContent>
+            @if (canWrite && draft)
+            {
+                <CardFooter><Button Type="submit" form="buyer-form" Variant="ButtonVariant.Outline">Kaydet</Button></CardFooter>
+            }
+        </Card>
+    </div>
+
+    <Dialog @bind-Open="cancelOpen" Class="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>@(invoice.Number is null ? "Taslak silinsin mi?" : "Fatura iptal edilsin mi?")</DialogTitle>
+            <DialogDescription>
+                @if (invoice.Number is null)
+                {
+                    <text>Taslak kaldırılır; kaynağından yeniden fatura açılmaz.</text>
+                }
+                else
+                {
+                    <text>Numara sırada kalır, fatura iptal edildi olarak işaretlenir. GİB'e iletilmiş faturayı entegratörde veya portalda da iptal etmeniz gerekir.</text>
+                }
+            </DialogDescription>
+        </DialogHeader>
+        @if (invoice.Number is not null)
+        {
+            <div class="grid gap-2">
+                <Label for="cancel-reason">İptal nedeni</Label>
+                <Input id="cancel-reason" @bind-Value="cancelReason" maxlength="500" />
+            </div>
+        }
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = false">Vazgeç</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="CancelAsync">@(invoice.Number is null ? "Sil" : "İptal et")</Button>
+        </DialogFooter>
+    </Dialog>
+}
+
+@code {
+    private Invoice? invoice;
+    private BuyerForm form = new();
+    private string? error, notice, cancelReason;
+    private bool loaded, canWrite, cancelOpen, busy;
+
+    [Parameter] public Guid Id { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        canWrite = CurrentUser.HasPermission(InvoicingPermissions.Write);
+        await LoadAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        invoice = await Invoices.GetAsync(Id);
+        if (invoice is not null)
+        {
+            form = BuyerForm.From(invoice);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        var result = await Invoices.UpdateDraftAsync(Id, new InvoiceDraftInput(form.ToBuyer(), form.Profile, form.Note));
+        error = result.IsSuccess ? null : result.Error!.Message;
+        notice = result.IsSuccess ? "Alıcı bilgileri kaydedildi." : null;
+        await LoadAsync();
+    }
+
+    private async Task RefreshBuyerAsync() => await Apply(await Invoices.RefreshBuyerAsync(Id), "Alıcı bilgileri kişi kaydından yenilendi.");
+
+    private async Task IssueAsync()
+    {
+        busy = true;
+        var saved = await Invoices.UpdateDraftAsync(Id, new InvoiceDraftInput(form.ToBuyer(), form.Profile, form.Note));
+        await Apply(saved.IsSuccess ? await Invoices.IssueAsync(Id) : saved, "Fatura kesildi.");
+        busy = false;
+    }
+
+    private async Task MarkTransmittedAsync() => await Apply(await Invoices.MarkTransmittedAsync(Id), "Fatura GİB'e iletildi olarak işaretlendi.");
+
+    private async Task CancelAsync()
+    {
+        var result = await Invoices.CancelAsync(Id, cancelReason);
+        cancelOpen = false;
+        if (result is { IsSuccess: true, Value: true })
+        {
+            Navigation.NavigateTo("invoices");
+            return;
+        }
+
+        error = result.IsSuccess ? null : result.Error!.Message;
+        notice = result.IsSuccess ? "Fatura iptal edildi." : null;
+        await LoadAsync();
+    }
+
+    private async Task Apply(Result<Guid> result, string success)
+    {
+        error = result.IsSuccess ? null : result.Error!.Message;
+        notice = result.IsSuccess ? success : null;
+        await LoadAsync();
+    }
+
+    private sealed class BuyerForm
+    {
+        public string? Name, TaxId, TaxOffice, FirstName, LastName, Street, District, City, PostalCode, Email, Phone, Note;
+        public string? ProfileText = nameof(EInvoiceProfiles.EArsiv);
+
+        public EInvoiceProfiles Profile => Enum.TryParse<EInvoiceProfiles>(ProfileText, out var p) ? p : EInvoiceProfiles.EArsiv;
+
+        public static BuyerForm From(Invoice i) => new()
+        {
+            Name = i.BuyerName, TaxId = i.BuyerTaxId, TaxOffice = i.BuyerTaxOffice, FirstName = i.BuyerFirstName, LastName = i.BuyerLastName, Street = i.BuyerStreet,
+            District = i.BuyerDistrict, City = i.BuyerCity, PostalCode = i.BuyerPostalCode, Email = i.BuyerEmail, Phone = i.BuyerPhone, Note = i.Note, ProfileText = i.Profile.ToString(),
+        };
+
+        public InvoiceBuyer ToBuyer() => new(Name ?? "", FirstName, LastName, TaxId ?? "", TaxOffice, Street, District, City, PostalCode, Email, Phone);
+    }
+}

@@ -1,0 +1,104 @@
+@page "/invoices/{Id:guid}/print"
+@layout PlainLayout
+@attribute [Authorize(Policy = InvoicingPermissions.Read)]
+@inject InvoiceService Invoices
+
+<PageTitle>Fatura @invoice?.Number · Arma CRM</PageTitle>
+
+@* Faturanın insan okunur görüntüsü. Resmi görüntü entegratörde ya da GİB portalında oluşur; bu sayfa kontrol ve paylaşım içindir. *@
+@if (invoice is null)
+{
+    <div class="mx-auto max-w-3xl p-6">
+        <Alert><AlertTitle>Fatura bulunamadı</AlertTitle><AlertDescription>Silinmiş olabilir.</AlertDescription></Alert>
+    </div>
+}
+else
+{
+    <div class="mx-auto max-w-3xl p-6 print:max-w-none print:p-0">
+        <div class="mb-4 flex justify-end gap-2 print:hidden">
+            <Button Variant="ButtonVariant.Outline" Href="@($"invoices/{invoice.Id}")">Geri</Button>
+            <button type="button" class="@ButtonVariants.For(ButtonVariant.Default, ButtonSize.Default)" onclick="window.print()">Yazdır</button>
+        </div>
+
+        <article class="bg-background rounded-lg border p-10 print:rounded-none print:border-0 print:p-0">
+            @if (invoice.Status != InvoiceStatus.Issued)
+            {
+                <p class="text-destructive mb-4 text-center text-sm font-semibold">@(invoice.Status == InvoiceStatus.Draft ? "TASLAK — GEÇERLİ FATURA DEĞİLDİR" : "İPTAL EDİLDİ")</p>
+            }
+            <header class="flex items-start justify-between gap-6 border-b pb-6 text-sm">
+                <div>
+                    <h1 class="text-lg font-semibold">@settings.SellerName</h1>
+                    <p>@string.Join(", ", new[] { settings.SellerStreet, settings.SellerDistrict, settings.SellerCity }.Where(p => p is not null))</p>
+                    <p>Vergi dairesi: @settings.SellerTaxOffice · VKN: @settings.SellerTaxId</p>
+                    @if (settings.SellerEmail is not null)
+                    {
+                        <p>@settings.SellerEmail</p>
+                    }
+                </div>
+                <div class="text-right">
+                    <p class="text-xl font-semibold tracking-tight">@(invoice.Profile == EInvoiceProfiles.EFatura ? "e-FATURA" : "e-ARŞİV FATURA")</p>
+                    <p class="font-mono">No: @(invoice.Number ?? "-")</p>
+                    <p>Tarih: @invoice.IssuedOn.ToString("dd.MM.yyyy")</p>
+                    <p class="font-mono text-xs">ETTN: @invoice.Uuid</p>
+                </div>
+            </header>
+
+            <section class="py-6 text-sm">
+                <p class="text-muted-foreground">Sayın</p>
+                <p class="font-medium">@invoice.BuyerName</p>
+                <p>@string.Join(", ", new[] { invoice.BuyerStreet, invoice.BuyerDistrict, invoice.BuyerCity }.Where(p => p is not null))</p>
+                <p>@(invoice.BuyerTaxId.Length == 10 ? "VKN" : "TCKN"): @invoice.BuyerTaxId @(invoice.BuyerTaxOffice is { } office ? $"· {office}" : "")</p>
+            </section>
+
+            <table class="w-full text-sm">
+                <thead class="border-b text-left">
+                    <tr><th class="py-2">Açıklama</th><th class="text-right">Miktar</th><th class="text-right">Birim fiyat</th><th class="text-right">İskonto</th><th class="text-right">KDV</th><th class="text-right">Tutar</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in invoice.Lines.OrderBy(l => l.Position))
+                    {
+                        <tr class="border-b">
+                            <td class="py-2">@line.Description</td>
+                            <td class="text-right tabular-nums">@line.Quantity.ToString("0.###") @line.Unit</td>
+                            <td class="text-right tabular-nums">@InvoiceService.Money(line.UnitPrice)</td>
+                            <td class="text-right tabular-nums">@(line.DiscountRate > 0 ? $"%{line.DiscountRate:0.##}" : "-")</td>
+                            <td class="text-right tabular-nums">%@line.VatRate</td>
+                            <td class="text-right tabular-nums">@InvoiceService.Money(line.Net)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <dl class="ml-auto mt-4 grid max-w-xs grid-cols-2 gap-1 text-sm">
+                <dt>Ara toplam</dt><dd class="text-right tabular-nums">@InvoiceService.Money(invoice.Subtotal)</dd>
+                @foreach (var group in invoice.Lines.GroupBy(l => l.VatRate).OrderBy(g => g.Key))
+                {
+                    <dt>KDV (%@group.Key)</dt><dd class="text-right tabular-nums">@InvoiceService.Money(group.Sum(l => l.Vat))</dd>
+                }
+                <dt class="font-semibold">Ödenecek tutar</dt><dd class="text-right font-semibold tabular-nums">@InvoiceService.Money(invoice.Total)</dd>
+            </dl>
+
+            @if (invoice.Lines.Any(l => l.VatRate == 0))
+            {
+                <p class="mt-6 text-xs">KDV istisna: @settings.ExemptionCode @settings.ExemptionReason</p>
+            }
+            @if (invoice.Note is not null)
+            {
+                <p class="mt-2 whitespace-pre-line text-xs">@invoice.Note</p>
+            }
+        </article>
+    </div>
+}
+
+@code {
+    private Invoice? invoice;
+    private InvoiceSettings settings = new();
+
+    [Parameter] public Guid Id { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        invoice = await Invoices.GetAsync(Id);
+        settings = await Invoices.SettingsAsync();
+    }
+}
