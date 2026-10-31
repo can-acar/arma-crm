@@ -28,3 +28,8 @@ public sealed record RecordTimelineEntry(
 
 /// <summary>Kaynağı silinen veya geçersiz olan (ödemesi başarısız bağış gibi) zaman çizelgesi kaydını kaldırır.</summary>
 public sealed record RemoveTimelineEntry(string SourceModule, string SourceId);
+
+/// <summary>
+/// Başka bir modülün (otomasyon kuralı gibi) açtığı görev. Atanan kullanıcı pasifse veya bulunamazsa görev atanmadan açılır.
+/// </summary>
+public sealed record CreateFollowUpTask(IReadOnlyList<Guid> ContactIds, string Subject, string? Body, DateTimeOffset? DueAt, Guid? AssignedToUserId);

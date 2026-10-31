@@ -14,10 +14,17 @@
             <h1 class="text-2xl font-semibold tracking-tight">Bağışlar</h1>
             <p class="text-muted-foreground text-sm">Tamamlanan: @if (result is not null) { <TotalsLine Totals="result.Totals" /> }</p>
         </div>
-        @if (canWrite)
-        {
-            <Button OnClick="() => editorOpen = true">Bağış kaydet</Button>
-        }
+        <div class="flex flex-wrap gap-2">
+            @if (canReceipt)
+            {
+                <Button Variant="ButtonVariant.Outline" OnClick="OpenBulkAsync">Toplu makbuz</Button>
+            }
+            @if (canWrite)
+            {
+                <Button Variant="ButtonVariant.Outline" Href="donations/bank">Havale eşleştir</Button>
+                <Button OnClick="() => editorOpen = true">Bağış kaydet</Button>
+            }
+        </div>
     </div>
 
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
@@ -71,13 +78,63 @@
 
 <DonationEditor @bind-Open="editorOpen" OnSaved="OpenDonation" />
 
+<Dialog Open="bulkOpen" OpenChanged="v => bulkOpen = v" Class="sm:max-w-md">
+    <DialogHeader>
+        <DialogTitle>Toplu makbuz</DialogTitle>
+        <DialogDescription>Seçilen yılda tamamlanmış ama makbuzu kesilmemiş bağışlara, bağış tarihi sırasıyla makbuz kesilir. Makbuz numaraları geri alınamaz.</DialogDescription>
+    </DialogHeader>
+    <div class="grid gap-2">
+        <Label for="bulk-year">Yıl</Label>
+        <NativeSelect id="bulk-year" Value="@bulkYear.ToString()" ValueChanged="BulkYearChangedAsync">
+            @for (var y = DateTime.Today.Year; y >= DateTime.Today.Year - 5; y--)
+            {
+                <option value="@y">@y</option>
+            }
+        </NativeSelect>
+        <p class="text-sm">@(bulkPending == 0 ? "Bu yılda makbuz bekleyen bağış yok." : $"{bulkPending} bağış için makbuz kesilecek.")</p>
+        @if (bulkDone is not null)
+        {
+            <Alert><AlertDescription>@bulkDone makbuz kesildi.</AlertDescription></Alert>
+        }
+    </div>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => bulkOpen = false">Kapat</Button>
+        <Button OnClick="IssueBulkAsync" Disabled="@(bulkPending == 0 || bulkBusy)">@(bulkBusy ? "Kesiliyor…" : "Makbuzları kes")</Button>
+    </DialogFooter>
+</Dialog>
+
 @code {
     private DonationPage? result;
     private IReadOnlyList<FundView> funds = [];
     private string? search, fund, status;
     private DateOnly? from, to;
     private int currentPage = 1;
-    private bool canWrite, editorOpen;
+    private bool canWrite, canReceipt, editorOpen, bulkOpen, bulkBusy;
+    private int bulkYear = DateTime.Today.Year, bulkPending;
+    private int? bulkDone;
+
+    private async Task OpenBulkAsync()
+    {
+        (bulkYear, bulkDone) = (DateTime.Today.Year, null);
+        bulkPending = await Donations.PendingReceiptCountAsync(bulkYear);
+        bulkOpen = true;
+    }
+
+    private async Task BulkYearChangedAsync(string? value)
+    {
+        bulkYear = int.TryParse(value, out var y) ? y : DateTime.Today.Year;
+        bulkDone = null;
+        bulkPending = await Donations.PendingReceiptCountAsync(bulkYear);
+    }
+
+    private async Task IssueBulkAsync()
+    {
+        bulkBusy = true;
+        bulkDone = await Donations.IssuePendingReceiptsAsync(bulkYear);
+        bulkPending = await Donations.PendingReceiptCountAsync(bulkYear);
+        bulkBusy = false;
+        await LoadAsync();
+    }
 
     private void OpenDonation(Guid id) => Navigation.NavigateTo($"donations/{id}");
 
@@ -89,6 +146,7 @@
     {
         fund = FundQuery;
         canWrite = CurrentUser.HasPermission(GivingPermissions.Write);
+        canReceipt = CurrentUser.HasPermission(GivingPermissions.Receipts);
         funds = await Funds.ListAsync();
         await LoadAsync();
     }

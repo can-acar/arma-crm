@@ -153,6 +153,18 @@ public sealed class ActivityService(ActivitiesDbContext db, IContactDirectory co
         return created.Value!.Id;
     }
 
+    /// <summary>Başka modülden gelen görev. Atanan kullanıcı geçersizse görev atanmadan açılır.</summary>
+    internal async Task CreateFollowUpAsync(CreateFollowUpTask message, CancellationToken cancellationToken)
+    {
+        var request = new SaveActivityRequest(ActivityKind.Task, message.Subject, message.Body, null, message.DueAt, message.AssignedToUserId, message.ContactIds);
+        if (await ValidateReferencesAsync(request, cancellationToken) == ActivityErrors.UserNotFound)
+        {
+            request = request with { AssignedToUserId = null };
+        }
+
+        await CreateAsync(request, cancellationToken);
+    }
+
     public async Task<Result<Guid>> UpdateAsync(Guid id, SaveActivityRequest request, CancellationToken cancellationToken = default)
     {
         var activity = await db.Activities.Include(a => a.Participants).FirstOrDefaultAsync(a => a.Id == id, cancellationToken);

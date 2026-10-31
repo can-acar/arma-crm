@@ -1,0 +1,82 @@
+@page "/campaigns"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = CampaignsPermissions.Read)]
+@inject CampaignService Campaigns
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Kampanyalar · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Kampanyalar</h1>
+            <p class="text-muted-foreground text-sm">Fon, etkinlik, toplu ileti ve formları bir amaç altında toplayıp sonuçlarını birlikte izleyin.</p>
+        </div>
+        @if (CurrentUser.HasPermission(CampaignsPermissions.Write))
+        {
+            <Button OnClick="() => editOpen = true">Kampanya ekle</Button>
+        }
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (items is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (items.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Henüz kampanya yok. Örneğin "Kış yardımı 2026" kampanyası açıp bağış fonunu ve yardım gecesi etkinliğini bağlayabilirsiniz.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Kampanya</TableHead>
+                            <TableHead>Tarih</TableHead>
+                            <TableHead>Hedef</TableHead>
+                            <TableHead Class="text-right">Bağlı kayıt</TableHead>
+                            <TableHead>Sorumlu</TableHead>
+                            <TableHead>Durum</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var item in items)
+                        {
+                            <TableRow>
+                                <TableCell><a class="font-medium hover:underline" href="campaigns/@item.Id">@item.Name</a></TableCell>
+                                <TableCell Class="text-sm whitespace-nowrap">@CampaignLabels.Period(item.StartOn, item.EndOn)</TableCell>
+                                <TableCell Class="min-w-48">
+                                    @if (item.GoalAmount is { } goal)
+                                    {
+                                        <GoalProgress Raised="item.Raised" Goal="goal" />
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted-foreground text-sm">—</span>
+                                    }
+                                </TableCell>
+                                <TableCell Class="text-right tabular-nums">@item.LinkCount</TableCell>
+                                <TableCell Class="text-sm">@(item.OwnerName ?? "—")</TableCell>
+                                <TableCell><StatusBadge Status="item.Status" /></TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<CampaignDialog @bind-Open="editOpen" OnSaved="Open" />
+
+@code {
+    private IReadOnlyList<CampaignSummary>? items;
+    private bool editOpen;
+
+    protected override async Task OnInitializedAsync() => items = await Campaigns.ListAsync();
+
+    private void Open(Guid id) => Navigation.NavigateTo("campaigns/" + id);
+}

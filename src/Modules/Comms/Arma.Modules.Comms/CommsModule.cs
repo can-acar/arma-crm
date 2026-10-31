@@ -34,6 +34,7 @@ public sealed class CommsModule : IModule, INavigationContributor
         services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<CommsInsights>());
         services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<CommsInsights>());
         services.AddSingleton<IContactPanel, CommsPanel>();
+        services.AddScoped<ICampaignSource, MailingCampaignSource>();
         services.AddSingleton<INavigationContributor>(this);
         AddSenders(services, configuration);
     }

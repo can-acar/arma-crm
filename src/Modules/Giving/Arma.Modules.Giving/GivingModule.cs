@@ -28,11 +28,13 @@ public sealed class GivingModule : IModule, INavigationContributor
         services.AddScoped<DonationService>();
         services.AddScoped<FundService>();
         services.AddScoped<OnlineGivingService>();
+        services.AddScoped<Arma.Modules.Giving.Application.Banking.BankService>();
         services.AddScoped<Arma.SharedKernel.Privacy.IPersonalDataSource, GivingPersonalData>();
         services.AddScoped<GivingInsights>();
         services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<GivingInsights>());
         services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<GivingInsights>());
         services.AddSingleton<IContactPanel, DonationsPanel>();
+        services.AddScoped<ICampaignSource, FundCampaignSource>();
         services.AddSingleton<INavigationContributor>(this);
         AddPayments(services, configuration);
     }
@@ -49,6 +51,7 @@ public sealed class GivingModule : IModule, INavigationContributor
     [
         new("Bağışlar", "donations", 30, GivingPermissions.Read),
         new("Fonlar", "donations/funds", 31, GivingPermissions.Read),
+        new("Havale eşleştirme", "donations/bank", 32, GivingPermissions.Write),
         new("Makbuz ve ödeme", "admin/giving", 930, GivingPermissions.Settings),
     ];
 

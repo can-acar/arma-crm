@@ -1,0 +1,133 @@
+@inject CampaignService Campaigns
+@inject ICurrentUser CurrentUser
+
+@* Kampanya ekleme ve düzenleme penceresi. *@
+<Dialog Open="Open" OpenChanged="OpenChanged" Class="sm:max-w-lg">
+    <DialogHeader>
+        <DialogTitle>@(Existing is null ? "Yeni kampanya" : "Kampanyayı düzenle")</DialogTitle>
+    </DialogHeader>
+
+    <FormAlert Error="@error" />
+
+    <form id="campaign-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="grid gap-2">
+            <Label for="campaign-name">Ad</Label>
+            <Input id="campaign-name" @bind-Value="name" maxlength="200" placeholder="Örnek: Kış yardımı 2026" />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="campaign-start">Başlangıç</Label>
+                <input id="campaign-start" type="date" class="@Styles.Input" @bind="startOn" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="campaign-end">Bitiş</Label>
+                <input id="campaign-end" type="date" class="@Styles.Input" @bind="endOn" />
+            </div>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+                <Label for="campaign-goal">Hedef (TL)</Label>
+                <Input id="campaign-goal" @bind-Value="goal" inputmode="decimal" placeholder="İsteğe bağlı" />
+            </div>
+            <div class="grid gap-2">
+                <Label for="campaign-status">Durum</Label>
+                <NativeSelect id="campaign-status" @bind-Value="status">
+                    @foreach (var s in Enum.GetValues<CampaignStatus>())
+                    {
+                        <option value="@s">@CampaignLabels.Status(s)</option>
+                    }
+                </NativeSelect>
+            </div>
+        </div>
+        <div class="grid gap-2">
+            <Label for="campaign-owner">Sorumlu</Label>
+            <NativeSelect id="campaign-owner" @bind-Value="ownerId">
+                <option value="">Atanmamış</option>
+                @foreach (var user in users)
+                {
+                    <option value="@user.Id">@user.FullName</option>
+                }
+            </NativeSelect>
+        </div>
+        <div class="grid gap-2">
+            <Label for="campaign-description">Açıklama</Label>
+            <Textarea id="campaign-description" @bind-Value="description" rows="3" maxlength="2000" />
+        </div>
+        <p class="text-muted-foreground text-xs">Sonuçlar başlangıç ve bitiş tarihleri arasındaki bağış, kayıt ve gönderimlerden hesaplanır. Tarih vermezseniz bağlı kaydın tüm sonuçları sayılır.</p>
+    </form>
+
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => OpenChanged.InvokeAsync(false)">Vazgeç</Button>
+        <Button Type="submit" form="campaign-form" Disabled="saving">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private IReadOnlyList<UserSummary> users = [];
+    private string? name, description, goal, ownerId, error;
+    private string status = nameof(CampaignStatus.Active);
+    private DateOnly? startOn, endOn;
+    private bool saving, wasOpen;
+
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    [Parameter] public CampaignView? Existing { get; set; }
+
+    [Parameter] public EventCallback<Guid> OnSaved { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Open && !wasOpen)
+        {
+            users = await Campaigns.UsersAsync();
+            (error, saving) = (null, false);
+            if (Existing is { } item)
+            {
+                (name, description, startOn, endOn) = (item.Name, item.Description, item.StartOn, item.EndOn);
+                goal = item.GoalAmount is { } g ? CampaignLabels.Money(g).Replace(" TL", "") : null;
+                status = item.Status.ToString();
+                ownerId = item.OwnerUserId?.ToString();
+            }
+            else
+            {
+                (name, description, goal) = (null, null, null);
+                (startOn, endOn) = (Campaigns.Today, null);
+                status = nameof(CampaignStatus.Active);
+                ownerId = users.Any(u => u.Id.ToString() == CurrentUser.Id) ? CurrentUser.Id : null;
+            }
+        }
+
+        wasOpen = Open;
+    }
+
+    private async Task SaveAsync()
+    {
+        decimal? goalAmount = null;
+        if (!string.IsNullOrWhiteSpace(goal))
+        {
+            if (!CampaignLabels.TryParseMoney(goal, out var value))
+            {
+                error = "Hedefi 100.000,00 biçiminde girin.";
+                return;
+            }
+
+            goalAmount = value;
+        }
+
+        var input = new CampaignInput(name ?? "", description, Enum.Parse<CampaignStatus>(status), startOn, endOn, goalAmount,
+            Guid.TryParse(ownerId, out var owner) ? owner : null);
+        saving = true;
+        var result = await Campaigns.SaveAsync(Existing?.Id, input);
+        saving = false;
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        await OpenChanged.InvokeAsync(false);
+        await OnSaved.InvokeAsync(result.Value);
+    }
+}

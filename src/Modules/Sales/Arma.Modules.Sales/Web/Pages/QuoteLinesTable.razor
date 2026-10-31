@@ -1,0 +1,40 @@
+@* Teklif kalemleri ve toplamlar; teklif sayfası ve çıktısı kullanır. *@
+<table class="w-full text-sm">
+    <thead class="border-b">
+        <tr class="text-left">
+            <th class="py-2 font-medium">#</th>
+            <th class="py-2 font-medium">Açıklama</th>
+            <th class="py-2 text-right font-medium">Miktar</th>
+            <th class="py-2 text-right font-medium">Birim fiyat</th>
+            <th class="py-2 text-right font-medium">İsk.</th>
+            <th class="py-2 text-right font-medium">KDV</th>
+            <th class="py-2 text-right font-medium">Tutar</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var line in Quote.Lines)
+        {
+            <tr class="border-b last:border-0">
+                <td class="py-2 tabular-nums">@line.Position</td>
+                <td class="py-2">@line.Description</td>
+                <td class="py-2 text-right tabular-nums whitespace-nowrap">@SalesLabels.Number(line.Quantity) @line.Unit</td>
+                <td class="py-2 text-right tabular-nums whitespace-nowrap">@SalesLabels.Money(line.UnitPrice)</td>
+                <td class="py-2 text-right tabular-nums">@(line.DiscountRate == 0 ? "" : $"%{SalesLabels.Number(line.DiscountRate)}")</td>
+                <td class="py-2 text-right tabular-nums">%@line.VatRate</td>
+                <td class="py-2 text-right tabular-nums whitespace-nowrap">@SalesLabels.Money(line.Net)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+<dl class="mt-4 ml-auto grid w-72 grid-cols-2 gap-1 text-sm">
+    <dt class="text-muted-foreground">Ara toplam</dt><dd class="text-right tabular-nums">@SalesLabels.Money(Quote.Subtotal)</dd>
+    @foreach (var group in Quote.Lines.Where(l => l.Vat != 0).GroupBy(l => l.VatRate).OrderBy(g => g.Key))
+    {
+        <dt class="text-muted-foreground">KDV %@group.Key</dt><dd class="text-right tabular-nums">@SalesLabels.Money(group.Sum(l => l.Vat))</dd>
+    }
+    <dt class="font-semibold">Genel toplam</dt><dd class="text-right font-semibold tabular-nums">@SalesLabels.Money(Quote.Total)</dd>
+</dl>
+
+@code {
+    [Parameter, EditorRequired] public QuoteView Quote { get; set; } = default!;
+}

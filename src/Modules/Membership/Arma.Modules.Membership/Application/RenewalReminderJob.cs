@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using Arma.Modules.Comms.Contracts;
 using Arma.Modules.Membership.Domain;
 using Arma.Modules.Membership.Infrastructure;
@@ -51,7 +52,7 @@ internal sealed class RenewalReminderJob(MembershipDbContext db, IDbContextOutbo
                 $"{row.Name} üyeliğiniz (üye no {row.Member.Number}) {MembershipLabels.Date(row.Member.EndOn!.Value)} tarihinde sona eriyor.{fee}\n\nÜyeliğinizi yenilemek için bizimle iletişime geçebilirsiniz."));
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return due.Count;
     }
 }

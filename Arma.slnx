@@ -34,6 +34,15 @@
   <Folder Name="/src/Modules/Events/">
     <Project Path="src/Modules/Events/Arma.Modules.Events/Arma.Modules.Events.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Sales/">
+    <Project Path="src/Modules/Sales/Arma.Modules.Sales/Arma.Modules.Sales.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Automation/">
+    <Project Path="src/Modules/Automation/Arma.Modules.Automation/Arma.Modules.Automation.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Campaigns/">
+    <Project Path="src/Modules/Campaigns/Arma.Modules.Campaigns/Arma.Modules.Campaigns.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Forms/">
     <Project Path="src/Modules/Forms/Arma.Modules.Forms/Arma.Modules.Forms.csproj" />
   </Folder>

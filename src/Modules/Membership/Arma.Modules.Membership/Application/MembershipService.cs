@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using System.Globalization;
 using Arma.Modules.Activities.Contracts;
 using Arma.Modules.Contacts.Contracts;
@@ -177,7 +178,7 @@ public sealed class MembershipService(MembershipDbContext db, IContactDirectory 
         outbox.Enroll(db);
         await outbox.PublishAsync(Timeline(member, $"Üye oldu: {type.Name} (No {member.Number})", PeriodText(member.StartOn, member.EndOn), member.StartOn, $"{member.Id}:join"));
         await PublishDuesTimelineAsync(member, dues.Payment);
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return member.Id;
     }
 
@@ -207,7 +208,7 @@ public sealed class MembershipService(MembershipDbContext db, IContactDirectory 
         outbox.Enroll(db);
         await outbox.PublishAsync(Timeline(member, $"Üyelik yenilendi: {type.Name}", PeriodText(start, end), Today, $"{member.Id}:renew:{start:yyyyMMdd}"));
         await PublishDuesTimelineAsync(member, payment.Payment);
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return member.Id;
     }
 
@@ -228,7 +229,7 @@ public sealed class MembershipService(MembershipDbContext db, IContactDirectory 
 
         outbox.Enroll(db);
         await PublishDuesTimelineAsync(member, payment);
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return payment!.Id;
     }
 
@@ -249,7 +250,7 @@ public sealed class MembershipService(MembershipDbContext db, IContactDirectory 
         var typeName = await db.Types.Where(t => t.Id == member.TypeId).Select(t => t.Name).FirstAsync(cancellationToken);
         outbox.Enroll(db);
         await outbox.PublishAsync(Timeline(member, $"Üyelik sonlandırıldı: {typeName}", member.CancelReason, on, $"{member.Id}:cancel:{on:yyyyMMdd}"));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return id;
     }
 
@@ -284,7 +285,7 @@ public sealed class MembershipService(MembershipDbContext db, IContactDirectory 
         db.Payments.Remove(payment);
         outbox.Enroll(db);
         await outbox.PublishAsync(new RemoveTimelineEntry(SourceModule, $"dues:{payment.Id}"));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return true;
     }
 

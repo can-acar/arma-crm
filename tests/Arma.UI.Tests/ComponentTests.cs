@@ -56,6 +56,7 @@ public class ClassNamesTests
     [InlineData("rounded-md", "rounded-t-lg", "rounded-md rounded-t-lg")]
     [InlineData("font-medium text-sm", "font-mono text-left", "font-medium text-sm font-mono text-left")]
     [InlineData("bg-transparent bg-[length:16px] bg-no-repeat", "bg-muted", "bg-muted bg-[length:16px] bg-no-repeat")]
+    [InlineData("p-2 whitespace-nowrap", "whitespace-normal", "p-2 whitespace-normal")]
     public void Later_conflicting_utility_wins(string baseClasses, string extra, string expected) =>
         ClassNames.Cn(baseClasses, extra).ShouldBe(expected);
 }

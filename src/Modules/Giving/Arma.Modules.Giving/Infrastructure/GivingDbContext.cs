@@ -18,6 +18,10 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
 
     public DbSet<ReceiptSettings> ReceiptSettings => Set<ReceiptSettings>();
 
+    public DbSet<BankStatement> BankStatements => Set<BankStatement>();
+
+    public DbSet<BankLine> BankLines => Set<BankLine>();
+
     /// <summary>
     /// Yıl içinde boşluksuz artan makbuz sırası. Satır kilidiyle artırılır; aynı anda kesilen iki makbuz
     /// aynı numarayı alamaz. Çağıran işlemin içinde çalışmalıdır.
@@ -64,6 +68,33 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
             entity.Property(f => f.Description).HasMaxLength(500);
             entity.HasIndex(f => new { f.TenantId, f.Name }).IsUnique().HasFilter("NOT is_deleted");
             entity.HasQueryFilter(f => f.TenantId == tenantId && !f.IsDeleted);
+        });
+
+        modelBuilder.Entity<BankStatement>(entity =>
+        {
+            entity.ToTable("bank_statements");
+            entity.Property(s => s.FileName).HasMaxLength(200);
+            entity.Property(s => s.Format).HasMaxLength(10);
+            entity.HasQueryFilter(s => s.TenantId == tenantId && !s.IsDeleted);
+        });
+
+        modelBuilder.Entity<BankLine>(entity =>
+        {
+            entity.ToTable("bank_lines");
+            entity.Property(l => l.Key).HasMaxLength(40);
+            entity.Property(l => l.Amount).HasPrecision(18, 2);
+            entity.Property(l => l.Description).HasMaxLength(500);
+            entity.Property(l => l.Counterparty).HasMaxLength(200);
+            entity.Property(l => l.Iban).HasMaxLength(34);
+            entity.Property(l => l.BankReference).HasMaxLength(100);
+            entity.Property(l => l.SuggestionReason).HasMaxLength(10);
+            entity.Property(l => l.Status).HasConversion<short>();
+            entity.HasOne<BankStatement>().WithMany().HasForeignKey(l => l.StatementId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(l => new { l.TenantId, l.Key }).IsUnique();
+            entity.HasIndex(l => new { l.TenantId, l.Status, l.BookedOn });
+            entity.HasIndex(l => new { l.TenantId, l.Iban });
+            entity.HasIndex(l => new { l.TenantId, l.ContactId });
+            entity.HasQueryFilter(l => l.TenantId == tenantId && !l.IsDeleted);
         });
 
         modelBuilder.Entity<ReceiptSettings>(entity =>

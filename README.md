@@ -195,6 +195,63 @@ cd deploy
 - Giriş yapan katılımcı `/e/bilet/{kod}/belge` adresinden katılım belgesini yazdırabilir. Etkinlikten bir gün
   önce kayıtlılara hatırlatma e-postası gider; etkinlik iptal edilirse herkese bildirim gider.
 
+## Satış hattı ve teklifler
+
+- Fırsatlar (başlık, müşteri, tutar, beklenen kapanış, sorumlu) aşamalı bir panoda izlenir; kart sürüklenerek
+  aşama ve sıra değiştirilir. Kaybedildi aşamasına taşınan fırsat için neden sorulur. Panonun üstünde açık
+  toplam ve aşama olasılığıyla ağırlıklı tahmin görünür; kapanmış fırsatlar 30 gün sonra panodan kalkar.
+- Aşamalar ve olasılıkları Yönetim > Satış ayarları'ndan değiştirilir; birden fazla satış hattı tanımlanabilir.
+  İçinde fırsat olan aşama silinemez.
+- Teklifler `T{yıl}-{sıra}` numarasıyla kesilir. Her kalemde miktar, birim, birim fiyat, iskonto ve KDV (%0, 1,
+  10, 20) vardır; tutarlar kuruşa yuvarlanır. Fırsattan hazırlanan teklif kabul edilince fırsat kazanıldı,
+  reddedilince kaybedildi olur. Yazdırma sayfası tarayıcıdan PDF olarak kaydedilebilir.
+- Fırsat ve teklif hareketleri kişinin zaman akışına düşer; gelişmiş aramada "açık fırsatı olan", "şu tarihten
+  sonra satış kazanılan" ve "hiç fırsatı olmayan" ölçütleri vardır.
+
+## Otomasyon
+
+- Kurallar "şu olunca şunları yap" biçimindedir. Tetikleyici ya bir modülün kişinin zaman akışına düştüğü kayıttır
+  (bağış, üyelik, etkinlik, satış, form; isteğe bağlı olarak konusu belirli bir metni içerenler) ya da kişinin
+  Gelişmiş arama'da kaydedilmiş bir aramaya girmesidir (15 dakikada bir denetlenir).
+- İşlemler: etiket ekleme, gruba ekleme, görev açma (sorumlu ve süreyle) ve bilgilendirme e-postası
+  (`{{ad}}`, `{{soyad}}`, `{{adsoyad}}`, `{{eposta}}` alanlarıyla). Otomasyon e-postasında ticari ileti izni
+  aranmaz; kampanya içeriği için Toplu ileti kullanılmalıdır.
+- Bir kural aynı kişiye aynı olay için bir kez uygulanır. Kayıtlı arama kuralı açılırken aramaya zaten uyan kişiler
+  istenirse atlanır. Kural ekranında son 100 çalışma görünür.
+
+## Havale/EFT eşleştirme ve yıl sonu makbuzları
+
+- Bağışlar > Havale eşleştirme sayfasına internet şubesinden indirilen ekstre yüklenir: Excel (.xlsx), CSV
+  (UTF-8 veya Windows-1254) ya da MT940. Excel ve CSV'de başlık satırı "Tarih", "Tutar"/"Alacak", "Açıklama"
+  sözcükleriyle bulunur. Yalnızca gelen hareketler alınır; aynı hareket ikinci kez yüklenirse atlanır.
+- Bağışçı önerisi önce aynı IBAN'dan daha önce onaylanmış havaleye, sonra açıklamadaki ada bakar (tam ad
+  eşleşmesi, Türkçe karaktersiz yazımlar dahil). Açıklamada fon adı geçiyorsa fon da önerilir. Öneriler tek tek
+  veya topluca onaylanır; onaylanan hareket "Havale / EFT" yöntemli bağış olur.
+- Kişi araması artık Türkçe karakterlere duyarsızdır: "SUKRU OZTURK" araması "Şükrü Öztürk"ü bulur.
+- Bağışlar sayfasındaki "Toplu makbuz" seçilen yılda makbuzu kesilmemiş tamamlanmış bağışlara bağış tarihi
+  sırasıyla makbuz keser. Kişi kartındaki "Yıllık özet" bağışçının o yılki bağışlarını yazdırılabilir
+  dökümde gösterir.
+
+## Kampanyalar
+
+- Kampanya bir amaç altında yürütülen çalışmayı toplar (yardım kampanyası, üye kazanımı gibi): tarih aralığı,
+  isteğe bağlı TL hedefi, sorumlusu ve durumu vardır.
+- Kampanyaya bağış fonu, etkinlik, toplu ileti ve form bağlanır. Sonuçlar bağlı kaydın kendi modülünden
+  `ICampaignSource` ile alınır; yeni bir modül bu arayüzü kaydederek kampanyalara katılır.
+- Hedefe tarih aralığındaki tamamlanmış TL bağışlar ve ödenmiş bilet gelirleri sayılır. "Ulaşılan kişi" bağış yapan,
+  etkinliğe kaydolan, toplu iletiyi alan veya formu dolduran tekil kişilerdir; bu kişiler tek tuşla bir gruba eklenir.
+- Kullanıcı yalnızca görme yetkisi olan modüllerin kayıtlarını bağlayabilir.
+
+## Kişi ek alanları
+
+**Yönetim → Kişi ek alanları** sayfasından kişi kartına kurumunuza özgü alanlar eklenir: metin, sayı, tarih, evet/hayır ve seçenekli. Bir alan yalnızca kişilere, kurumlara veya hanelere gösterilecek şekilde sınırlanabilir; kapatılan alan kartta görünmez ama değerleri silinmez.
+
+- Değerler kişi kartındaki **Ek bilgiler** kartından girilir ve kişinin `custom_fields_json` (jsonb) sütununda alan kimliğiyle saklanır. Sayılar "1.250,5" gibi Türkçe biçimde de yazılabilir.
+- Her alan **Gelişmiş arama**da "Ek alanlar" grubunda ölçüt olur (metin içerir, seçenek eşittir, sayı en az, tarihten sonra, evet).
+- CSV dışa aktarma her etkin alan için bir sütun ekler; içe aktarmada başlığı alan adıyla eşleşen sütunlar okunur, geçersiz değerler satır hatası olarak raporlanır.
+- Değeri olan bir alanın türü değiştirilemez. Alan silinince tüm kişilerdeki değeri de silinir. Mükerrer birleştirmede asıl kaydın değerleri korunur, boş olanlar diğer kayıttan doldurulur.
+- KVKK dışa aktarmasında "Ek bilgiler" bölümü yer alır; anonimleştirme tüm ek alan değerlerini siler.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`

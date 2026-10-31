@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using System.Security.Cryptography;
 using Arma.Modules.Comms.Domain;
 using Arma.Modules.Comms.Infrastructure;
@@ -74,7 +75,7 @@ public sealed class ConsentService(
             await outbox.PublishAsync(new SyncConsentToIys(consent.Id));
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return consent.Id;
     }
 
