@@ -52,6 +52,8 @@ public sealed class MembershipDbContext(DbContextOptions<MembershipDbContext> op
             entity.Property(m => m.Note).HasMaxLength(1000);
             entity.HasOne<MembershipType>().WithMany().HasForeignKey(m => m.TypeId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(m => new { m.TenantId, m.Number }).IsUnique();
+            entity.Property(m => m.ExternalKey).HasMaxLength(100);
+            entity.HasIndex(m => new { m.TenantId, m.ExternalKey }).IsUnique().HasFilter("external_key IS NOT NULL AND NOT is_deleted");
             entity.HasIndex(m => new { m.TenantId, m.ContactId });
             entity.HasIndex(m => new { m.TenantId, m.EndOn });
             entity.HasQueryFilter(m => m.TenantId == tenantId && !m.IsDeleted);

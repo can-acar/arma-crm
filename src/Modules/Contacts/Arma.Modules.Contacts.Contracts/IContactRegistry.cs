@@ -10,4 +10,10 @@ public sealed record ContactRegistration(Guid? Id, bool Created, string? Error);
 public interface IContactRegistry
 {
     Task<ContactRegistration> FindOrCreatePersonAsync(string firstName, string lastName, string? email, string? phone, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Eski sistemden aktarılmış kişilerin dış anahtarlarını ("civicrm:42") Arma kimliklerine çevirir. Birleştirilmiş
+    /// kayıtlar asıl kayda çözülür; bulunamayan anahtarlar sonuçta yer almaz.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, Guid>> FindByExternalKeysAsync(IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default);
 }

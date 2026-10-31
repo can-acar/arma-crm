@@ -100,6 +100,26 @@ cd deploy
 önce `migrate` servisini, sonra uygulamayı başlatır. Güncellemede aynı komut yeterlidir.
 `.env` dosyasını yedekleyin.
 
+## Kurulum (Windows Server / IIS)
+
+Paketi üretmek için (.NET 10 SDK ile, herhangi bir işletim sisteminde):
+
+```bash
+deploy/windows/build-package.sh 1.0.0   # deploy/out/arma-crm-iis-1.0.0.zip
+```
+
+Sunucuda ASP.NET Core 10 Hosting Bundle ve PostgreSQL 18 kurulu olmalı. Paketi açıp yönetici PowerShell'de:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-iis.ps1 -CreateDatabase
+```
+
+Betik IIS, WebSocket ve Uygulama Başlatma özelliklerini açar; ilk kurulumda `C:\ProgramData\Arma\arma.env` dosyasını
+(kurum kimliği, `-CreateDatabase` ile süper kullanıcı olmayan `arma` rolü ve parolası) üretir; dosyaları kopyalar, `migrate`
+ile şemayı günceller ve sürekli açık bir uygulama havuzu ile siteyi kurar. Ayarlar havuzun ortam değişkenlerine yazılır,
+site klasöründe tutulmaz. Güncellemede yeni paketle aynı komut (`-CreateDatabase` olmadan) yeterlidir; ayrıntılar
+`deploy/windows/KURULUM.txt` içinde.
+
 ## Kimlik ve yetki
 
 - İlk açılışta `/setup` ekranı ilk yöneticiyi oluşturur. Kullanıcı olmadan başka sayfa açılmaz.
@@ -251,6 +271,16 @@ cd deploy
 - CSV dışa aktarma her etkin alan için bir sütun ekler; içe aktarmada başlığı alan adıyla eşleşen sütunlar okunur, geçersiz değerler satır hatası olarak raporlanır.
 - Değeri olan bir alanın türü değiştirilemez. Alan silinince tüm kişilerdeki değeri de silinir. Mükerrer birleştirmede asıl kaydın değerleri korunur, boş olanlar diğer kayıttan doldurulur.
 - KVKK dışa aktarmasında "Ek bilgiler" bölümü yer alır; anonimleştirme tüm ek alan değerlerini siler.
+
+## CiviCRM'den aktarım
+
+**Yönetim → Veri aktarımı** (`contacts.import` izni) CiviCRM'den "Birincil alanlar" ile dışa aktarılmış CSV dosyalarını sırayla alır:
+
+1. **Kişiler** (Export Contacts): kişi, kurum ve haneler; adres (State → il, City → ilçe), doğum tarihi, etiketler ve gruplar. Çöp kutusundaki kayıtlar atlanır. Arma'da aynı e-postayla kayıtlı kişi varsa yeni kayıt açılmaz, CiviCRM kimliği o kişiye bağlanır. "External Identifier" alanında geçerli bir TCKN varsa alınır.
+2. **Bağışlar** (Export Contributions): yalnızca tamamlanmış ve iade edilmiş katkılar. Mali tür ("Financial Type") yayına kapalı fon olarak açılır; "Donation" fonsuz, "Member Dues" atlanır. Aktarılan bağışların makbuzu CiviCRM'de kesildiği varsayılır; yıl sonu toplu makbuza girmez.
+3. **Üyelikler** (Export Memberships): üyelik türü adıyla eşleşir, yoksa 12 aylık ücretsiz tür açılır (süre ve ücreti sonra düzeltin). Tarihler olduğu gibi alınır, bitiş tarihi boşsa ömür boyu sayılır, Arma kendi üye numarasını verir.
+
+Kayıtlar CiviCRM kimlikleriyle (`external_key`, örn. `civicrm:42`) saklanır; aynı dosya yeniden yüklenirse yalnızca yeni satırlar eklenir. Bağış ve üyelikler kişiyi bu kimlikle bulduğu için önce kişiler aktarılmalıdır; birleştirilmiş kişiler asıl kayda çözülür. Bir dosya en fazla 50 MB / 200.000 satır olabilir. Yeni bir kaynak eklemek için modül `IDataImporter` uygular.
 
 ## Denetim izi
 

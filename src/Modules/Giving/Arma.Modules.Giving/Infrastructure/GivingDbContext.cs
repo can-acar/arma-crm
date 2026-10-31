@@ -54,6 +54,8 @@ public sealed class GivingDbContext(DbContextOptions<GivingDbContext> options, I
             entity.Property(d => d.ReceiptVoidReason).HasMaxLength(300);
             entity.Property(d => d.Provider).HasMaxLength(30);
             entity.Property(d => d.ProviderPaymentId).HasMaxLength(100);
+            entity.Property(d => d.ExternalKey).HasMaxLength(100);
+            entity.HasIndex(d => new { d.TenantId, d.ExternalKey }).IsUnique().HasFilter("external_key IS NOT NULL AND NOT is_deleted");
             entity.Ignore(d => d.HasReceipt);
             entity.HasOne<Fund>().WithMany().HasForeignKey(d => d.FundId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(d => new { d.TenantId, d.ContactId });

@@ -12,6 +12,7 @@ public static class ContactsPermissions
     public const string Export = "contacts.export";
     public const string ViewSensitive = "contacts.sensitive";
     public const string Fields = "contacts.fields";
+    public const string Import = "contacts.import";
 
     public static readonly PermissionDefinition[] All =
     [
@@ -21,5 +22,6 @@ public static class ContactsPermissions
         new(Export, Group, "Kayıtları dışa aktarma"),
         new(ViewSensitive, Group, "TCKN gibi hassas alanları maskesiz görme"),
         new(Fields, Group, "Kişi kartına ek alan tanımlama"),
+        new(Import, Group, "Eski sistemden (CiviCRM) veri aktarma"),
     ];
 }

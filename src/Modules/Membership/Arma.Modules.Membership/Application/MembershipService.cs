@@ -389,6 +389,20 @@ public sealed class MembershipService(MembershipDbContext db, IContactDirectory 
         }
     }
 
+    /// <summary>Eski sistemden aktarılan üyelikleri zaman çizelgesi kayıtlarıyla birlikte kaydeder.</summary>
+    internal async Task SaveImportedAsync(IReadOnlyList<(Member Member, MembershipType Type)> members, CancellationToken cancellationToken)
+    {
+        outbox.Enroll(db);
+        foreach (var (member, type) in members)
+        {
+            db.Members.Add(member);
+            await outbox.PublishAsync(Timeline(member, $"Üye oldu: {type.Name} (No {member.Number})", PeriodText(member.StartOn, member.EndOn), member.JoinedOn, $"{member.Id}:join"));
+        }
+
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
+        db.ChangeTracker.Clear();
+    }
+
     private RecordTimelineEntry Timeline(Member member, string subject, string? body, DateOnly on, string sourceId)
     {
         var now = clock.GetLocalNow();

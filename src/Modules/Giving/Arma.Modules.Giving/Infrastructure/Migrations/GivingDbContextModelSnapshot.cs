@@ -299,6 +299,11 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasColumnName("currency")
                         .IsFixedLength();
 
+                    b.Property<string>("ExternalKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_key");
+
                     b.Property<Guid?>("FundId")
                         .HasColumnType("uuid")
                         .HasColumnName("fund_id");
@@ -378,6 +383,11 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "ContactId")
                         .HasDatabaseName("ix_donations_tenant_id_contact_id");
+
+                    b.HasIndex("TenantId", "ExternalKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_donations_tenant_id_external_key")
+                        .HasFilter("external_key IS NOT NULL AND NOT is_deleted");
 
                     b.HasIndex("TenantId", "ReceiptNumber")
                         .IsUnique()

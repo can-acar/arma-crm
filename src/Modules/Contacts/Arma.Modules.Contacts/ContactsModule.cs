@@ -35,6 +35,7 @@ public sealed class ContactsModule : IModule, INavigationContributor
         services.AddScoped<ContactTransferService>();
         services.AddScoped<ContactSearchService>();
         services.AddScoped<CustomFieldService>();
+        services.AddScoped<IDataImporter, CivicrmContactImporter>();
         services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<CustomFieldService>());
         services.AddScoped<IDashboardContributor, ContactsDashboard>();
         services.AddScoped<IPersonalDataSource, ContactsPersonalData>();
@@ -56,5 +57,6 @@ public sealed class ContactsModule : IModule, INavigationContributor
         new("Gelişmiş arama", "contacts/search", 11, ContactsPermissions.Read),
         new("Etiket ve gruplar", "contacts/groups", 12, ContactsPermissions.Read),
         new("Kişi ek alanları", "admin/custom-fields", 925, ContactsPermissions.Fields),
+        new("Veri aktarımı", "admin/import", 927, ContactsPermissions.Import),
     ];
 }

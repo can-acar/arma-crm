@@ -265,7 +265,7 @@ public sealed class DonationService(
     {
         var (start, end) = (new DateOnly(year, 1, 1), new DateOnly(year, 12, 31));
         return db.Donations.Where(d => d.Status == DonationStatus.Completed && d.ReceivedOn >= start && d.ReceivedOn <= end
-            && (d.ReceiptNumber == null || d.ReceiptVoidReason != null));
+            && d.ExternalKey == null && (d.ReceiptNumber == null || d.ReceiptVoidReason != null));
     }
 
     public async Task<Result<Guid>> VoidReceiptAsync(Guid id, string reason, CancellationToken cancellationToken = default)
@@ -316,6 +316,24 @@ public sealed class DonationService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Eski sistemden aktarılan bağışları zaman çizelgesi kayıtlarıyla birlikte tek işlemde kaydeder.</summary>
+    internal async Task SaveImportedAsync(IReadOnlyList<Donation> donations, IReadOnlyDictionary<Guid, string> fundNames, CancellationToken cancellationToken)
+    {
+        outbox.Enroll(db);
+        db.Donations.AddRange(donations);
+        foreach (var donation in donations)
+        {
+            var fund = donation.FundId is { } fundId ? fundNames.GetValueOrDefault(fundId) : null;
+            var text = $"Bağış: {Money.Format(donation.Amount, donation.Currency)}" + (fund is null ? "" : $" ({fund})");
+            await outbox.PublishAsync(new RecordTimelineEntry([donation.ContactId], ActivityKind.System,
+                donation.Status == DonationStatus.Refunded ? $"İade edildi · {text}" : text,
+                donation.Note, ToTimestamp(donation.ReceivedOn), SourceModule, donation.Id.ToString()));
+        }
+
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
+        db.ChangeTracker.Clear();
     }
 
     /// <summary>Kaydı kaydeder ve kişinin zaman çizelgesini aynı işlemde günceller.</summary>

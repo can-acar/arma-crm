@@ -48,6 +48,7 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
             entity.Property(c => c.NationalId).HasMaxLength(11);
             entity.Property(c => c.Website).HasMaxLength(300);
             entity.Property(c => c.SearchText).IsRequired();
+            entity.Property(c => c.ExternalKey).HasMaxLength(100);
             entity.Property(c => c.CustomFieldsJson).HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb").IsRequired();
             entity.Ignore(c => c.CustomFields);
             entity.Ignore(c => c.MaskedNationalId);
@@ -65,6 +66,7 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
             entity.HasIndex(c => new { c.TenantId, c.DisplayName });
             entity.HasIndex(c => new { c.TenantId, c.Email });
             entity.HasIndex(c => new { c.TenantId, c.NationalId }).IsUnique().HasFilter("national_id IS NOT NULL AND NOT is_deleted");
+            entity.HasIndex(c => new { c.TenantId, c.ExternalKey }).IsUnique().HasFilter("external_key IS NOT NULL");
             entity.HasIndex(c => c.SearchText).HasMethod("gin").HasOperators("gin_trgm_ops");
 
             entity.HasQueryFilter(c => c.TenantId == tenantId && !c.IsDeleted);

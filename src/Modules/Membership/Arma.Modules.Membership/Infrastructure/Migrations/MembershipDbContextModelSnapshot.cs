@@ -199,6 +199,11 @@ namespace Arma.Modules.Membership.Infrastructure.Migrations
                         .HasColumnType("date")
                         .HasColumnName("end_on");
 
+                    b.Property<string>("ExternalKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_key");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -251,6 +256,11 @@ namespace Arma.Modules.Membership.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "EndOn")
                         .HasDatabaseName("ix_members_tenant_id_end_on");
+
+                    b.HasIndex("TenantId", "ExternalKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_members_tenant_id_external_key")
+                        .HasFilter("external_key IS NOT NULL AND NOT is_deleted");
 
                     b.HasIndex("TenantId", "Number")
                         .IsUnique()
