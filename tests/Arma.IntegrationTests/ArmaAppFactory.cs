@@ -24,6 +24,9 @@ public sealed class ArmaAppFactory : WebApplicationFactory<Program>, IAsyncLifet
 
     public static readonly string SampleEInvoiceToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
 
+    /// <summary>Hassas alanların şifreleme anahtarı; testler arasında aynı kalır (EF modeli süreç içinde paylaşılır).</summary>
+    public static readonly string EncryptionKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+
     public static bool IsConfigured => !string.IsNullOrEmpty(ServerConnection);
 
     public string ConnectionString => new NpgsqlConnectionStringBuilder(ServerConnection) { Database = databaseName }.ConnectionString;
@@ -46,6 +49,7 @@ public sealed class ArmaAppFactory : WebApplicationFactory<Program>, IAsyncLifet
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:arma", ConnectionString);
         builder.UseSetting("Arma:TenantId", TenantId.ToString());
+        builder.UseSetting("Arma:Security:EncryptionKey", EncryptionKey);
         builder.UseSetting("Arma:MigrateOnStartup", "true");
         builder.UseSetting("Arma:Jobs:Enabled", "false");
         builder.UseSetting("Arma:Security:AllowHttp", "true");

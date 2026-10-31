@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Arma.Modules.Contacts;
 
@@ -50,6 +51,13 @@ public sealed class ContactsModule : IModule, INavigationContributor
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ContactsDbContext>();
         await db.Database.MigrateAsync(cancellationToken);
+
+        var encrypted = await NationalIdEncryption.EncryptPlaintextAsync(db, scope.ServiceProvider.GetRequiredService<ISensitiveDataProtector>(), cancellationToken);
+        if (encrypted > 0)
+        {
+            scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<ContactsModule>()
+                .LogInformation("{Count} kişinin kimlik numarası şifrelendi", encrypted);
+        }
     }
 
     public IEnumerable<NavigationItem> GetNavigationItems() =>

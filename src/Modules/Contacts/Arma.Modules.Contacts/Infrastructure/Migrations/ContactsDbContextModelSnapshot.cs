@@ -161,9 +161,13 @@ namespace Arma.Modules.Contacts.Infrastructure.Migrations
                         .HasColumnName("merged_into_id");
 
                     b.Property<string>("NationalId")
-                        .HasMaxLength(11)
-                        .HasColumnType("character varying(11)")
+                        .HasColumnType("text")
                         .HasColumnName("national_id");
+
+                    b.Property<string>("NationalIdHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("national_id_hash");
 
                     b.Property<string>("OrganizationName")
                         .HasMaxLength(200)
@@ -221,10 +225,10 @@ namespace Arma.Modules.Contacts.Infrastructure.Migrations
                         .HasDatabaseName("ix_contacts_tenant_id_external_key")
                         .HasFilter("external_key IS NOT NULL");
 
-                    b.HasIndex("TenantId", "NationalId")
+                    b.HasIndex("TenantId", "NationalIdHash")
                         .IsUnique()
-                        .HasDatabaseName("ix_contacts_tenant_id_national_id")
-                        .HasFilter("national_id IS NOT NULL AND NOT is_deleted");
+                        .HasDatabaseName("ix_contacts_tenant_id_national_id_hash")
+                        .HasFilter("national_id_hash IS NOT NULL AND NOT is_deleted");
 
                     b.ToTable("contacts", "contacts");
                 });

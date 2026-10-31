@@ -61,6 +61,9 @@ builder.Services.AddRazorComponents()
 
 var app = builder.Build();
 
+// Hassas alan anahtarı eksik ya da hatalıysa uygulama ilk istekte değil açılışta dursun.
+app.Services.GetRequiredService<Arma.SharedKernel.Security.ISensitiveDataProtector>();
+
 foreach (var plugin in ArmaModules.Plugins)
 {
     if (plugin.State == Arma.Infrastructure.Plugins.PluginState.Failed)

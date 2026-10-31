@@ -5,6 +5,7 @@ name: arma
 x-arma-env: &arma-env
   ConnectionStrings__arma: Host=postgres;Database=arma;Username=arma;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}
   Arma__TenantId: ${ARMA_TENANT_ID:?ARMA_TENANT_ID gerekli}
+  Arma__Security__EncryptionKey: ${ARMA_ENCRYPTION_KEY:?ARMA_ENCRYPTION_KEY gerekli; install.sh ile üretin}
   # Önünde HTTPS sonlandıran bir ters vekil (nginx, Caddy) varsa true yapın.
   Arma__Security__TrustForwardedHeaders: ${ARMA_BEHIND_PROXY:-false}
   # Yalnızca iç ağda, HTTPS olmadan çalışan kurulumlar için; API belirteç ucunu HTTP üzerinden açar.

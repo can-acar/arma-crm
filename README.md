@@ -183,6 +183,13 @@ site klasöründe tutulmaz. Güncellemede yeni paketle aynı komut (`-CreateData
 - Kişisel veri envanteri ekranı VERBİS kaydına başlangıç olarak CSV verir.
 - Denetim izi, işlem güvenliği ve ispat için anonimleştirmeden sonra da saklanır; anonimleştirmenin kendisi
   denetim izine değer yazmadan kaydedilir.
+- Kimlik numarası (TCKN/VKN) veritabanında AES-256-GCM ile şifreli saklanır. Anahtar veritabanında değil
+  `.env` dosyasında durur (`ARMA_ENCRYPTION_KEY`, IIS'te `Arma__Security__EncryptionKey`); kurulum betikleri
+  ilk kurulumda ve güncellemede eksikse üretir. Veritabanı yedeği tek başına ele geçirilse de numaralar okunamaz.
+  **Anahtarı veritabanı yedeğiyle birlikte ama ayrı bir yerde saklayın:** kaybolursa şifreli alanlar geri
+  getirilemez, değiştirilirse mevcut kayıtlar çözülemez. Anahtar yoksa uygulama açılmaz (geliştirme ortamı hariç).
+- Mükerrer kontrolü ve tekillik, numaranın anahtarlı özeti (`national_id_hash`, HMAC-SHA256) üzerinden yapılır.
+  Bu özellikten önce kaydedilmiş açık numaralar `migrate` komutunda şifrelenir.
 
 ## Pano, arama ve formlar
 
@@ -397,12 +404,15 @@ Geliştirme rehberi: [docs/eklentiler.md](docs/eklentiler.md). Örnek eklenti: [
   politikası, `app.tenant_id` oturum değişkenine göre başka kurumun satırını gizler.
 - Şema değişiklikleri uygulama açılışında değil `dotnet Arma.Host.dll migrate` komutuyla uygulanır
   (geliştirmede `Arma:MigrateOnStartup` ile otomatik).
+- Hassas bir metin alanı `[SensitiveData]` ile işaretlenir: denetim izinde maskelenir ve modülün DbContext'i
+  `OnModelCreating` sonunda `modelBuilder.EncryptSensitiveData()` çağırıyorsa şifreli saklanır. Eşitlik araması
+  gerekiyorsa yanına `[BlindIndex(nameof(Alan))]` taşıyan bir özet alanı eklenir; kayıtta kendiliğinden dolar.
 - Arayüz kodu yalnızca `Arma.UI` bileşenlerini kullanır; sayfalarda yerleşim dışında ham Tailwind sınıfı
   kullanılmaz.
 
 ## Sıradaki adımlar (Faz 0'dan kalanlar)
 
-- Hassas alanların veritabanında şifrelenmesi.
+- Diğer hassas alanların şifrelenmesi: banka ekstresindeki IBAN (açıklama metninde de geçtiği için ayrıca ele
+  alınmalı), vaka notları gibi özel nitelikli veriler; anahtar döndürme (eski anahtarla çözüp yenisiyle şifreleme).
 - İl-ilçe-mahalle referans verisi (şu an yalnızca 81 il listesi var, ilçe serbest metin).
 - `Arma.UI`: Dialog, Select, Combobox, Dropdown Menu, Sheet, Tabs, Toast, Data Table.
-- Windows Server (IIS) kurulum paketi.
