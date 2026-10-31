@@ -43,6 +43,9 @@
   <Folder Name="/src/Modules/Campaigns/">
     <Project Path="src/Modules/Campaigns/Arma.Modules.Campaigns/Arma.Modules.Campaigns.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Cases/">
+    <Project Path="src/Modules/Cases/Arma.Modules.Cases/Arma.Modules.Cases.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Forms/">
     <Project Path="src/Modules/Forms/Arma.Modules.Forms/Arma.Modules.Forms.csproj" />
   </Folder>
