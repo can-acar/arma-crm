@@ -1,0 +1,155 @@
+@page "/admin/cases"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = CasesPermissions.Settings)]
+@inject CaseService Cases
+
+<PageTitle>Vaka türleri · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Vaka türleri</h1>
+            <p class="text-muted-foreground text-sm">Her tür için vaka açılınca oluşacak adımları ve kaç gün içinde yapılacaklarını tanımlayın.</p>
+        </div>
+        <Button OnClick="() => Edit(null)">Tür ekle</Button>
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (types is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (types.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Henüz vaka türü yok.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Tür</TableHead>
+                            <TableHead>Adımlar</TableHead>
+                            <TableHead>Açık vaka</TableHead>
+                            <TableHead>Durum</TableHead>
+                            <TableHead Class="text-right">İşlem</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var type in types)
+                        {
+                            <TableRow>
+                                <TableCell Class="whitespace-normal">
+                                    <div class="font-medium">@type.Name</div>
+                                    @if (type.Description is not null)
+                                    {
+                                        <div class="text-muted-foreground text-xs">@type.Description</div>
+                                    }
+                                </TableCell>
+                                <TableCell Class="whitespace-normal text-sm">
+                                    @(type.Steps.Count == 0 ? "—" : string.Join(" → ", type.Steps.Select(s => $"{s.Title} ({s.DueAfterDays} gün)")))
+                                </TableCell>
+                                <TableCell class="tabular-nums">@type.OpenCases</TableCell>
+                                <TableCell>@(type.IsActive ? "Açık" : "Kapalı")</TableCell>
+                                <TableCell Class="text-right"><Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => Edit(type)">Düzenle</Button></TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<Dialog @bind-Open="editorOpen" Class="sm:max-w-2xl">
+    <DialogHeader>
+        <DialogTitle>@(editingId is null ? "Yeni vaka türü" : "Vaka türünü düzenle")</DialogTitle>
+        <DialogDescription>Adım değişiklikleri yalnızca bundan sonra açılan vakalara uygulanır.</DialogDescription>
+    </DialogHeader>
+    <FormAlert Error="@error" />
+    <form id="case-type-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="grid gap-2">
+            <Label for="type-name">Ad</Label>
+            <Input id="type-name" @bind-Value="name" maxlength="100" placeholder="Örnek: Sosyal yardım başvurusu" />
+        </div>
+        <div class="grid gap-2">
+            <Label for="type-description">Açıklama</Label>
+            <Input id="type-description" @bind-Value="description" maxlength="500" />
+        </div>
+        <div class="grid gap-2">
+            <Label>Adımlar</Label>
+            @foreach (var (step, index) in steps.Select((s, i) => (s, i)))
+            {
+                <div class="flex items-center gap-2">
+                    <span class="text-muted-foreground w-5 text-right text-sm tabular-nums">@(index + 1).</span>
+                    <Input id="@($"step-{index}")" @bind-Value="step.Title" maxlength="200" placeholder="Örnek: Ev ziyareti" Class="flex-1" />
+                    <Input id="@($"step-days-{index}")" @bind-Value="step.Days" inputmode="numeric" Class="w-20" aria-label="Gün" />
+                    <span class="text-muted-foreground text-sm">gün</span>
+                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => steps.RemoveAt(index)" aria-label="Adımı kaldır">✕</Button>
+                </div>
+            }
+            <div><Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="() => steps.Add(new StepDraft())">Adım ekle</Button></div>
+            <p class="text-muted-foreground text-xs">Gün, vakanın açıldığı günden itibaren sayılır; 0 aynı gün demektir.</p>
+        </div>
+        @if (editingId is not null)
+        {
+            <label class="flex items-center gap-2 text-sm"><Checkbox @bind-Checked="isActive" /> Yeni vakalarda seçilebilir</label>
+        }
+    </form>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => editorOpen = false">Vazgeç</Button>
+        <Button Type="submit" form="case-type-form">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private IReadOnlyList<CaseTypeView>? types;
+    private List<StepDraft> steps = [];
+    private Guid? editingId;
+    private string? name, description, error;
+    private bool isActive = true, editorOpen;
+
+    protected override async Task OnInitializedAsync() => types = await Cases.TypesAsync();
+
+    private void Edit(CaseTypeView? type)
+    {
+        (editingId, name, description, isActive, error) = (type?.Id, type?.Name, type?.Description, type?.IsActive ?? true, null);
+        steps = type is null
+            ? [new StepDraft { Title = "İlk görüşme", Days = "0" }]
+            : [.. type.Steps.Select(s => new StepDraft { Title = s.Title, Days = s.DueAfterDays.ToString() })];
+        editorOpen = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        var templates = new List<StepTemplate>();
+        foreach (var step in steps.Where(s => !string.IsNullOrWhiteSpace(s.Title)))
+        {
+            if (!int.TryParse(step.Days, out var days))
+            {
+                error = $"\"{step.Title}\" adımı için gün sayısını yazın.";
+                return;
+            }
+
+            templates.Add(new StepTemplate(step.Title!, days));
+        }
+
+        var result = await Cases.SaveTypeAsync(editingId, new SaveCaseTypeRequest(name ?? "", description, isActive, templates));
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        editorOpen = false;
+        types = await Cases.TypesAsync();
+    }
+
+    private sealed class StepDraft
+    {
+        public string? Title { get; set; }
+
+        public string? Days { get; set; } = "0";
+    }
+}

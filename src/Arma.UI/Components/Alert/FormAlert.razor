@@ -1,0 +1,17 @@
+@namespace Arma.UI
+
+@* Form sonucunda hata ya da bilgi mesajı; ikisi de boşsa hiçbir şey çizmez. *@
+@if (!string.IsNullOrEmpty(Error))
+{
+    <Alert Variant="AlertVariant.Destructive"><AlertDescription>@Error</AlertDescription></Alert>
+}
+else if (!string.IsNullOrEmpty(Info))
+{
+    <Alert><AlertDescription>@Info</AlertDescription></Alert>
+}
+
+@code {
+    [Parameter] public string? Error { get; set; }
+
+    [Parameter] public string? Info { get; set; }
+}

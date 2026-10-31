@@ -1,0 +1,97 @@
+@page "/contacts/import"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = ContactsPermissions.Write)]
+@inject ContactTransferService Transfer
+
+<PageTitle>İçe aktar · Arma CRM</PageTitle>
+
+<div class="mx-auto flex max-w-3xl flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Kişileri içe aktar</h1>
+        <p class="text-muted-foreground text-sm">Excel'den "CSV UTF-8" olarak kaydettiğiniz dosyayı yükleyin. Noktalı virgül ve virgül ayırıcı tanınır.</p>
+    </div>
+
+    <Card>
+        <CardHeader>
+            <CardTitle>Dosya</CardTitle>
+            <CardDescription>
+                Sütunlar: Tür, Ad, Soyad, Kurum/Hane, E-posta, Telefon, Kimlik no, Doğum tarihi, Web, İl, İlçe, Adres, Posta kodu, Etiketler.
+                Etiketleri virgülle ayırın. Aynı kimlik numarası veya e-postayla kayıtlı satırlar atlanır.
+            </CardDescription>
+            <CardAction><Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Href="api/v1/contacts/import-template" target="_blank">Örnek dosya</Button></CardAction>
+        </CardHeader>
+        <CardContent class="grid gap-4">
+            <InputFile OnChange="OnFileSelected" accept=".csv,text/csv" class="@Styles.Input" />
+            <div>
+                <Button OnClick="ImportAsync" Disabled="@(file is null || busy)">@(busy ? "Aktarılıyor…" : "İçe aktar")</Button>
+            </div>
+            <FormAlert Error="@error" />
+        </CardContent>
+    </Card>
+
+    @if (result is not null)
+    {
+        <Card>
+            <CardHeader>
+                <CardTitle>@result.Created / @result.Total kayıt eklendi</CardTitle>
+                <CardDescription>@(result.Errors.Count == 0 ? "Atlanan satır yok." : $"{result.Errors.Count} satır atlandı.")</CardDescription>
+                <CardAction><Button Size="ButtonSize.Sm" Href="contacts">Kişilere git</Button></CardAction>
+            </CardHeader>
+            @if (result.Errors.Count > 0)
+            {
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow><TableHead>Satır</TableHead><TableHead>Ad</TableHead><TableHead>Neden</TableHead></TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            @foreach (var e in result.Errors.Take(500))
+                            {
+                                <TableRow><TableCell>@e.Row</TableCell><TableCell>@e.Name</TableCell><TableCell>@e.Reason</TableCell></TableRow>
+                            }
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            }
+        </Card>
+    }
+</div>
+
+@code {
+    private const long MaxFileSize = 20 * 1024 * 1024;
+
+    private IBrowserFile? file;
+    private ImportResult? result;
+    private string? error;
+    private bool busy;
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => (file, result, error) = (e.File, null, null);
+
+    private async Task ImportAsync()
+    {
+        if (file is null)
+        {
+            return;
+        }
+
+        if (file.Size > MaxFileSize)
+        {
+            error = "Dosya 20 MB'tan büyük olamaz.";
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            await using var buffer = new MemoryStream();
+            await file.OpenReadStream(MaxFileSize).CopyToAsync(buffer);
+            buffer.Position = 0;
+            var imported = await Transfer.ImportAsync(buffer);
+            (result, error) = imported.IsSuccess ? (imported.Value, (string?)null) : (null, imported.Error!.Message);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

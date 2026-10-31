@@ -1,0 +1,92 @@
+@page "/admin/audit"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = AuditModule.ReadPermission)]
+@inject AuditLogService Service
+
+<PageTitle>Denetim izi · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Denetim izi</h1>
+        <p class="text-muted-foreground text-sm">Her ekleme, değişiklik, silme, dışa aktarma ve hassas alan görüntüleme. Kayıtlar değiştirilemez.</p>
+    </div>
+
+    <Card>
+        <CardHeader>
+            <div class="grid gap-3 sm:grid-cols-5">
+                <NativeSelect Value="@entityType" ValueChanged="v => FilterAsync(() => entityType = v)" aria-label="Kayıt türü">
+                    <option value="">Tüm kayıt türleri</option>
+                    @foreach (var type in entityTypes)
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </NativeSelect>
+                <NativeSelect Value="@action" ValueChanged="v => FilterAsync(() => action = v)" aria-label="İşlem">
+                    <option value="">Tüm işlemler</option>
+                    @foreach (var value in Enum.GetValues<AuditAction>())
+                    {
+                        <option value="@value">@AuditTable.Label(value)</option>
+                    }
+                </NativeSelect>
+                <Input placeholder="Kullanıcı" Value="@user" ValueChanged="v => FilterAsync(() => user = v)" aria-label="Kullanıcı" />
+                <Input Type="date" Value="@from" ValueChanged="v => FilterAsync(() => from = v)" aria-label="Başlangıç" />
+                <Input Type="date" Value="@to" ValueChanged="v => FilterAsync(() => to = v)" aria-label="Bitiş" />
+            </div>
+        </CardHeader>
+        <CardContent>
+            @if (result is null)
+            {
+                <Skeleton Class="h-24 w-full" />
+            }
+            else if (result.Items.Count == 0)
+            {
+                <p class="text-muted-foreground py-8 text-center text-sm">Kayıt yok.</p>
+            }
+            else
+            {
+                <AuditTable Records="result.Items" ShowEntity="true" />
+                <div class="flex items-center justify-end gap-2 pt-4">
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="@(currentPage <= 1)" OnClick="() => GoAsync(currentPage - 1)">Önceki</Button>
+                    <span class="text-muted-foreground text-sm">Sayfa @currentPage / @PageCount (@result.Total kayıt)</span>
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Disabled="@(currentPage >= PageCount)" OnClick="() => GoAsync(currentPage + 1)">Sonraki</Button>
+                </div>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private AuditPage? result;
+    private IReadOnlyList<string> entityTypes = [];
+    private string? entityType, action, user, from, to;
+    private int currentPage = 1;
+
+    private int PageCount => result is null ? 1 : Math.Max(1, (int)Math.Ceiling(result.Total / (double)result.PageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        entityTypes = await Service.EntityTypesAsync();
+        await LoadAsync();
+    }
+
+    private async Task FilterAsync(Action apply)
+    {
+        apply();
+        currentPage = 1;
+        await LoadAsync();
+    }
+
+    private async Task GoAsync(int target)
+    {
+        currentPage = target;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => result = await Service.SearchAsync(new AuditQuery(
+        EntityType: string.IsNullOrEmpty(entityType) ? null : entityType,
+        User: user,
+        Action: Enum.TryParse<AuditAction>(action, out var a) ? a : null,
+        From: DateOnly.TryParse(from, out var f) ? f : null,
+        To: DateOnly.TryParse(to, out var t) ? t : null,
+        Page: currentPage));
+}

@@ -1,0 +1,49 @@
+@* Bağış listesi tablosu; bağışlar sayfası ve kişi kartı kullanır. *@
+<Table>
+    <TableHeader>
+        <TableRow>
+            <TableHead>Tarih</TableHead>
+            @if (ShowContact)
+            {
+                <TableHead>Bağışçı</TableHead>
+            }
+            <TableHead Class="text-right">Tutar</TableHead>
+            <TableHead>Fon</TableHead>
+            <TableHead>Yöntem</TableHead>
+            <TableHead>Durum</TableHead>
+            <TableHead>Makbuz</TableHead>
+        </TableRow>
+    </TableHeader>
+    <TableBody>
+        @foreach (var donation in Items)
+        {
+            <TableRow>
+                <TableCell Class="whitespace-nowrap"><a class="hover:underline" href="donations/@donation.Id">@GivingLabels.Date(donation.ReceivedOn)</a></TableCell>
+                @if (ShowContact)
+                {
+                    <TableCell><a class="hover:underline" href="contacts/@donation.ContactId">@donation.ContactName</a></TableCell>
+                }
+                <TableCell Class="text-right font-medium tabular-nums whitespace-nowrap">@Money.Format(donation.Amount, donation.Currency)</TableCell>
+                <TableCell>@(donation.FundName ?? "Genel")</TableCell>
+                <TableCell>@GivingLabels.Method(donation.Method)</TableCell>
+                <TableCell><Badge Variant="GivingLabels.StatusVariant(donation.Status)">@GivingLabels.Status(donation.Status)</Badge></TableCell>
+                <TableCell Class="text-sm">
+                    @if (donation.HasReceipt)
+                    {
+                        <span class="font-mono">@donation.ReceiptNumber</span>
+                    }
+                    else if (donation.ReceiptVoidReason is not null)
+                    {
+                        <span class="text-muted-foreground line-through">@donation.ReceiptNumber</span>
+                    }
+                </TableCell>
+            </TableRow>
+        }
+    </TableBody>
+</Table>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<DonationView> Items { get; set; } = [];
+
+    [Parameter] public bool ShowContact { get; set; } = true;
+}

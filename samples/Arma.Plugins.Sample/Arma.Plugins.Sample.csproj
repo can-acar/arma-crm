@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    Örnek eklenti. Arma derlemelerine başvurular Private=false ile yapılır: derlemeler eklenti klasörüne kopyalanmaz,
+    çalışırken uygulamadaki sürümleri kullanılır. Depo dışında bir eklenti, aynı derlemelere kurulu Arma klasöründen
+    <Reference Include="..."><Private>false</Private></Reference> ile başvurabilir (bkz. docs/eklentiler.md).
+  -->
+  <PropertyGroup>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Arma.SharedKernel\Arma.SharedKernel.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\..\src\Arma.UI\Arma.UI.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\..\src\Modules\Contacts\Arma.Modules.Contacts.Contracts\Arma.Modules.Contacts.Contracts.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

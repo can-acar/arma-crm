@@ -1,0 +1,69 @@
+@page "/automation"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = AutomationPermissions.Read)]
+@inject AutomationService Automation
+@inject ICurrentUser CurrentUser
+
+<PageTitle>Otomasyon · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Otomasyon</h1>
+            <p class="text-muted-foreground text-sm">"Şu olunca şunları yap" kuralları. Her kural bir kişiye aynı olay için bir kez uygulanır.</p>
+        </div>
+        @if (CurrentUser.HasPermission(AutomationPermissions.Manage))
+        {
+            <Button Href="automation/new">Kural ekle</Button>
+        }
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (rules is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (rules.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Henüz kural yok. Örneğin "Bağış alınınca teşekkür görevi aç" ya da "Yeni üyeye hoş geldin e-postası gönder" kuralı ekleyebilirsiniz.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Kural</TableHead>
+                            <TableHead>Ne zaman</TableHead>
+                            <TableHead>Ne yapılır</TableHead>
+                            <TableHead Class="text-right">Uygulandı</TableHead>
+                            <TableHead>Durum</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var rule in rules)
+                        {
+                            <TableRow>
+                                <TableCell><a class="font-medium hover:underline" href="automation/@rule.Id">@rule.Name</a></TableCell>
+                                <TableCell Class="text-sm">@When(rule)</TableCell>
+                                <TableCell Class="text-sm">@string.Join(", ", rule.Actions.Select(a => AutomationLabels.Action(a.Kind)))</TableCell>
+                                <TableCell Class="text-right tabular-nums">@rule.RunCount</TableCell>
+                                <TableCell><Badge Variant="rule.IsActive ? BadgeVariant.Secondary : BadgeVariant.Outline">@(rule.IsActive ? "Açık" : "Kapalı")</Badge></TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private IReadOnlyList<RuleView>? rules;
+
+    protected override async Task OnInitializedAsync() => rules = await Automation.ListAsync();
+
+    internal static string When(RuleView rule) => rule.Trigger == TriggerKind.SegmentEntered
+        ? $"\"{rule.SegmentName ?? "silinmiş arama"}\" aramasına giren kişi"
+        : $"{AutomationLabels.Source(rule.SourceModule)}{(rule.SubjectContains is null ? "" : $": \"{rule.SubjectContains}\"")}";
+}

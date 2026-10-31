@@ -1,5 +1,6 @@
 using System.Globalization;
 using Arma.Modules.Contacts.Contracts;
+using Arma.SharedKernel.Auditing;
 using Arma.SharedKernel.Domain;
 
 namespace Arma.Modules.Contacts.Domain;
@@ -28,10 +29,39 @@ public sealed class Contact : Entity
     public string? Phone { get; private set; }
 
     /// <summary>Kişi için TCKN, kurum için VKN. Ekranda yalnızca maskeli gösterilir.</summary>
+    [SensitiveData]
     public string? NationalId { get; private set; }
 
-    /// <summary>Türkçe kurallarla küçük harfe çevrilmiş ad ve e-posta; arama bu alan üzerinden yapılır.</summary>
+    public DateOnly? BirthDate { get; private set; }
+
+    public string? Website { get; private set; }
+
+    /// <summary>Türkçe kurallarla küçük harfe çevrilmiş ad, e-posta ve telefon; arama bu alan üzerinden yapılır.</summary>
+    [NotAudited]
     public string SearchText { get; private set; } = string.Empty;
+
+    /// <summary>Mükerrer kayıt birleştirildiyse asıl kaydın kimliği. Diğer modüller eski kimliği buradan çözer.</summary>
+    public Guid? MergedIntoId { get; private set; }
+
+    /// <summary>KVKK kapsamında anonimleştirildiyse zamanı; kayıt bağış ve makbuz bütünlüğü için silinmez.</summary>
+    public DateTimeOffset? AnonymizedAt { get; private set; }
+
+    /// <summary>Ek alan değerleri: alan kimliği → saklama biçimindeki değer (jsonb).</summary>
+    public string CustomFieldsJson { get; private set; } = "{}";
+
+    public IReadOnlyDictionary<string, string> CustomFields =>
+        System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(CustomFieldsJson) ?? [];
+
+    /// <summary>Eski sistemden aktarıldıysa oradaki kimliği ("civicrm:42"); yeniden aktarımda mükerrer kaydı önler.</summary>
+    public string? ExternalKey { get; private set; }
+
+    public List<Address> Addresses { get; private set; } = [];
+
+    public List<Tag> Tags { get; private set; } = [];
+
+    public List<Group> Groups { get; private set; } = [];
+
+    public Address? PrimaryAddress => Addresses.FirstOrDefault(a => a.IsPrimary) ?? Addresses.FirstOrDefault();
 
     public static Result<Contact> CreatePerson(string firstName, string lastName, string? email, string? phone, string? tckn)
     {
@@ -82,12 +112,163 @@ public sealed class Contact : Entity
         return contact.SetChannels(email, phone);
     }
 
+    public static Result<Contact> CreateHousehold(string name, string? email, string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return ContactErrors.NameRequired;
+        }
+
+        var contact = new Contact { Type = ContactType.Household, OrganizationName = name.Trim(), DisplayName = name.Trim() };
+        return contact.SetChannels(email, phone);
+    }
+
+    public Result<Contact> UpdatePerson(string firstName, string lastName, string? email, string? phone, string? tckn, DateOnly? birthDate)
+    {
+        if (Type != ContactType.Person)
+        {
+            return ContactErrors.WrongType;
+        }
+
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
+        {
+            return ContactErrors.NameRequired;
+        }
+
+        tckn = Clean(tckn);
+        if (tckn is not null && !TurkishIdentityNumber.IsValidTckn(tckn))
+        {
+            return ContactErrors.InvalidTckn;
+        }
+
+        FirstName = firstName.Trim();
+        LastName = lastName.Trim();
+        DisplayName = $"{FirstName} {LastName}";
+        NationalId = tckn;
+        BirthDate = birthDate;
+        return SetChannels(email, phone);
+    }
+
+    public Result<Contact> UpdateOrganization(string name, string? email, string? phone, string? vkn, string? website)
+    {
+        if (Type == ContactType.Person)
+        {
+            return ContactErrors.WrongType;
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return ContactErrors.NameRequired;
+        }
+
+        vkn = Clean(vkn);
+        if (Type == ContactType.Organization && vkn is not null && !TurkishIdentityNumber.IsValidVknFormat(vkn))
+        {
+            return ContactErrors.InvalidVkn;
+        }
+
+        OrganizationName = name.Trim();
+        DisplayName = OrganizationName;
+        NationalId = Type == ContactType.Organization ? vkn : null;
+        Website = Clean(website);
+        return SetChannels(email, phone);
+    }
+
+    /// <summary>Adres listesini değiştirir; tek birincil adres kalır.</summary>
+    public void SetAddresses(IEnumerable<Address> addresses)
+    {
+        var list = addresses.Where(a => !a.IsEmpty).ToList();
+        if (list.Count > 0 && list.Count(a => a.IsPrimary) != 1)
+        {
+            list = list.Select((a, i) => a with { IsPrimary = i == 0 }).ToList();
+        }
+
+        Addresses = list;
+    }
+
+    /// <summary>
+    /// Bu kaydın eksik alanlarını <paramref name="duplicate"/> kaydından doldurur, etiket, grup ve adreslerini alır;
+    /// mükerrer kaydı bu kayda yönlendirip siler.
+    /// </summary>
+    public Result<Contact> Absorb(Contact duplicate)
+    {
+        if (duplicate.Id == Id)
+        {
+            return ContactErrors.MergeSelf;
+        }
+
+        if (duplicate.Type != Type)
+        {
+            return ContactErrors.MergeTypeMismatch;
+        }
+
+        Email ??= duplicate.Email;
+        Phone ??= duplicate.Phone;
+        NationalId ??= duplicate.NationalId;
+        BirthDate ??= duplicate.BirthDate;
+        Website ??= duplicate.Website;
+        var fields = new Dictionary<string, string>(CustomFields);
+        foreach (var (key, value) in duplicate.CustomFields)
+        {
+            fields.TryAdd(key, value);
+        }
+
+        SetCustomFields(fields);
+
+        foreach (var tag in duplicate.Tags.Where(t => Tags.All(x => x.Id != t.Id)))
+        {
+            Tags.Add(tag);
+        }
+
+        foreach (var group in duplicate.Groups.Where(g => Groups.All(x => x.Id != g.Id)))
+        {
+            Groups.Add(group);
+        }
+
+        var known = Addresses.Select(a => a with { IsPrimary = false }).ToHashSet();
+        SetAddresses(Addresses.Concat(duplicate.Addresses.Select(a => a with { IsPrimary = false }).Where(known.Add)));
+        SearchText = BuildSearchText();
+
+        duplicate.MergedIntoId = Id;
+        duplicate.IsDeleted = true;
+        return this;
+    }
+
     public string? MaskedNationalId => NationalId is null ? null : TurkishIdentityNumber.Mask(NationalId);
 
     public ContactSummary ToSummary() => new(Id, Type, DisplayName, Email, Phone);
 
-    /// <summary>Aramada kullanılan normalleştirme: "İSTANBUL" ve "istanbul" aynı sonucu verir.</summary>
-    public static string Normalize(string value) => value.Trim().ToLower(Turkish);
+    internal void LinkExternal(string key) => ExternalKey = key;
+
+    internal void SetCustomFields(IReadOnlyDictionary<string, string> values) =>
+        CustomFieldsJson = System.Text.Json.JsonSerializer.Serialize(values.OrderBy(v => v.Key, StringComparer.Ordinal).ToDictionary(v => v.Key, v => v.Value));
+
+    /// <summary>
+    /// Arama için küçük harfe çevirir ve Türkçe harfleri sadeleştirir: "ŞÜKRÜ ÖZ", "Şükrü Öz" ve "SUKRU OZ" aynı aranır.
+    /// Banka açıklamaları ve eski sistemlerden gelen veriler çoğunlukla Türkçe karaktersizdir.
+    /// </summary>
+    public static string Normalize(string value)
+    {
+        var chars = value.Trim().ToLower(Turkish).ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            chars[i] = chars[i] switch
+            {
+                'ı' => 'i',
+                'ş' => 's',
+                'ğ' => 'g',
+                'ü' => 'u',
+                'ö' => 'o',
+                'ç' => 'c',
+                'â' => 'a',
+                'î' => 'i',
+                'û' => 'u',
+                _ => chars[i],
+            };
+        }
+
+        return new string(chars);
+    }
 
     private Result<Contact> SetChannels(string? email, string? phone)
     {
@@ -99,9 +280,28 @@ public sealed class Contact : Entity
 
         Email = email?.ToLowerInvariant();
         Phone = Clean(phone);
-        SearchText = Normalize($"{DisplayName} {Email}");
+        SearchText = BuildSearchText();
 
         return this;
+    }
+
+    private string BuildSearchText() => Normalize($"{DisplayName} {Email} {PhoneDigits(Phone)}");
+
+    /// <summary>Telefonun yalnızca rakamları; "0532 111 22 33" ile "+90 532 1112233" aynı aranır.</summary>
+    public static string PhoneDigits(string? phone)
+    {
+        if (string.IsNullOrEmpty(phone))
+        {
+            return string.Empty;
+        }
+
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("90") && digits.Length == 12)
+        {
+            digits = digits[2..];
+        }
+
+        return digits.TrimStart('0');
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -116,4 +316,14 @@ public static class ContactErrors
     public static readonly Error InvalidVkn = new("contacts.invalid_vkn", "Vergi kimlik numarası 10 haneli olmalıdır.");
 
     public static readonly Error InvalidEmail = new("contacts.invalid_email", "E-posta adresi geçerli değil.");
+
+    public static readonly Error WrongType = new("contacts.wrong_type", "Bu işlem bu kayıt türü için geçerli değil.");
+
+    public static readonly Error NotFound = new("contacts.not_found", "Kayıt bulunamadı.");
+
+    public static readonly Error DuplicateNationalId = new("contacts.duplicate_national_id", "Bu kimlik numarasıyla kayıtlı başka bir kişi var.");
+
+    public static readonly Error MergeSelf = new("contacts.merge_self", "Bir kayıt kendisiyle birleştirilemez.");
+
+    public static readonly Error MergeTypeMismatch = new("contacts.merge_type", "Yalnızca aynı türdeki kayıtlar birleştirilebilir.");
 }

@@ -1,0 +1,135 @@
+@page "/donations/funds"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = GivingPermissions.Read)]
+@inject FundService Funds
+@inject ICurrentUser CurrentUser
+
+<PageTitle>Fonlar · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Fonlar</h1>
+            <p class="text-muted-foreground text-sm">Bağışın yönlendirildiği amaçlar (genel bağış, burs, kurban gibi). Toplamlar yalnızca TL bağışları içerir.</p>
+        </div>
+        @if (canManage)
+        {
+            <Button OnClick="() => Edit(null)">Fon ekle</Button>
+        }
+    </div>
+
+    <Card>
+        <CardContent>
+            @if (funds.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Henüz fon yok. Fon seçilmeyen bağışlar "Genel" sayılır.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Fon</TableHead>
+                            <TableHead Class="text-right">Toplam</TableHead>
+                            <TableHead Class="text-right">Bağış</TableHead>
+                            <TableHead>Durum</TableHead>
+                            <TableHead></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var fund in funds)
+                        {
+                            <TableRow>
+                                <TableCell>
+                                    <a class="font-medium hover:underline" href="donations?fund=@fund.Id">@fund.Name</a>
+                                    @if (fund.Description is not null)
+                                    {
+                                        <div class="text-muted-foreground text-xs">@fund.Description</div>
+                                    }
+                                </TableCell>
+                                <TableCell Class="text-right tabular-nums">@Money.Format(fund.TotalTry, "TRY")</TableCell>
+                                <TableCell Class="text-right tabular-nums">@fund.DonationCount</TableCell>
+                                <TableCell>
+                                    @if (!fund.IsActive)
+                                    {
+                                        <Badge Variant="BadgeVariant.Outline">Pasif</Badge>
+                                    }
+                                    else if (fund.IsPublic)
+                                    {
+                                        <Badge Variant="BadgeVariant.Secondary">Bağış formunda</Badge>
+                                    }
+                                </TableCell>
+                                <TableCell Class="text-right">
+                                    @if (canManage)
+                                    {
+                                        <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => Edit(fund)">Düzenle</Button>
+                                    }
+                                </TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<Dialog @bind-Open="editorOpen">
+    <DialogHeader>
+        <DialogTitle>@(editing is null ? "Fon ekle" : "Fonu düzenle")</DialogTitle>
+    </DialogHeader>
+    <FormAlert Error="@error" />
+    <form id="fund-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="grid gap-2">
+            <Label for="fund-name">Ad</Label>
+            <Input id="fund-name" @bind-Value="name" maxlength="120" />
+        </div>
+        <div class="grid gap-2">
+            <Label for="fund-description">Açıklama</Label>
+            <Textarea id="fund-description" @bind-Value="description" rows="2" maxlength="500" />
+        </div>
+        <label class="flex items-center gap-2 text-sm"><Checkbox @bind-Checked="isPublic" /> Çevrim içi bağış formunda seçilebilsin</label>
+        @if (editing is not null)
+        {
+            <label class="flex items-center gap-2 text-sm"><Checkbox @bind-Checked="isActive" /> Etkin (pasif fona yeni bağış kaydedilemez)</label>
+        }
+    </form>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => editorOpen = false">Vazgeç</Button>
+        <Button Type="submit" form="fund-form">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private IReadOnlyList<FundView> funds = [];
+    private FundView? editing;
+    private string? name, description, error;
+    private bool isPublic, isActive = true, canManage, editorOpen;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canManage = CurrentUser.HasPermission(GivingPermissions.Settings);
+        funds = await Funds.ListAsync();
+    }
+
+    private void Edit(FundView? fund)
+    {
+        editing = fund;
+        (name, description, isPublic, isActive, error) = (fund?.Name, fund?.Description, fund?.IsPublic ?? false, fund?.IsActive ?? true, null);
+        editorOpen = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        var request = new SaveFundRequest(name ?? "", description, isActive, isPublic);
+        var result = editing is null ? await Funds.CreateAsync(request) : await Funds.UpdateAsync(editing.Id, request);
+        if (!result.IsSuccess)
+        {
+            error = result.Error!.Message;
+            return;
+        }
+
+        editorOpen = false;
+        funds = await Funds.ListAsync();
+    }
+}
