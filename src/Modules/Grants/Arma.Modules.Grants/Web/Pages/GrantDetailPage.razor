@@ -1,0 +1,267 @@
+@page "/grants/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = GrantsPermissions.Read)]
+@inject GrantService Grants
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Hibe · Arma CRM</PageTitle>
+
+@if (detail is null)
+{
+    @if (loaded)
+    {
+        <Alert><AlertTitle>Hibe bulunamadı</AlertTitle></Alert>
+    }
+}
+else
+{
+    var grant = detail.Summary;
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <p class="text-muted-foreground text-sm"><a class="hover:underline" href="grants">Hibeler</a></p>
+                <h1 class="text-2xl font-semibold tracking-tight">@grant.Title</h1>
+                <p class="text-sm">
+                    <a class="hover:underline" href="contacts/@grant.FunderId">@grant.FunderName</a>
+                    @if (grant.Program is not null)
+                    {
+                        <span class="text-muted-foreground"> · @grant.Program</span>
+                    }
+                    <Badge Variant="GrantLabels.StatusVariant(grant.Status)" Class="ml-1">@GrantLabels.Status(grant.Status)</Badge>
+                </p>
+            </div>
+            @if (canWrite)
+            {
+                <div class="flex flex-wrap gap-2">
+                    @switch (grant.Status)
+                    {
+                        case GrantStatus.Preparing:
+                            <Button OnClick="() => ChangeAsync(GrantStatus.Submitted)">Başvuru yapıldı</Button>
+                            break;
+                        case GrantStatus.Submitted:
+                            <Button OnClick="OpenAward">Kabul edildi</Button>
+                            <Button Variant="ButtonVariant.Outline" OnClick="() => ChangeAsync(GrantStatus.Rejected)">Reddedildi</Button>
+                            break;
+                        case GrantStatus.Awarded:
+                            <Button OnClick="() => ChangeAsync(GrantStatus.Closed)">Projeyi tamamla</Button>
+                            <Button Variant="ButtonVariant.Outline" OnClick="OpenAward">Kabul tutarı</Button>
+                            break;
+                        case GrantStatus.Rejected:
+                            <Button Variant="ButtonVariant.Outline" OnClick="() => ChangeAsync(GrantStatus.Submitted)">Yeniden değerlendir</Button>
+                            break;
+                        default:
+                            <Button Variant="ButtonVariant.Outline" OnClick="() => ChangeAsync(GrantStatus.Awarded, grant.Awarded)">Yeniden aç</Button>
+                            break;
+                    }
+                    <Button Variant="ButtonVariant.Outline" OnClick="() => editorOpen = true">Düzenle</Button>
+                    <Button Variant="ButtonVariant.Ghost" OnClick="() => deleteOpen = true">Sil</Button>
+                </div>
+            }
+        </div>
+
+        <FormAlert Error="@error" />
+
+        <div class="grid gap-4 sm:grid-cols-3">
+            <Card><CardHeader><CardDescription>Talep edilen</CardDescription><CardTitle Class="text-lg">@GrantLabels.Money(grant.Requested, grant.Currency)</CardTitle></CardHeader></Card>
+            <Card><CardHeader><CardDescription>Kabul edilen</CardDescription><CardTitle Class="text-lg">@(grant.Awarded is { } a ? GrantLabels.Money(a, grant.Currency) : "-")</CardTitle></CardHeader></Card>
+            <Card><CardHeader><CardDescription>Alınan ödeme</CardDescription><CardTitle Class="text-lg">@GrantLabels.Money(grant.Received, grant.Currency)</CardTitle></CardHeader></Card>
+        </div>
+
+        <div class="grid gap-6 lg:grid-cols-3">
+            <Card Class="lg:col-span-2">
+                <CardHeader>
+                    <CardTitle>Takvim</CardTitle>
+                    <CardDescription>Rapor teslimleri ve hibe verenden beklenen ödeme dilimleri.</CardDescription>
+                </CardHeader>
+                <CardContent Class="grid gap-4">
+                    @if (detail.Milestones.Count == 0)
+                    {
+                        <p class="text-muted-foreground text-sm">Henüz takvim kaydı yok.</p>
+                    }
+                    else
+                    {
+                        <ul class="divide-y" data-testid="grant-milestones">
+                            @foreach (var item in detail.Milestones)
+                            {
+                                <li class="flex items-center gap-3 py-2">
+                                    <Checkbox Checked="item.CompletedOn is not null" CheckedChanged="v => ToggleAsync(item.Id, v)" disabled="@(!canWrite)" aria-label="@item.Title" />
+                                    <div class="flex-1">
+                                        <div class="@(item.CompletedOn is not null ? "text-muted-foreground line-through" : "")">@item.Title</div>
+                                        <div class="@(item.IsOverdue ? "text-destructive text-xs" : "text-muted-foreground text-xs")">
+                                            @GrantLabels.Kind(item.Kind) · @(item.CompletedOn is { } done ? $"Tamamlandı {GrantLabels.Date(done)}" : $"Son gün {GrantLabels.Date(item.DueOn)}")
+                                        </div>
+                                    </div>
+                                    @if (item.Amount is { } amount)
+                                    {
+                                        <span class="tabular-nums text-sm">@GrantLabels.Money(amount, grant.Currency)</span>
+                                    }
+                                    @if (canWrite)
+                                    {
+                                        <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => DeleteMilestoneAsync(item.Id)">Sil</Button>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                    @if (canWrite)
+                    {
+                        <form class="grid gap-2 sm:grid-cols-4" @onsubmit="AddMilestoneAsync" @onsubmit:preventDefault>
+                            <Input id="milestone-title" @bind-Value="milestoneTitle" maxlength="200" placeholder="Yeni kayıt, örnek: Ara rapor" aria-label="Başlık" Class="sm:col-span-4" />
+                            <NativeSelect @bind-Value="kind" aria-label="Tür">
+                                @foreach (var option in Enum.GetValues<MilestoneKind>())
+                                {
+                                    <option value="@option">@GrantLabels.Kind(option)</option>
+                                }
+                            </NativeSelect>
+                            <input id="milestone-due" type="date" class="@Styles.Input" @bind="milestoneDue" aria-label="Son gün" />
+                            <Input id="milestone-amount" inputmode="decimal" @bind-Value="milestoneAmount" placeholder="Tutar" aria-label="Tutar" disabled="@(kind != nameof(MilestoneKind.Payment))" />
+                            <Button Type="submit" Variant="ButtonVariant.Outline">Ekle</Button>
+                        </form>
+                    }
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader><CardTitle>Bilgiler</CardTitle></CardHeader>
+                <CardContent>
+                    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                        <dt class="text-muted-foreground">Sorumlu</dt><dd>@(grant.OwnerName ?? "-")</dd>
+                        <dt class="text-muted-foreground">Son gün</dt><dd>@GrantLabels.Date(grant.Deadline)</dd>
+                        <dt class="text-muted-foreground">Başvuru</dt><dd>@GrantLabels.Date(detail.SubmittedOn)</dd>
+                        <dt class="text-muted-foreground">Karar</dt><dd>@GrantLabels.Date(detail.DecidedOn)</dd>
+                        <dt class="text-muted-foreground">Proje</dt><dd>@(grant.StartOn is null && grant.EndOn is null ? "-" : $"{GrantLabels.Date(grant.StartOn)} – {GrantLabels.Date(grant.EndOn)}")</dd>
+                    </dl>
+                    @if (detail.Description is not null)
+                    {
+                        <Separator Class="my-4" />
+                        <p class="whitespace-pre-line text-sm">@detail.Description</p>
+                    }
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+
+    <GrantDialog @bind-Open="editorOpen" Editing="detail" OnSaved="_ => LoadAsync()" />
+
+    <Dialog @bind-Open="awardOpen" Class="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>Hibe kabul edildi</DialogTitle>
+            <DialogDescription>Hibe verenin onayladığı tutarı girin. Ödeme dilimlerini takvime ekleyerek gelişini izleyebilirsiniz.</DialogDescription>
+        </DialogHeader>
+        <form id="award-form" class="grid gap-2" @onsubmit="AwardAsync" @onsubmit:preventDefault>
+            <Label for="grant-awarded">Kabul edilen tutar (@grant.Currency)</Label>
+            <Input id="grant-awarded" inputmode="decimal" @bind-Value="awarded" />
+        </form>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => awardOpen = false">Vazgeç</Button>
+            <Button Type="submit" form="award-form">Kaydet</Button>
+        </DialogFooter>
+    </Dialog>
+
+    <Dialog @bind-Open="deleteOpen" Class="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>Hibe silinsin mi?</DialogTitle>
+            <DialogDescription>"@grant.Title" ve takvimi kaldırılır.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => deleteOpen = false">Vazgeç</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="DeleteAsync">Sil</Button>
+        </DialogFooter>
+    </Dialog>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo Turkish = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+    private GrantDetail? detail;
+    private string? error, milestoneTitle, milestoneAmount, awarded;
+    private string kind = nameof(MilestoneKind.Report);
+    private DateOnly? milestoneDue;
+    private bool loaded, canWrite, editorOpen, awardOpen, deleteOpen;
+
+    [Parameter] public Guid Id { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        canWrite = CurrentUser.HasPermission(GrantsPermissions.Write);
+        await LoadAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync() => detail = await Grants.GetAsync(Id);
+
+    private void OpenAward()
+    {
+        awarded = (detail!.Summary.Awarded ?? detail.Summary.Requested).ToString("N2", Turkish);
+        awardOpen = true;
+    }
+
+    private async Task AwardAsync()
+    {
+        if (!decimal.TryParse(awarded, System.Globalization.NumberStyles.Number, Turkish, out var amount))
+        {
+            error = "Tutarı 250.000,00 biçiminde girin.";
+            awardOpen = false;
+            return;
+        }
+
+        awardOpen = false;
+        await ChangeAsync(GrantStatus.Awarded, amount);
+    }
+
+    private async Task ChangeAsync(GrantStatus status, decimal? amount = null) =>
+        await Apply(await Grants.ChangeStatusAsync(Id, status, amount));
+
+    private async Task ToggleAsync(Guid milestoneId, bool done) => await Apply(await Grants.SetMilestoneDoneAsync(milestoneId, done));
+
+    private async Task AddMilestoneAsync()
+    {
+        if (milestoneDue is not { } due)
+        {
+            error = "Takvim kaydı için son günü seçin.";
+            return;
+        }
+
+        decimal? amount = null;
+        if (kind == nameof(MilestoneKind.Payment))
+        {
+            if (!decimal.TryParse(milestoneAmount, System.Globalization.NumberStyles.Number, Turkish, out var value))
+            {
+                error = "Ödeme diliminin tutarını 50.000,00 biçiminde girin.";
+                return;
+            }
+
+            amount = value;
+        }
+
+        var result = await Grants.AddMilestoneAsync(Id, new SaveMilestoneRequest(Enum.Parse<MilestoneKind>(kind), milestoneTitle ?? "", due, amount));
+        if (result.IsSuccess)
+        {
+            milestoneTitle = milestoneAmount = null;
+            milestoneDue = null;
+        }
+
+        await Apply(result);
+    }
+
+    private async Task DeleteMilestoneAsync(Guid milestoneId)
+    {
+        await Grants.DeleteMilestoneAsync(milestoneId);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        deleteOpen = false;
+        if ((await Grants.DeleteAsync(Id)).IsSuccess)
+        {
+            Navigation.NavigateTo("grants");
+        }
+    }
+
+    private async Task Apply(Result<Guid> result)
+    {
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+}

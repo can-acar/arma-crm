@@ -271,6 +271,15 @@ site klasöründe tutulmaz. Güncellemede yeni paketle aynı komut (`-CreateData
   etkinliğe kaydolan, toplu iletiyi alan veya formu dolduran tekil kişilerdir; bu kişiler tek tuşla bir gruba eklenir.
 - Kullanıcı yalnızca görme yetkisi olan modüllerin kayıtlarını bağlayabilir.
 
+## Hibeler
+
+**Hibeler** menüsü vakıf, kalkınma ajansı ve kurumlara yapılan hibe başvurularını izler. Hibe veren bir kişi kartıdır (çoğunlukla kurum); kartındaki **Hibeler** sekmesinden de başvuru eklenir.
+
+- Bir hibe Hazırlanıyor → Başvuruldu → Kabul edildi / Reddedildi → Tamamlandı yolunu izler. Kabulde onaylanan tutar girilir; başvuru ve karar tarihleri kendiliğinden yazılır.
+- **Takvim** rapor teslimlerini ve hibe verenden beklenen ödeme dilimlerini tutar. Dilim alındı olarak işaretlenince "Alınan ödeme" artar ve hibe verenin zaman çizelgesine yazılır. Günü geçen teslimler kırmızı görünür.
+- Panoda "Bekleyen hibe başvurusu" (geciken teslim ve 30 gün içindeki son günlerle) ve yılın kabul edilen hibe tutarı, gelişmiş aramada "Hibe başvurusu yapılan kurum" ve "Hibe aldığımız kurum" ölçütleri bulunur. `GET /api/v1/grants` salt okunur listeyi verir.
+- Mükerrer birleştirmede hibeler asıl kayda taşınır. İzinler: `grants.read`, `grants.write` (Personel rolüne varsayılan olarak verilmez).
+
 ## Kişi ek alanları
 
 **Yönetim → Kişi ek alanları** sayfasından kişi kartına kurumunuza özgü alanlar eklenir: metin, sayı, tarih, evet/hayır ve seçenekli. Bir alan yalnızca kişilere, kurumlara veya hanelere gösterilecek şekilde sınırlanabilir; kapatılan alan kartta görünmez ama değerleri silinmez.
