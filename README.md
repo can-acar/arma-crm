@@ -310,6 +310,27 @@ Kayıtlar CiviCRM kimlikleriyle (`external_key`, örn. `civicrm:42`) saklanır; 
 - Panoda "Açık vaka" ve "Bana atanan vaka" kutucukları, gelişmiş aramada "Açık vakası var" ve "Vaka türü" ölçütleri bulunur. `GET /api/v1/cases` vaka listesini salt okunur verir.
 - Mükerrer birleştirmede vakalar asıl kişiye taşınır. KVKK dışa aktarması gizli notlar dahil vakaları içerir; anonimleştirme konu, açıklama ve not metinlerini siler.
 
+## Webhook'lar
+
+**Yönetim → Webhook'lar** (`webhooks.manage` izni) olayları başka sistemlere (muhasebe, web sitesi, Zapier/n8n gibi) anlık bildirir. Bir adres eklenirken hangi olayların gönderileceği seçilir:
+
+| Olay | Ne zaman |
+| --- | --- |
+| `giving.activity` | Bağış kaydı, iadesi, taahhüt |
+| `membership.activity` | Üyelik ve aidat |
+| `events.activity` | Etkinlik kaydı ve katılım |
+| `sales.activity` | Satış fırsatı ve teklif |
+| `forms.activity` | Form yanıtı |
+| `cases.activity` | Vaka açılışı, notu, kapanışı |
+| `grants.activity` | Hibe durumu ve ödemesi |
+| `contacts.merged` | Mükerrer kişi birleştirme |
+
+Gövde `{"id", "type", "createdAt", "data"}` biçiminde JSON'dur; `data` olayın kaynağını (`source.module`, `source.id`), başlığını ve ilgili kişileri (ad, e-posta, telefon) içerir. Aynı kaynak değişince yeni bir olay gelir; alıcı `source.id` ile kaydını güncelleyebilir.
+
+- Her istek `X-Arma-Event`, `X-Arma-Delivery`, `X-Arma-Timestamp` ve `X-Arma-Signature` başlıklarını taşır. İmza `sha256=` + hex(HMAC-SHA256(gizli anahtar, `{X-Arma-Timestamp}.{gövde}`)) olarak hesaplanır. Gizli anahtar yalnızca oluşturulurken ve yenilenirken gösterilir; veritabanında şifreli saklanır.
+- Gönderimler dakikada bir yapılır. 2xx dışı yanıt veya bağlantı hatasında 1 dk, 5 dk, 30 dk, 2 sa, 6 sa ve 24 sa sonra yeniden denenir; ardından "Başarısız" olur ve ekrandan elle yeniden denenebilir. 30 günden eski gönderim kayıtları silinir.
+- Adres https olmalıdır; yerel ağdaki http bir alıcı için `Arma__Webhooks__AllowHttp=true` verilebilir (127.0.0.1 her zaman izinlidir). Yönlendirmeler izlenmez, istek 10 saniyede zaman aşımına uğrar.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`

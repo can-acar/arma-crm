@@ -28,6 +28,7 @@
     <ProjectReference Include="..\Modules\Campaigns\Arma.Modules.Campaigns\Arma.Modules.Campaigns.csproj" />
     <ProjectReference Include="..\Modules\Cases\Arma.Modules.Cases\Arma.Modules.Cases.csproj" />
     <ProjectReference Include="..\Modules\Grants\Arma.Modules.Grants\Arma.Modules.Grants.csproj" />
+    <ProjectReference Include="..\Modules\Webhooks\Arma.Modules.Webhooks\Arma.Modules.Webhooks.csproj" />
     <ProjectReference Include="..\Modules\Identity\Arma.Modules.Identity\Arma.Modules.Identity.csproj" />
   </ItemGroup>
 
