@@ -1,4 +1,6 @@
 using System.Reflection;
+using Arma.SharedKernel.Security;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +18,15 @@ public interface IModule
     /// <summary>Modülün Blazor sayfalarını barındıran derleme; sayfası yoksa null.</summary>
     Assembly? PagesAssembly => null;
 
+    /// <summary>Modülün tanımladığı izinler; rol ekranında listelenir.</summary>
+    IEnumerable<PermissionDefinition> Permissions => [];
+
     void AddServices(IServiceCollection services, IConfiguration configuration);
+
+    /// <summary>Kimlik doğrulama ve yetkilendirmeden sonra, uç noktalardan önce araya girecek ara katmanlar.</summary>
+    void UseMiddleware(IApplicationBuilder app)
+    {
+    }
 
     void MapEndpoints(IEndpointRouteBuilder endpoints);
 

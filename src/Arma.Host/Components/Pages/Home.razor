@@ -1,36 +1,97 @@
 @page "/"
+@inject IEnumerable<IDashboardContributor> Contributors
+@inject ICurrentUser CurrentUser
+@inject ILogger<Home> Logger
 
 <PageTitle>Pano · Arma CRM</PageTitle>
 
 <div class="flex flex-col gap-6">
     <div>
         <h1 class="text-2xl font-semibold tracking-tight">Pano</h1>
-        <p class="text-muted-foreground text-sm">Arma CRM'e hoş geldiniz.</p>
+        <p class="text-muted-foreground text-sm">Kurumunuzun güncel durumu</p>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-3">
-        <Card>
-            <CardHeader>
-                <CardTitle>Kişiler</CardTitle>
-                <CardDescription>Kişi ve kurum kayıtlarını yönetin.</CardDescription>
-            </CardHeader>
-            <CardFooter>
-                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Sm" Href="contacts">Kişilere git</Button>
-            </CardFooter>
-        </Card>
-        <Card>
-            <CardHeader>
-                <CardTitle>Bağışlar</CardTitle>
-                <CardDescription>Faz 1'de geliyor.</CardDescription>
-            </CardHeader>
-            <CardFooter><Badge Variant="BadgeVariant.Secondary">Yakında</Badge></CardFooter>
-        </Card>
-        <Card>
-            <CardHeader>
-                <CardTitle>İletişim</CardTitle>
-                <CardDescription>Faz 1'de geliyor.</CardDescription>
-            </CardHeader>
-            <CardFooter><Badge Variant="BadgeVariant.Secondary">Yakında</Badge></CardFooter>
-        </Card>
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        @foreach (var tile in tiles)
+        {
+            <Card>
+                <CardHeader>
+                    <CardDescription>@tile.Title</CardDescription>
+                    <CardTitle Class="text-2xl tabular-nums">
+                        @if (tile.Href is not null)
+                        {
+                            <a class="hover:underline" href="@tile.Href">@tile.Value</a>
+                        }
+                        else
+                        {
+                            @tile.Value
+                        }
+                    </CardTitle>
+                    @if (tile.Hint is not null)
+                    {
+                        <p class="text-muted-foreground text-xs">@tile.Hint</p>
+                    }
+                </CardHeader>
+            </Card>
+        }
     </div>
+
+    @foreach (var chart in charts)
+    {
+        var max = chart.Points.Count == 0 ? 0 : chart.Points.Max(p => p.Value);
+        <Card>
+            <CardHeader>
+                <CardTitle>@chart.Title</CardTitle>
+                <CardDescription>Toplam @Format(chart.Points.Sum(p => p.Value), chart.Format)</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div class="flex h-48 items-end gap-2" role="img" aria-label="@chart.Title">
+                    @foreach (var point in chart.Points)
+                    {
+                        var height = max == 0 ? 0 : (int)Math.Round(point.Value / max * 100);
+                        <div class="flex h-full flex-1 flex-col items-center justify-end gap-1" title="@point.Label: @Format(point.Value, chart.Format)">
+                            <div class="bg-primary w-full rounded-t" style="height: @(Math.Max(height, point.Value > 0 ? 2 : 0))%"></div>
+                            <span class="text-muted-foreground text-[10px] whitespace-nowrap">@point.Label</span>
+                        </div>
+                    }
+                </div>
+            </CardContent>
+        </Card>
+    }
+
+    @if (tiles.Count == 0 && charts.Count == 0)
+    {
+        <p class="text-muted-foreground text-sm">Gösterilecek bilgi yok. Yetkiniz olan menülerden başlayabilirsiniz.</p>
+    }
 </div>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Turkish = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
+    private List<DashboardTile> tiles = [];
+    private List<DashboardChart> charts = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        foreach (var contributor in Contributors)
+        {
+            // Bir modülün hatası panonun tamamını düşürmesin.
+            try
+            {
+                tiles.AddRange((await contributor.TilesAsync(default)).Where(Allowed));
+                charts.AddRange((await contributor.ChartsAsync(default)).Where(c => c.Permission is null || CurrentUser.HasPermission(c.Permission)));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Pano bilgisi alınamadı: {Contributor}", contributor.GetType().Name);
+            }
+        }
+
+        tiles = [.. tiles.OrderBy(t => t.Order)];
+        charts = [.. charts.OrderBy(c => c.Order)];
+    }
+
+    private bool Allowed(DashboardTile tile) => tile.Permission is null || CurrentUser.HasPermission(tile.Permission);
+
+    private static string Format(decimal value, string format) =>
+        format == "money" ? string.Format(Turkish, "{0:N0} TL", value) : value.ToString("N0", Turkish);
+}

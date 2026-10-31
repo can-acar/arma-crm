@@ -1,0 +1,93 @@
+@inject DonationService Donations
+@inject PledgeService Pledges
+
+@* Bağışçı portalında "Bağışlarım": toplamlar, makbuzlar, yıllık özetler ve açık taahhütler. *@
+<Card>
+    <CardHeader>
+        <CardTitle>Bağışlarım</CardTitle>
+        @if (summary is not null && summary.Lifetime.Count > 0)
+        {
+            <CardDescription>Toplam <TotalsLine Totals="summary.Lifetime" /> · bu yıl <TotalsLine Totals="summary.ThisYear" /></CardDescription>
+        }
+    </CardHeader>
+    <CardContent Class="grid gap-4">
+        @if (items.Count == 0)
+        {
+            <p class="text-muted-foreground text-sm">Henüz kayıtlı bağışınız yok.</p>
+        }
+        else
+        {
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Tarih</TableHead>
+                        <TableHead Class="text-right">Tutar</TableHead>
+                        <TableHead>Fon</TableHead>
+                        <TableHead>Makbuz</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    @foreach (var donation in items)
+                    {
+                        <TableRow>
+                            <TableCell>@GivingLabels.Date(donation.ReceivedOn)</TableCell>
+                            <TableCell Class="text-right tabular-nums">@Money.Format(donation.Amount, donation.Currency)</TableCell>
+                            <TableCell>@(donation.FundName ?? "Genel")</TableCell>
+                            <TableCell>
+                                @if (donation.HasReceipt)
+                                {
+                                    <a class="hover:underline" href="portal/makbuz/@donation.Id" target="_blank">@donation.ReceiptNumber</a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted-foreground text-xs">Henüz kesilmedi</span>
+                                }
+                            </TableCell>
+                        </TableRow>
+                    }
+                </TableBody>
+            </Table>
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="text-muted-foreground">Yıllık bağış özeti:</span>
+                @foreach (var year in years)
+                {
+                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" Href="@($"portal/yillik/{year}")" target="_blank">@year</Button>
+                }
+            </div>
+        }
+
+        @if (pledges.Count > 0)
+        {
+            <div class="grid gap-2">
+                <h3 class="text-sm font-medium">Taahhütlerim</h3>
+                @foreach (var pledge in pledges)
+                {
+                    <div class="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
+                        <div>
+                            <div>@Money.Format(pledge.Amount, pledge.Currency) · @GivingLabels.Plan(pledge.Frequency, pledge.InstallmentCount) · @(pledge.FundName ?? "Genel")</div>
+                            <div class="text-muted-foreground text-xs">Ödenen @Money.Format(pledge.Paid, pledge.Currency), kalan @Money.Format(pledge.Remaining, pledge.Currency)@(pledge.NextDueOn is { } due ? $" · sıradaki vade {GivingLabels.Date(due)}" : "")</div>
+                        </div>
+                        <Badge Variant="GivingLabels.StateVariant(pledge.State)">@GivingLabels.State(pledge.State)</Badge>
+                    </div>
+                }
+            </div>
+        }
+    </CardContent>
+</Card>
+
+@code {
+    private DonorSummary? summary;
+    private IReadOnlyList<DonationView> items = [];
+    private IReadOnlyList<int> years = [];
+    private IReadOnlyList<PledgeView> pledges = [];
+
+    [Parameter] public Guid ContactId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        summary = await Donations.DonorSummaryAsync(ContactId);
+        items = (await Donations.ListAsync(new DonationFilter(ContactId: ContactId, Status: DonationStatus.Completed, PageSize: 100))).Items;
+        years = [.. items.Select(d => d.ReceivedOn.Year).Distinct().OrderByDescending(y => y)];
+        pledges = [.. (await Pledges.ListAsync(contactId: ContactId)).Where(p => p.State is PledgeState.Open or PledgeState.Overdue)];
+    }
+}

@@ -1,0 +1,96 @@
+@page "/admin/giving"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = GivingPermissions.Settings)]
+@inject DonationService Donations
+@inject OnlineGivingService Online
+@inject NavigationManager Navigation
+
+<PageTitle>Makbuz ve ödeme · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Makbuz ve ödeme</h1>
+        <p class="text-muted-foreground text-sm">Makbuzda yazan kurum bilgileri ve çevrim içi bağış formu</p>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+        <Card>
+            <CardHeader>
+                <CardTitle>Makbuz bilgileri</CardTitle>
+                <CardDescription>Makbuz numarası her yıl 1'den başlar: @(prefix)@(DateTime.Now.Year)-000001</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <form class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                    @if (saved)
+                    {
+                        <Alert><AlertDescription>Kaydedildi.</AlertDescription></Alert>
+                    }
+                    <div class="grid gap-2">
+                        <Label for="org-name">Kurum adı</Label>
+                        <Input id="org-name" @bind-Value="organization" maxlength="200" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="org-address">Adres</Label>
+                        <Textarea id="org-address" @bind-Value="address" rows="2" maxlength="500" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="org-legal">Resmî bilgiler</Label>
+                        <Textarea id="org-legal" @bind-Value="legal" rows="2" maxlength="500" placeholder="Vergi dairesi ve no, kütük no" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="org-footer">Makbuz alt notu</Label>
+                        <Textarea id="org-footer" @bind-Value="footer" rows="3" maxlength="1000" placeholder="Teşekkür metni veya vergi indirimi açıklaması" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="org-prefix">Numara öneki</Label>
+                        <Input id="org-prefix" Class="w-32" @bind-Value="prefix" maxlength="10" placeholder="Örn. MKB-" />
+                    </div>
+                    <div><Button Type="submit">Kaydet</Button></div>
+                </form>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Çevrim içi bağış</CardTitle>
+                <CardDescription>Ödeme kuruluşu sunucu yapılandırmasından seçilir (Giving__Payments__Provider).</CardDescription>
+            </CardHeader>
+            <CardContent Class="grid gap-3 text-sm">
+                @if (Online.IsEnabled)
+                {
+                    <p>Bağış formu açık. Web sitenize bu bağlantıyı ekleyin:</p>
+                    <p><a class="font-mono underline" href="bagis" target="_blank">@Navigation.ToAbsoluteUri("bagis")</a></p>
+                    <p class="text-muted-foreground">Formda yalnızca "Bağış formunda seçilebilsin" işaretli fonlar görünür.</p>
+                }
+                else
+                {
+                    <p>Çevrim içi bağış kapalı. Açmak için iyzico veya PayTR üye işyeri bilgilerini kurulumun ayar dosyasına girin; ayrıntılar kurulum belgesinde.</p>
+                }
+            </CardContent>
+        </Card>
+    </div>
+</div>
+
+@code {
+    private string? organization, address, legal, footer, prefix;
+    private bool saved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var settings = await Donations.ReceiptSettingsAsync();
+        (organization, address, legal, footer, prefix) = (settings.OrganizationName, settings.Address, settings.LegalInfo, settings.Footer, settings.NumberPrefix);
+    }
+
+    private async Task SaveAsync()
+    {
+        await Donations.SaveReceiptSettingsAsync(new ReceiptSettings
+        {
+            OrganizationName = organization ?? "",
+            Address = address,
+            LegalInfo = legal,
+            Footer = footer,
+            NumberPrefix = prefix ?? "",
+        });
+        saved = true;
+    }
+}

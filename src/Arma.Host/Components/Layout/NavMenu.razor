@@ -2,22 +2,36 @@
 
 <nav class="flex flex-col gap-1 p-2">
     <NavLink href="" Match="NavLinkMatch.All" class="@ItemClass" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">Pano</NavLink>
-    @foreach (var item in Items.Where(i => i.RequiredRole is null || user?.IsInRole(i.RequiredRole) == true))
+    @foreach (var item in Items)
     {
+        if (item.Order >= AdminOrder && !adminHeaderShown)
+        {
+            adminHeaderShown = true;
+            <span class="text-muted-foreground mt-4 px-2 text-xs font-medium">Yönetim</span>
+        }
         <NavLink href="@item.Href" class="@ItemClass" ActiveClass="bg-sidebar-accent text-sidebar-accent-foreground">@item.Title</NavLink>
     }
 </nav>
 
 @code {
-    private System.Security.Claims.ClaimsPrincipal? user;
-
-    [CascadingParameter]
-    private Task<AuthenticationState>? AuthenticationState { get; set; }
-
-    protected override async Task OnParametersSetAsync() =>
-        user = AuthenticationState is null ? null : (await AuthenticationState).User;
-
     private const string ItemClass = "flex h-8 items-center rounded-md px-2 text-sm font-medium hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 
-    private IEnumerable<NavigationItem> Items => Contributors.SelectMany(c => c.GetNavigationItems()).OrderBy(i => i.Order);
+    /// <summary>Bu sıradan sonraki bağlantılar "Yönetim" başlığı altında gösterilir.</summary>
+    private const int AdminOrder = 900;
+
+    private bool adminHeaderShown;
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationState { get; set; }
+
+    private IEnumerable<NavigationItem> Items { get; set; } = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        adminHeaderShown = false;
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        Items = Contributors.SelectMany(c => c.GetNavigationItems())
+            .Where(i => i.Permission is null || user?.HasClaim(ArmaClaimTypes.Permission, i.Permission) == true)
+            .OrderBy(i => i.Order)
+            .ToList();
+    }
 }

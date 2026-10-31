@@ -1,0 +1,326 @@
+@page "/admin/webhooks"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = WebhooksPermissions.Manage)]
+@inject WebhookService Webhooks
+
+<PageTitle>Webhook'lar · Arma CRM</PageTitle>
+
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight">Webhook'lar</h1>
+            <p class="text-muted-foreground text-sm">Bağış, üyelik, etkinlik gibi olaylar seçtiğiniz adrese imzalı JSON olarak gönderilir. Ulaşılamayan adrese gönderim 6 kez, artan aralıklarla (1 dakikadan 24 saate) yeniden denenir.</p>
+        </div>
+        <Button OnClick="() => Edit(null)">Webhook ekle</Button>
+    </div>
+
+    <FormAlert Error="@error" />
+
+    @if (secret is not null)
+    {
+        <Alert>
+            <AlertTitle>Gizli anahtar</AlertTitle>
+            <AlertDescription>
+                <p>Bu anahtar yalnızca şimdi gösterilir; alıcı sistemde imzayı doğrulamak için saklayın.</p>
+                <code class="bg-muted mt-2 block break-all rounded px-2 py-1 font-mono text-xs" data-testid="webhook-secret">@secret</code>
+                <p class="mt-2 text-xs">İmza: <code>X-Arma-Signature = sha256=HMAC_SHA256(anahtar, X-Arma-Timestamp + "." + gövde)</code></p>
+            </AlertDescription>
+        </Alert>
+    }
+
+    @if (testResult is not null)
+    {
+        <Alert Variant="@(testResult.Success ? AlertVariant.Default : AlertVariant.Destructive)">
+            <AlertTitle>@(testResult.Success ? "Deneme başarılı" : "Deneme başarısız")</AlertTitle>
+            <AlertDescription>@(testResult.Success ? $"Adres HTTP {testResult.StatusCode} ile yanıt verdi." : testResult.Error)</AlertDescription>
+        </Alert>
+    }
+
+    <Card>
+        <CardContent>
+            @if (endpoints is null)
+            {
+                <Skeleton Class="h-24" />
+            }
+            else if (endpoints.Count == 0)
+            {
+                <p class="text-muted-foreground py-6 text-center text-sm">Henüz webhook yok.</p>
+            }
+            else
+            {
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Ad ve adres</TableHead>
+                            <TableHead>Olaylar</TableHead>
+                            <TableHead>Durum</TableHead>
+                            <TableHead><span class="sr-only">İşlem</span></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var endpoint in endpoints)
+                        {
+                            <TableRow>
+                                <TableCell>
+                                    <div class="font-medium">@endpoint.Name</div>
+                                    <div class="text-muted-foreground break-all text-xs">@endpoint.Url</div>
+                                </TableCell>
+                                <TableCell Class="text-sm">@string.Join(", ", endpoint.Events.Select(Label))</TableCell>
+                                <TableCell Class="text-sm">
+                                    <Badge Variant="endpoint.IsActive ? BadgeVariant.Secondary : BadgeVariant.Outline">@(endpoint.IsActive ? "Açık" : "Kapalı")</Badge>
+                                    @if (endpoint.Failed > 0)
+                                    {
+                                        <div class="text-destructive text-xs">@endpoint.Failed başarısız gönderim</div>
+                                    }
+                                    @if (endpoint.Pending > 0)
+                                    {
+                                        <div class="text-muted-foreground text-xs">@endpoint.Pending bekliyor</div>
+                                    }
+                                    @if (endpoint.LastDeliveredAt is { } last)
+                                    {
+                                        <div class="text-muted-foreground text-xs">Son başarılı: @last.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                                    }
+                                </TableCell>
+                                <TableCell Class="text-right whitespace-nowrap">
+                                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => ShowDeliveriesAsync(endpoint)">Gönderimler</Button>
+                                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => TestAsync(endpoint.Id)">Dene</Button>
+                                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => Edit(endpoint)">Düzenle</Button>
+                                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => RotateAsync(endpoint.Id)">Anahtarı yenile</Button>
+                                    <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => deleting = endpoint">Sil</Button>
+                                </TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            }
+        </CardContent>
+    </Card>
+
+    @if (selected is not null && deliveries is not null)
+    {
+        <Card>
+            <CardHeader>
+                <CardTitle>@selected.Name · son gönderimler</CardTitle>
+                <CardDescription>30 günden eski tamamlanmış gönderimler silinir.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                @if (deliveries.Count == 0)
+                {
+                    <p class="text-muted-foreground text-sm">Henüz gönderim yok.</p>
+                }
+                else
+                {
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Zaman</TableHead>
+                                <TableHead>Olay</TableHead>
+                                <TableHead>Durum</TableHead>
+                                <TableHead>Sonuç</TableHead>
+                                <TableHead></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            @foreach (var delivery in deliveries)
+                            {
+                                <TableRow>
+                                    <TableCell Class="text-sm whitespace-nowrap">@delivery.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</TableCell>
+                                    <TableCell Class="font-mono text-xs">@delivery.EventType</TableCell>
+                                    <TableCell><Badge Variant="StatusVariant(delivery.Status)">@StatusLabel(delivery.Status)</Badge></TableCell>
+                                    <TableCell Class="text-muted-foreground text-xs">
+                                        @(delivery.LastError ?? (delivery.LastStatusCode is { } code ? $"HTTP {code}" : "-"))
+                                        @if (delivery.Status == DeliveryStatus.Pending && delivery.Attempts > 0)
+                                        {
+                                            <div>@delivery.Attempts. deneme başarısız; sonraki @delivery.NextAttemptAt.ToLocalTime().ToString("dd.MM HH:mm")</div>
+                                        }
+                                    </TableCell>
+                                    <TableCell Class="text-right">
+                                        @if (delivery.Status == DeliveryStatus.Failed)
+                                        {
+                                            <Button Size="ButtonSize.Sm" Variant="ButtonVariant.Ghost" OnClick="() => RetryAsync(delivery.Id)">Yeniden dene</Button>
+                                        }
+                                    </TableCell>
+                                </TableRow>
+                            }
+                        </TableBody>
+                    </Table>
+                }
+            </CardContent>
+        </Card>
+    }
+</div>
+
+<Dialog Open="editorOpen" OpenChanged="v => editorOpen = v" Class="sm:max-w-lg">
+    <DialogHeader><DialogTitle>@(editing is null ? "Webhook ekle" : "Webhook'u düzenle")</DialogTitle></DialogHeader>
+    <FormAlert Error="@formError" />
+    <form id="webhook-form" class="grid gap-4" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="grid gap-2">
+            <Label for="webhook-name">Ad</Label>
+            <Input id="webhook-name" @bind-Value="name" maxlength="100" placeholder="Örnek: Muhasebe entegrasyonu" />
+        </div>
+        <div class="grid gap-2">
+            <Label for="webhook-url">Adres</Label>
+            <Input id="webhook-url" @bind-Value="url" maxlength="500" placeholder="https://ornek.org/arma-webhook" />
+        </div>
+        <fieldset class="grid gap-2">
+            <legend class="mb-1 text-sm font-medium">Olaylar</legend>
+            @foreach (var (key, label) in WebhookEndpoint.EventTypes)
+            {
+                <label class="flex items-center gap-2 text-sm">
+                    <Checkbox Checked="selectedEvents.Contains(key)" CheckedChanged="v => Toggle(key, v)" aria-label="@label" />
+                    @label <span class="text-muted-foreground font-mono text-xs">@key</span>
+                </label>
+            }
+        </fieldset>
+        <label class="flex items-center gap-2 text-sm">
+            <Checkbox @bind-Checked="isActive" /> Gönderim açık
+        </label>
+    </form>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => editorOpen = false">Vazgeç</Button>
+        <Button Type="submit" form="webhook-form">Kaydet</Button>
+    </DialogFooter>
+</Dialog>
+
+<Dialog Open="deleting is not null" OpenChanged="v => { if (!v) deleting = null; }" Class="sm:max-w-md">
+    <DialogHeader>
+        <DialogTitle>Webhook silinsin mi?</DialogTitle>
+        <DialogDescription>"@deleting?.Name" adresine gönderim durur, bekleyen gönderimler silinir.</DialogDescription>
+    </DialogHeader>
+    <DialogFooter>
+        <Button Variant="ButtonVariant.Outline" OnClick="() => deleting = null">Vazgeç</Button>
+        <Button Variant="ButtonVariant.Destructive" OnClick="DeleteAsync">Sil</Button>
+    </DialogFooter>
+</Dialog>
+
+@code {
+    private IReadOnlyList<EndpointView>? endpoints;
+    private IReadOnlyList<DeliveryView>? deliveries;
+    private EndpointView? editing, deleting, selected;
+    private WebhookTestResult? testResult;
+    private string? name, url, error, formError, secret;
+    private HashSet<string> selectedEvents = [];
+    private bool isActive = true, editorOpen;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        endpoints = await Webhooks.ListAsync();
+        if (selected is not null)
+        {
+            deliveries = await Webhooks.DeliveriesAsync(selected.Id);
+        }
+    }
+
+    private static string Label(string key) => WebhookEndpoint.EventTypes.GetValueOrDefault(key, key);
+
+    private static string StatusLabel(DeliveryStatus status) => status switch
+    {
+        DeliveryStatus.Pending => "Bekliyor",
+        DeliveryStatus.Succeeded => "Gönderildi",
+        _ => "Başarısız",
+    };
+
+    private static BadgeVariant StatusVariant(DeliveryStatus status) => status switch
+    {
+        DeliveryStatus.Succeeded => BadgeVariant.Secondary,
+        DeliveryStatus.Failed => BadgeVariant.Destructive,
+        _ => BadgeVariant.Outline,
+    };
+
+    private void Edit(EndpointView? endpoint)
+    {
+        editing = endpoint;
+        name = endpoint?.Name;
+        url = endpoint?.Url;
+        selectedEvents = endpoint is null ? [.. WebhookEndpoint.EventTypes.Keys] : [.. endpoint.Events];
+        isActive = endpoint?.IsActive ?? true;
+        formError = null;
+        editorOpen = true;
+    }
+
+    private void Toggle(string key, bool on)
+    {
+        if (on)
+        {
+            selectedEvents.Add(key);
+        }
+        else
+        {
+            selectedEvents.Remove(key);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        var request = new SaveEndpointRequest(name ?? "", url ?? "", [.. selectedEvents], isActive);
+        if (editing is null)
+        {
+            var created = await Webhooks.CreateAsync(request);
+            if (!created.IsSuccess)
+            {
+                formError = created.Error!.Message;
+                return;
+            }
+
+            secret = created.Value!.Secret;
+        }
+        else
+        {
+            var updated = await Webhooks.UpdateAsync(editing.Id, request);
+            if (!updated.IsSuccess)
+            {
+                formError = updated.Error!.Message;
+                return;
+            }
+        }
+
+        editorOpen = false;
+        await LoadAsync();
+    }
+
+    private async Task RotateAsync(Guid id)
+    {
+        var result = await Webhooks.RotateSecretAsync(id);
+        secret = result.IsSuccess ? result.Value!.Secret : null;
+        error = result.IsSuccess ? null : result.Error!.Message;
+    }
+
+    private async Task TestAsync(Guid id)
+    {
+        testResult = null;
+        testResult = await Webhooks.TestAsync(id);
+    }
+
+    private async Task ShowDeliveriesAsync(EndpointView endpoint)
+    {
+        selected = endpoint;
+        deliveries = await Webhooks.DeliveriesAsync(endpoint.Id);
+    }
+
+    private async Task RetryAsync(Guid deliveryId)
+    {
+        await Webhooks.RetryAsync(deliveryId);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (deleting is null)
+        {
+            return;
+        }
+
+        var result = await Webhooks.DeleteAsync(deleting.Id);
+        if (selected?.Id == deleting.Id)
+        {
+            selected = null;
+            deliveries = null;
+        }
+
+        deleting = null;
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+}
