@@ -100,6 +100,26 @@ cd deploy
 önce `migrate` servisini, sonra uygulamayı başlatır. Güncellemede aynı komut yeterlidir.
 `.env` dosyasını yedekleyin.
 
+## Kurulum (Windows Server / IIS)
+
+Paketi üretmek için (.NET 10 SDK ile, herhangi bir işletim sisteminde):
+
+```bash
+deploy/windows/build-package.sh 1.0.0   # deploy/out/arma-crm-iis-1.0.0.zip
+```
+
+Sunucuda ASP.NET Core 10 Hosting Bundle ve PostgreSQL 18 kurulu olmalı. Paketi açıp yönetici PowerShell'de:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-iis.ps1 -CreateDatabase
+```
+
+Betik IIS, WebSocket ve Uygulama Başlatma özelliklerini açar; ilk kurulumda `C:\ProgramData\Arma\arma.env` dosyasını
+(kurum kimliği, `-CreateDatabase` ile süper kullanıcı olmayan `arma` rolü ve parolası) üretir; dosyaları kopyalar, `migrate`
+ile şemayı günceller ve sürekli açık bir uygulama havuzu ile siteyi kurar. Ayarlar havuzun ortam değişkenlerine yazılır,
+site klasöründe tutulmaz. Güncellemede yeni paketle aynı komut (`-CreateDatabase` olmadan) yeterlidir; ayrıntılar
+`deploy/windows/KURULUM.txt` içinde.
+
 ## Kimlik ve yetki
 
 - İlk açılışta `/setup` ekranı ilk yöneticiyi oluşturur. Kullanıcı olmadan başka sayfa açılmaz.
