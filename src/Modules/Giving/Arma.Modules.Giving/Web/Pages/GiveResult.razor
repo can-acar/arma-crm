@@ -29,6 +29,7 @@
         var status = Guid.TryParseExact(D, "N", out var id) ? await Online.StatusAsync(id) : null;
         (title, message) = status switch
         {
+            { Status: DonationStatus.Completed, Monthly: true } s => ("Teşekkür ederiz", $"{Money.Format(s.Amount, "TRY")} tutarındaki bağışınız alındı. Düzenli bağışınız her ay aynı gün kayıtlı kartınızdan alınacak."),
             { Status: DonationStatus.Completed } s => ("Teşekkür ederiz", $"{Money.Format(s.Amount, "TRY")} tutarındaki bağışınız alındı. Desteğiniz için teşekkür ederiz."),
             { Status: DonationStatus.Pending } => ("Ödemeniz işleniyor", "Ödeme kuruluşundan onay bekleniyor. Birkaç dakika içinde tamamlanır; tekrar ödeme yapmayın."),
             _ when Navigation.Uri.Contains("/bagis/tesekkurler", StringComparison.Ordinal) => ("Ödemeniz işleniyor", "Ödeme sonucunu bekliyoruz."),

@@ -65,4 +65,20 @@ public static class GivingLabels
         Application.PledgeState.Fulfilled => BadgeVariant.Secondary,
         _ => BadgeVariant.Outline,
     };
+
+    public static string Recurring(RecurringStatus status) => status switch
+    {
+        RecurringStatus.PendingSetup => "Kurulum bekliyor",
+        RecurringStatus.Active => "Etkin",
+        RecurringStatus.Paused => "Durmuş",
+        RecurringStatus.Cancelled => "Durduruldu",
+        _ => status.ToString(),
+    };
+
+    public static BadgeVariant RecurringVariant(RecurringStatus status) => status switch
+    {
+        RecurringStatus.Active => BadgeVariant.Default,
+        RecurringStatus.Paused => BadgeVariant.Destructive,
+        _ => BadgeVariant.Outline,
+    };
 }

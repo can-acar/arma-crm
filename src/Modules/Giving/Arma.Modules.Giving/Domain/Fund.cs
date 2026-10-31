@@ -56,4 +56,10 @@ public sealed class ReceiptSettings : Entity
 
     /// <summary>Makbuz numarası öneki; numara "{önek}{yıl}-{sıra}" biçimindedir.</summary>
     public string NumberPrefix { get; set; } = "";
+
+    /// <summary>
+    /// Bağış formunda sunulan ödeme sağlayıcılarının anahtarları, sırasıyla ("iyzico,paytr"). Boşsa yapılandırılmış
+    /// bütün sağlayıcılar sunulur.
+    /// </summary>
+    public string? PaymentProviders { get; set; }
 }

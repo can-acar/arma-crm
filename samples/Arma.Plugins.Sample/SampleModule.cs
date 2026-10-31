@@ -40,6 +40,11 @@ public sealed class SampleModule : IModule, INavigationContributor
             .WithTags("Örnek eklenti")
             .AllowAnonymous();
 
+        // Örnek ödeme sağlayıcısının sayfası (bkz. SamplePaymentProvider). Gerçek sağlayıcıda bu sayfa kuruluşundadır.
+        endpoints.MapGet("/api/v1/plugins/ornek/odeme", (string order, string amount, string cb, string sig) => SamplePaymentProvider.Page(order, amount, cb, sig))
+            .ExcludeFromDescription()
+            .AllowAnonymous();
+
         endpoints.MapGet("/api/v1/plugins/ornek/merges", (MergeCounter counter) => Results.Ok(new { count = counter.Count }))
             .WithTags("Örnek eklenti")
             .RequireAuthorization(ReadPermission);

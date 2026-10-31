@@ -2,22 +2,33 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Arma.SharedKernel.Payments;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
-namespace Arma.Modules.Giving.Payments;
+namespace Arma.Payments.Providers;
 
 /// <summary>PayTR iFrame API. Sonuç, PayTR sunucusundan "bildirim URL" adresine POST ile gelir.</summary>
-internal sealed class PayTrProvider(HttpClient http, IOptions<PaymentOptions> options, ILogger<PayTrProvider> logger) : IPaymentProvider
+public sealed class PayTrProvider(IHttpClientFactory httpClients, ILogger<PayTrProvider> logger) : IPaymentProvider
 {
     private const string TokenUrl = "https://www.paytr.com/odeme/api/get-token";
+    private const string FramePrefix = "https://www.paytr.com/odeme/guvenli/";
 
-    private PayTrOptions Settings => options.Value.PayTR;
+    public PaymentProviderDescriptor Descriptor { get; } = new("paytr", "PayTR", PaymentCapabilities.OneTime,
+    [
+        new("MerchantId", "Mağaza numarası", IsSecret: false),
+        new("MerchantKey", "Mağaza parolası (merchant_key)"),
+        new("MerchantSalt", "Mağaza gizli anahtarı (merchant_salt)"),
+        new("TestMode", "Test modu", IsSecret: false, IsRequired: false, DefaultValue: "false",
+            Help: "true iken PayTR test kartlarıyla işlem yapılır, para çekilmez."),
+    ])
+    {
+        Description = "Kartla ödeme PayTR'nin güvenli sayfasında, bağış formunun içinde alınır. Bildirim adresi PayTR panelinde tanımlanmalıdır.",
+        Website = "https://www.paytr.com",
+        Order = 20,
+    };
 
-    public string Name => "paytr";
-
-    public async Task<PaymentStart> StartAsync(PaymentRequest request, CancellationToken cancellationToken)
+    public async Task<PaymentStart> StartAsync(PaymentRequest request, IPaymentProviderSettings settings, CancellationToken cancellationToken)
     {
         var amount = ToKurus(request.Amount);
         var basket = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new object[][]
@@ -27,15 +38,15 @@ internal sealed class PayTrProvider(HttpClient http, IOptions<PaymentOptions> op
         const string noInstallment = "1";
         const string maxInstallment = "0";
         const string currency = "TL";
-        var testMode = Settings.TestMode ? "1" : "0";
+        var testMode = settings.GetFlag("TestMode") ? "1" : "0";
 
-        var hashInput = Settings.MerchantId + request.Payer.Ip + request.OrderId + request.Payer.Email + amount + basket
+        var hashInput = settings["MerchantId"] + request.Payer.Ip + request.OrderId + request.Payer.Email + amount + basket
             + noInstallment + maxInstallment + currency + testMode;
-        var token = Sign(hashInput + Settings.MerchantSalt);
+        var token = Sign(settings, hashInput + settings["MerchantSalt"]);
 
         var form = new Dictionary<string, string>
         {
-            ["merchant_id"] = Settings.MerchantId,
+            ["merchant_id"] = settings["MerchantId"],
             ["user_ip"] = request.Payer.Ip,
             ["merchant_oid"] = request.OrderId,
             ["email"] = request.Payer.Email,
@@ -45,7 +56,7 @@ internal sealed class PayTrProvider(HttpClient http, IOptions<PaymentOptions> op
             ["debug_on"] = "0",
             ["no_installment"] = noInstallment,
             ["max_installment"] = maxInstallment,
-            ["user_name"] = $"{request.Payer.FirstName} {request.Payer.LastName}",
+            ["user_name"] = request.Payer.FullName,
             ["user_address"] = "-",
             ["user_phone"] = string.IsNullOrWhiteSpace(request.Payer.Phone) ? "-" : request.Payer.Phone,
             ["merchant_ok_url"] = request.SuccessUrl,
@@ -58,28 +69,28 @@ internal sealed class PayTrProvider(HttpClient http, IOptions<PaymentOptions> op
 
         try
         {
-            using var response = await http.PostAsync(TokenUrl, new FormUrlEncodedContent(form), cancellationToken);
+            using var response = await httpClients.CreateClient(PaymentsBuilder.HttpClientName).PostAsync(TokenUrl, new FormUrlEncodedContent(form), cancellationToken);
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
             if (json.RootElement.GetProperty("status").GetString() == "success")
             {
-                return new PaymentStart(null, "https://www.paytr.com/odeme/guvenli/" + json.RootElement.GetProperty("token").GetString(), null);
+                return PaymentStart.Frame(FramePrefix + json.RootElement.GetProperty("token").GetString());
             }
 
             var reason = json.RootElement.TryGetProperty("reason", out var r) ? r.GetString() : null;
             logger.LogWarning("PayTR ödeme başlatılamadı: {Reason}", reason);
             return PaymentStart.Failed("Ödeme sayfası açılamadı. Lütfen daha sonra tekrar deneyin.");
         }
-        catch (Exception ex) when (ex is HttpRequestException or JsonException or KeyNotFoundException or TaskCanceledException)
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or KeyNotFoundException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
             logger.LogError(ex, "PayTR'ye bağlanılamadı");
             return PaymentStart.Failed("Ödeme sistemine bağlanılamadı. Lütfen daha sonra tekrar deneyin.");
         }
     }
 
-    public Task<PaymentNotification?> VerifyCallbackAsync(IFormCollection form, CancellationToken cancellationToken)
+    public Task<PaymentNotification?> VerifyCallbackAsync(IFormCollection form, IPaymentProviderSettings settings, CancellationToken cancellationToken)
     {
         string oid = form["merchant_oid"].ToString(), status = form["status"].ToString(), total = form["total_amount"].ToString();
-        var expected = Sign(oid + Settings.MerchantSalt + status + total);
+        var expected = Sign(settings, oid + settings["MerchantSalt"] + status + total);
         if (!CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expected), Encoding.ASCII.GetBytes(form["hash"].ToString())))
         {
             logger.LogWarning("PayTR bildiriminin imzası geçersiz ({OrderId})", oid);
@@ -95,11 +106,13 @@ internal sealed class PayTrProvider(HttpClient http, IOptions<PaymentOptions> op
     public IResult Acknowledge(PaymentNotification? notification, string successUrl, string failUrl) =>
         notification is null ? Results.BadRequest("PAYTR notification failed: bad hash") : Results.Text("OK");
 
+    public bool AllowsFrame(string url) => url.StartsWith(FramePrefix, StringComparison.Ordinal);
+
     private static string ToKurus(decimal amount) => ((long)decimal.Round(amount * 100)).ToString(CultureInfo.InvariantCulture);
 
-    private string Sign(string value)
+    internal static string Sign(IPaymentProviderSettings settings, string value)
     {
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(Settings.MerchantKey));
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(settings["MerchantKey"]));
         return Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(value)));
     }
 }

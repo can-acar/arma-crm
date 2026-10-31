@@ -3,6 +3,7 @@
     <Project Path="src/Arma.AppHost/Arma.AppHost.csproj" />
     <Project Path="src/Arma.Host/Arma.Host.csproj" />
     <Project Path="src/Arma.Infrastructure/Arma.Infrastructure.csproj" />
+    <Project Path="src/Arma.Payments/Arma.Payments.csproj" />
     <Project Path="src/Arma.ServiceDefaults/Arma.ServiceDefaults.csproj" />
     <Project Path="src/Arma.SharedKernel/Arma.SharedKernel.csproj" />
     <Project Path="src/Arma.UI/Arma.UI.csproj" />

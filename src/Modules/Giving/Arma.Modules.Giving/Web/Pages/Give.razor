@@ -14,7 +14,7 @@
         <p class="text-muted-foreground text-sm">Desteğiniz için teşekkür ederiz. Ödeme, güvenli ödeme sayfasında kartla yapılır.</p>
     </div>
 
-    @if (!Online.IsEnabled)
+    @if (options.Count == 0)
     {
         <Alert><AlertDescription>Çevrim içi bağış şu an kapalı.</AlertDescription></Alert>
     }
@@ -44,6 +44,39 @@
                                 }
                             </InputSelect>
                         </div>
+                    }
+
+                    @if (options.Any(o => o.SupportsMonthly))
+                    {
+                        <label class="flex items-start gap-2 text-sm">
+                            <InputCheckbox id="monthly" @bind-Value="Input.Monthly" class="@($"{Styles.Checkbox} mt-0.5")" />
+                            <span>
+                                Her ay tekrarla
+                                <span class="text-muted-foreground block">Kartınız ödeme kuruluşunda saklanır ve her ay aynı gün bu tutar çekilir. Dilediğiniz zaman bağışçı portalından durdurabilirsiniz.@(options.Any(o => !o.SupportsMonthly) ? $" Yalnızca şu ödeme yöntemlerinde: {string.Join(", ", options.Where(o => o.SupportsMonthly).Select(o => o.DisplayName))}." : "")</span>
+                            </span>
+                        </label>
+                    }
+
+                    @if (options.Count > 1)
+                    {
+                        <fieldset class="grid gap-2">
+                            <legend class="mb-2 text-sm font-medium">Ödeme yöntemi</legend>
+                            <InputRadioGroup @bind-Value="Input.Provider">
+                                @foreach (var option in options)
+                                {
+                                    <label class="flex items-start gap-2 rounded-md border p-3 text-sm">
+                                        <InputRadio Value="option.Key" class="mt-0.5" />
+                                        <span>
+                                            <span class="font-medium">@option.DisplayName</span>
+                                            @if (option.Description is not null)
+                                            {
+                                                <span class="text-muted-foreground block">@option.Description</span>
+                                            }
+                                        </span>
+                                    </label>
+                                }
+                            </InputRadioGroup>
+                        </fieldset>
                     }
 
                     <div class="grid grid-cols-2 gap-4">
@@ -85,6 +118,7 @@
 @code {
     private static readonly System.Globalization.CultureInfo Turkish = System.Globalization.CultureInfo.GetCultureInfo("tr-TR");
     private IReadOnlyList<FundView> funds = [];
+    private IReadOnlyList<PaymentOption> options = [];
     private string? organization, error;
 
     [CascadingParameter] private Microsoft.AspNetCore.Http.HttpContext HttpContext { get; set; } = default!;
@@ -95,6 +129,8 @@
     {
         Input ??= new();
         funds = await Funds.PublicAsync();
+        options = await Online.OptionsAsync();
+        Input.Provider ??= options.FirstOrDefault()?.Key;
         var settings = await Donations.ReceiptSettingsAsync();
         organization = settings.OrganizationName.Length > 0 ? settings.OrganizationName : null;
     }
@@ -123,7 +159,7 @@
         var urls = new OnlineGivingUrls($"{request.Scheme}://{request.Host}{request.PathBase}");
         var ip = HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "127.0.0.1";
         var result = await Online.StartAsync(new OnlineDonationRequest(Input.FirstName, Input.LastName, Input.Email, Input.Phone, amount,
-            Guid.TryParse(Input.FundId, out var fundId) ? fundId : null), ip, urls);
+            Guid.TryParse(Input.FundId, out var fundId) ? fundId : null) { Provider = Input.Provider, Monthly = Input.Monthly }, ip, urls);
         if (!result.IsSuccess)
         {
             error = result.Error!.Message;
@@ -155,5 +191,9 @@
         public string? Website { get; set; }
 
         public bool Consent { get; set; }
+
+        public string? Provider { get; set; }
+
+        public bool Monthly { get; set; }
     }
 }
