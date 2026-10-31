@@ -52,6 +52,7 @@ public class ModuleBoundaryTests
         ["Arma.Modules.Campaigns"] = typeof(Arma.Modules.Campaigns.CampaignsModule).Assembly,
         ["Arma.Modules.Cases"] = typeof(Arma.Modules.Cases.CasesModule).Assembly,
         ["Arma.Modules.Grants"] = typeof(Arma.Modules.Grants.GrantsModule).Assembly,
+        ["Arma.Modules.Webhooks"] = typeof(Arma.Modules.Webhooks.WebhooksModule).Assembly,
         ["Arma.Modules.Forms"] = typeof(Arma.Modules.Forms.FormsModule).Assembly,
         ["Arma.Modules.Giving"] = typeof(Arma.Modules.Giving.GivingModule).Assembly,
         ["Arma.Modules.Identity"] = typeof(Arma.Modules.Identity.IdentityModule).Assembly,

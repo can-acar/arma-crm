@@ -49,6 +49,9 @@
   <Folder Name="/src/Modules/Grants/">
     <Project Path="src/Modules/Grants/Arma.Modules.Grants/Arma.Modules.Grants.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Webhooks/">
+    <Project Path="src/Modules/Webhooks/Arma.Modules.Webhooks/Arma.Modules.Webhooks.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Forms/">
     <Project Path="src/Modules/Forms/Arma.Modules.Forms/Arma.Modules.Forms.csproj" />
   </Folder>
