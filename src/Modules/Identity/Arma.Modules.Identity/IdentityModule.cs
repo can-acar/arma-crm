@@ -15,7 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Arma.Modules.Identity;
 
-public sealed class IdentityModule : IModule
+public sealed class IdentityModule : IModule, INavigationContributor
 {
     public const string LoginPath = "/account/login";
 
@@ -55,7 +55,7 @@ public sealed class IdentityModule : IModule
             options.Cookie.SameSite = SameSiteMode.Lax;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
             options.LoginPath = LoginPath;
-            options.AccessDeniedPath = LoginPath;
+            options.AccessDeniedPath = "/account/access-denied";
             options.ExpireTimeSpan = TimeSpan.FromHours(8);
             options.SlidingExpiration = true;
 
@@ -64,7 +64,12 @@ public sealed class IdentityModule : IModule
             options.Events.OnRedirectToAccessDenied = context => RedirectOrStatus(context.HttpContext, context.RedirectUri, StatusCodes.Status403Forbidden);
         });
 
+        // Kilitlenen veya rolü değişen kullanıcının açık oturumu en geç bu sürede güncellenir.
+        services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(1));
+
         services.AddScoped<UserProvisioning>();
+        services.AddScoped<UserAdministration>();
+        services.AddSingleton<INavigationContributor>(this);
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints) => AccountEndpoints.Map(endpoints);
@@ -81,6 +86,9 @@ public sealed class IdentityModule : IModule
             await roles.CreateAsync(new IdentityRole<Guid>(UserProvisioning.AdministratorRole) { Id = Guid.CreateVersion7() });
         }
     }
+
+    public IEnumerable<NavigationItem> GetNavigationItems() =>
+        [new NavigationItem("Kullanıcılar", "admin/users", 90, UserProvisioning.AdministratorRole)];
 
     private static Task RedirectOrStatus(HttpContext context, string redirectUri, int statusCode)
     {

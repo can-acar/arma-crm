@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Arma.Host;
 using Arma.Host.Components;
+using Arma.Host.Identity;
 using Arma.Modules.Identity.Application;
 using Arma.SharedKernel.Tenancy;
 
@@ -22,6 +23,7 @@ foreach (var module in ArmaModules.All)
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddCurrentUser();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -81,6 +83,7 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseCurrentUser();
 app.UseAntiforgery();
 
 app.MapStaticAssets().AllowAnonymous();

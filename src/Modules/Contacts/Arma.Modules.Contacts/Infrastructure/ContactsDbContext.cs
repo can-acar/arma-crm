@@ -1,11 +1,12 @@
 using Arma.Modules.Contacts.Domain;
 using Arma.SharedKernel.Domain;
+using Arma.SharedKernel.Identity;
 using Arma.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace Arma.Modules.Contacts.Infrastructure;
 
-public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> options, ITenantContext tenant, TimeProvider clock)
+public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> options, ITenantContext tenant, ICurrentUser currentUser, TimeProvider clock)
     : DbContext(options)
 {
     public const string Schema = "contacts";
@@ -44,16 +45,19 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var now = clock.GetUtcNow();
+        var userId = currentUser.UserId?.ToString();
         foreach (var entry in ChangeTracker.Entries<Entity>())
         {
             if (entry.State == EntityState.Added)
             {
                 entry.Entity.TenantId = tenantId;
                 entry.Entity.CreatedAt = now;
+                entry.Entity.CreatedBy = userId;
             }
             else if (entry.State == EntityState.Modified)
             {
                 entry.Entity.UpdatedAt = now;
+                entry.Entity.UpdatedBy = userId;
             }
         }
 
