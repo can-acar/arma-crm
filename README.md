@@ -27,7 +27,7 @@ src/
   Arma.ServiceDefaults/   OpenTelemetry, sağlık kontrolleri, dayanıklı HTTP istemcileri
   Arma.AppHost/           .NET Aspire ile yerel geliştirme ortamı
   Modules/
-    Identity/             Kullanıcılar, roller, giriş/çıkış, iki adımlı doğrulama (ASP.NET Core Identity, çerez oturumu)
+    Identity/             Kullanıcılar ve yönetimi, roller, giriş/çıkış, iki adımlı doğrulama (ASP.NET Core Identity)
     Contacts/             Kişiler modülü (Domain, Application, Infrastructure, Web) + Contracts
 tests/
   Arma.Modules.Contacts.Tests/   TCKN/VKN kontrolleri, kişi kuralları
@@ -64,6 +64,7 @@ dotnet run --project src/Arma.Host -- create-admin admin@ornek.com.tr "Ad Soyad"
 
 Giriş yaptıktan sonra kenar çubuğundaki **Hesap güvenliği** sayfasından iki adımlı doğrulama
 (Google/Microsoft Authenticator gibi TOTP uygulamaları) açılabilir; açılışta 10 kurtarma kodu bir kez gösterilir.
+Yöneticiler **Kullanıcılar** sayfasından (`/admin/users`) kullanıcı ekler, kilitler, yönetici yapar ve 2FA'yı sıfırlar.
 
 **Testler:**
 
@@ -106,6 +107,9 @@ docker compose run --rm -it migrate create-admin admin@ornek.com.tr "Ad Soyad"
 - Her sayfa ve API uç noktası varsayılan olarak oturum ister (yetkilendirme fallback politikası).
   Herkese açık olanlar (giriş sayfası, sağlık kontrolleri, statik dosyalar) `AllowAnonymous` ile işaretlenir.
   Oturumsuz API çağrıları yönlendirilmez, `401` döner.
+- Kilitlenen ya da rolü değişen kullanıcının açık oturumu en geç 1 dakikada güncellenir (security stamp doğrulaması).
+- Kayıtların `created_by` / `updated_by` alanları `ICurrentUser` üzerinden oturumdaki kullanıcının kimliğiyle dolar.
+  Blazor devrelerinde HttpContext güvenilir olmadığından kullanıcı, istekte ara katman, devrede `CircuitHandler` ile atanır.
 - Oturum çerezlerini koruyan Data Protection anahtarları `identity.data_protection_keys` tablosundadır;
   konteyner yenilense de oturumlar düşmez.
 - Arayüz kodu yalnızca `Arma.UI` bileşenlerini kullanır; sayfalarda yerleşim dışında ham Tailwind sınıfı
@@ -113,10 +117,10 @@ docker compose run --rm -it migrate create-admin admin@ornek.com.tr "Ad Soyad"
 
 ## Sıradaki adımlar (Faz 0'dan kalanlar)
 
-- Kimlik: kurum genelinde 2FA zorunluluğu, kullanıcı yönetimi ekranı, parola sıfırlama (e-posta altyapısı gerekiyor).
+- Kimlik: kurum genelinde 2FA zorunluluğu, parola sıfırlama ve davet e-postası (e-posta altyapısı gerekiyor),
+  rollerin kuruma bağlanması ve modül bazında yetkiler.
 - Kimlik: dış istemciler için OpenIddict ile token tabanlı API erişimi.
-- Kimlik tabloları için Row Level Security (şu an yalnızca EF sorgu filtresi var) ve kayıtların
-  `created_by` / `updated_by` alanlarının oturumdaki kullanıcıdan doldurulması.
+- Kimlik tabloları için Row Level Security (şu an yalnızca EF sorgu filtresi var).
 - `Arma.UI`: Dialog, Select, Combobox, Dropdown Menu, Sheet, Tabs, Toast, Data Table.
 - Wolverine ile modüller arası olaylar ve outbox.
 - Windows Server (IIS) kurulum paketi.

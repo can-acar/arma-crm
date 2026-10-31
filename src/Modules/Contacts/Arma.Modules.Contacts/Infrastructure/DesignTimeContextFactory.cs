@@ -1,3 +1,4 @@
+using Arma.SharedKernel.Identity;
 using Arma.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
@@ -14,11 +15,16 @@ internal sealed class DesignTimeContextFactory : IDesignTimeDbContextFactory<Con
             .UseSnakeCaseNamingConvention()
             .Options;
 
-        return new ContactsDbContext(options, new DesignTimeTenant(), TimeProvider.System);
+        return new ContactsDbContext(options, new DesignTimeTenant(), new NoUser(), TimeProvider.System);
     }
 
     private sealed class DesignTimeTenant : ITenantContext
     {
         public Guid TenantId => Guid.Empty;
+    }
+
+    private sealed class NoUser : ICurrentUser
+    {
+        public Guid? UserId => null;
     }
 }
