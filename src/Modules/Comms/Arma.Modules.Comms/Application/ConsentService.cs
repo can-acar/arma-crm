@@ -91,7 +91,7 @@ public sealed class ConsentService(
         var recipient = consent.Channel == Channel.Email ? consent.Address : "+90" + consent.Address;
         var source = consent.Source switch
         {
-            "form" or "unsubscribe" => "HS_WEB",
+            "form" or "unsubscribe" or "portal" => "HS_WEB",
             "import" => "HS_EORTAM",
             _ => "HS_FIZIKSEL_ORTAM",
         };

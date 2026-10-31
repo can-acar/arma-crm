@@ -1,8 +1,12 @@
 @page "/donations/{Id:guid}/receipt"
+@page "/portal/makbuz/{Id:guid}"
 @layout PlainLayout
-@attribute [Authorize(Policy = GivingPermissions.Read)]
+@* Bağışçı portalından da açılır; yetki aşağıda kodla denetlenir: bağış izni ya da bağışın sahibi portal oturumu. *@
+@attribute [AllowAnonymous]
 @inject DonationService Donations
 @inject IContactDirectory Directory
+@inject ICurrentUser CurrentUser
+@inject Arma.SharedKernel.Portal.IPortalSession Portal
 
 <PageTitle>Makbuz @donation?.ReceiptNumber · Arma CRM</PageTitle>
 
@@ -16,7 +20,7 @@ else
 {
     <div class="mx-auto max-w-2xl p-6 print:max-w-none print:p-0">
         <div class="mb-4 flex justify-end gap-2 print:hidden">
-            <Button Variant="ButtonVariant.Outline" Href="@($"donations/{donation.Id}")">Geri</Button>
+            <Button Variant="ButtonVariant.Outline" Href="@(staff ? $"donations/{donation.Id}" : "portal/hesap")">Geri</Button>
             <button type="button" class="@ButtonVariants.For(ButtonVariant.Default, ButtonSize.Default)" onclick="window.print()">Yazdır</button>
         </div>
 
@@ -77,12 +81,19 @@ else
     private DonationView? donation;
     private ContactSummary? donor;
     private ReceiptSettings settings = new();
+    private bool staff;
 
     [Parameter] public Guid Id { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
+        staff = CurrentUser.HasPermission(GivingPermissions.Read);
         donation = await Donations.GetAsync(Id);
+        if (donation is not null && !staff && await Portal.ContactIdAsync() != donation.ContactId)
+        {
+            donation = null;
+        }
+
         settings = await Donations.ReceiptSettingsAsync();
         if (donation is not null)
         {

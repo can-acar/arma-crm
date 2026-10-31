@@ -37,7 +37,7 @@ public sealed record ParticipantView(
     RegistrationStatus Status, PaymentState Payment, decimal Amount, string Code, string Source, DateTimeOffset RegisteredAt,
     DateTimeOffset? CheckedInAt, string? Note);
 
-public sealed record ContactRegistrationView(Guid Id, Guid EventId, string EventTitle, DateTimeOffset StartsAt, string? TicketName, RegistrationStatus Status, PaymentState Payment, DateTimeOffset? CheckedInAt);
+public sealed record ContactRegistrationView(Guid Id, Guid EventId, string EventTitle, DateTimeOffset StartsAt, string? TicketName, RegistrationStatus Status, PaymentState Payment, DateTimeOffset? CheckedInAt, string Code = "");
 
 public sealed record TicketPageView(string Code, string Name, string EventTitle, DateTimeOffset StartsAt, DateTimeOffset EndsAt, string? Location, string? TicketName,
     RegistrationStatus Status, PaymentState Payment, decimal Amount, DateTimeOffset? CheckedInAt, EventStatus EventStatus);
@@ -446,7 +446,7 @@ public sealed class EventService(
             .Join(db.Events, r => r.EventId, e => e.Id, (r, e) => new { r, e })
             .OrderByDescending(x => x.e.StartsAt)
             .Select(x => new ContactRegistrationView(x.r.Id, x.e.Id, x.e.Title, x.e.StartsAt,
-                db.TicketTypes.Where(t => t.Id == x.r.TicketTypeId).Select(t => t.Name).FirstOrDefault(), x.r.Status, x.r.Payment, x.r.CheckedInAt))
+                db.TicketTypes.Where(t => t.Id == x.r.TicketTypeId).Select(t => t.Name).FirstOrDefault(), x.r.Status, x.r.Payment, x.r.CheckedInAt, x.r.Code))
             .ToListAsync(cancellationToken);
 
     /// <summary>Bilet sayfası; kod bilinmeden erişilemez.</summary>

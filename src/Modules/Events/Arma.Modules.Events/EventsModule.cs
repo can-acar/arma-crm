@@ -33,6 +33,7 @@ public sealed class EventsModule : IModule, INavigationContributor
         services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<EventsInsights>());
         services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<EventsInsights>());
         services.AddSingleton<IContactPanel, EventsPanel>();
+        services.AddSingleton<Arma.SharedKernel.Portal.IPortalSection, EventsPortalSection>();
         services.AddScoped<ICampaignSource, EventCampaignSource>();
         services.AddSingleton<INavigationContributor>(this);
     }
@@ -49,6 +50,17 @@ public sealed class EventsModule : IModule, INavigationContributor
     [
         new("Etkinlikler", "events", 38, EventsPermissions.Read),
     ];
+
+    private sealed class EventsPortalSection : Arma.SharedKernel.Portal.IPortalSection
+    {
+        public string Key => "events";
+
+        public string Title => "Etkinliklerim";
+
+        public int Order => 30;
+
+        public Type ComponentType => typeof(Web.Pages.PortalEvents);
+    }
 
     private sealed class EventsPanel : IContactPanel
     {

@@ -455,6 +455,19 @@ public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimePr
         return rows.ToDictionary(c => c.Id, c => c.ToSummary());
     }
 
+    public async Task<ContactSummary?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalized = email?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return null;
+        }
+
+        var contact = await db.Contacts.AsNoTracking().Where(c => c.Email != null && c.Email.ToLower() == normalized)
+            .OrderBy(c => c.CreatedAt).FirstOrDefaultAsync(cancellationToken);
+        return contact?.ToSummary();
+    }
+
     public async Task<IReadOnlyList<ContactSummary>> SearchAsync(string term, int take = 10, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(term))

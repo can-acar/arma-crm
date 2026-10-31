@@ -1,8 +1,12 @@
 @page "/donations/annual/{ContactId:guid}/{Year:int}"
+@page "/portal/yillik/{Year:int}"
 @layout PlainLayout
-@attribute [Authorize(Policy = GivingPermissions.Read)]
+@* Bağışçı portalından da açılır: portal adresinde kişi oturumdan alınır, yönetim adresinde bağış izni gerekir. *@
+@attribute [AllowAnonymous]
 @inject DonationService Donations
 @inject IContactDirectory Directory
+@inject ICurrentUser CurrentUser
+@inject Arma.SharedKernel.Portal.IPortalSession Portal
 
 <PageTitle>@Year bağış özeti · Arma CRM</PageTitle>
 
@@ -16,9 +20,9 @@ else
 {
     <div class="mx-auto max-w-3xl p-6 print:max-w-none print:p-0">
         <div class="mb-4 flex flex-wrap justify-end gap-2 print:hidden">
-            <Button Variant="ButtonVariant.Outline" Href="@($"contacts/{ContactId}")">Kişiye dön</Button>
-            <Button Variant="ButtonVariant.Outline" Href="@($"donations/annual/{ContactId}/{Year - 1}")">@(Year - 1)</Button>
-            <Button Variant="ButtonVariant.Outline" Href="@($"donations/annual/{ContactId}/{Year + 1}")">@(Year + 1)</Button>
+            <Button Variant="ButtonVariant.Outline" Href="@(portal ? "portal/hesap" : $"contacts/{ContactId}")">@(portal ? "Hesabıma dön" : "Kişiye dön")</Button>
+            <Button Variant="ButtonVariant.Outline" Href="@YearLink(Year - 1)">@(Year - 1)</Button>
+            <Button Variant="ButtonVariant.Outline" Href="@YearLink(Year + 1)">@(Year + 1)</Button>
             <button type="button" class="@ButtonVariants.For(ButtonVariant.Default, ButtonSize.Default)" onclick="window.print()">Yazdır</button>
         </div>
 
@@ -102,14 +106,28 @@ else
     private Arma.Modules.Giving.Application.AnnualStatement? statement;
     private ReceiptSettings settings = new();
 
+    private bool portal;
+
     [Parameter] public Guid ContactId { get; set; }
 
     [Parameter] public int Year { get; set; }
 
     protected override async Task OnParametersSetAsync()
     {
-        donor = await Directory.FindAsync(ContactId);
+        portal = ContactId == Guid.Empty;
+        if (portal)
+        {
+            ContactId = await Portal.ContactIdAsync() ?? Guid.Empty;
+        }
+        else if (!CurrentUser.HasPermission(GivingPermissions.Read))
+        {
+            ContactId = Guid.Empty;
+        }
+
+        donor = ContactId == Guid.Empty ? null : await Directory.FindAsync(ContactId);
         settings = await Donations.ReceiptSettingsAsync();
         statement = donor is null || Year is < 2000 or > 2100 ? null : await Donations.AnnualStatementAsync(donor.Id, Year);
     }
+
+    private string YearLink(int year) => portal ? $"portal/yillik/{year}" : $"donations/annual/{ContactId}/{year}";
 }

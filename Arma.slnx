@@ -52,6 +52,9 @@
   <Folder Name="/src/Modules/Webhooks/">
     <Project Path="src/Modules/Webhooks/Arma.Modules.Webhooks/Arma.Modules.Webhooks.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Portal/">
+    <Project Path="src/Modules/Portal/Arma.Modules.Portal/Arma.Modules.Portal.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Forms/">
     <Project Path="src/Modules/Forms/Arma.Modules.Forms/Arma.Modules.Forms.csproj" />
   </Folder>

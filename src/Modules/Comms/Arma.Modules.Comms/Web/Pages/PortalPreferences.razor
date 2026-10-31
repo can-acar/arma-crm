@@ -1,0 +1,85 @@
+@using Arma.SharedKernel.Portal
+@inject ConsentService Consents
+@inject IPortalSession Portal
+
+@* Bağışçı portalında ticari ileti izinleri. Statik sayfada form ile kaydedilir. *@
+<Card>
+    <CardHeader>
+        <CardTitle>İletişim tercihlerim</CardTitle>
+        <CardDescription>Duyuru, kampanya ve etkinlik iletilerini hangi kanaldan almak istediğinizi seçin. Makbuz gibi bilgilendirme iletileri bu tercihten bağımsız gönderilir.</CardDescription>
+    </CardHeader>
+    <CardContent>
+        @if (saved)
+        {
+            <Alert Class="mb-4"><AlertDescription>Tercihleriniz kaydedildi.</AlertDescription></Alert>
+        }
+        <FormAlert Error="@error" />
+        <form method="post" class="grid gap-3" @formname="portal-preferences" @onsubmit="SaveAsync">
+            <AntiforgeryToken />
+            <input type="hidden" name="Input.Submitted" value="1" />
+            @foreach (var consent in consents.Where(c => c.Channel is Channel.Email or Channel.Sms))
+            {
+                var name = consent.Channel == Channel.Email ? "Input.Email" : "Input.Sms";
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="@name" value="true" checked="@(consent.Status == ConsentStatus.Approved)" class="accent-primary size-4" />
+                    @(consent.Channel == Channel.Email ? "E-posta ile duyuru almak istiyorum" : "SMS ile duyuru almak istiyorum")
+                </label>
+            }
+            <div><Button Type="submit" Variant="ButtonVariant.Outline">Tercihleri kaydet</Button></div>
+        </form>
+    </CardContent>
+</Card>
+
+@code {
+    private IReadOnlyList<ConsentView> consents = [];
+    private string? error;
+    private bool saved;
+
+    [Parameter] public Guid ContactId { get; set; }
+
+    [SupplyParameterFromForm(FormName = "portal-preferences")] private PreferencesInput? Input { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Input ??= new();
+        consents = await Consents.ForContactAsync(ContactId);
+    }
+
+    private async Task SaveAsync()
+    {
+        // Form, sayfayı açan kişinin oturumuyla eşleşmeli; başka birinin tercihi değiştirilemez.
+        if (await Portal.ContactIdAsync() != ContactId || Input?.Submitted != "1")
+        {
+            return;
+        }
+
+        foreach (var (channel, wanted) in new[] { (Channel.Email, Input.Email), (Channel.Sms, Input.Sms) })
+        {
+            var current = consents.First(c => c.Channel == channel).Status;
+            var target = wanted ? ConsentStatus.Approved : ConsentStatus.Rejected;
+            // Hiç izin kaydı olmayan kanal, kişi işaretlemedikçe "bilinmiyor" olarak kalır.
+            if (current == target || (!wanted && current == ConsentStatus.Unknown))
+            {
+                continue;
+            }
+
+            var result = await Consents.SetAsync(ContactId, channel, target, "portal");
+            if (!result.IsSuccess)
+            {
+                error = result.Error!.Message;
+            }
+        }
+
+        consents = await Consents.ForContactAsync(ContactId);
+        saved = error is null;
+    }
+
+    private sealed class PreferencesInput
+    {
+        public string? Submitted { get; set; }
+
+        public bool Email { get; set; }
+
+        public bool Sms { get; set; }
+    }
+}

@@ -331,6 +331,19 @@ Gövde `{"id", "type", "createdAt", "data"}` biçiminde JSON'dur; `data` olayın
 - Gönderimler dakikada bir yapılır. 2xx dışı yanıt veya bağlantı hatasında 1 dk, 5 dk, 30 dk, 2 sa, 6 sa ve 24 sa sonra yeniden denenir; ardından "Başarısız" olur ve ekrandan elle yeniden denenebilir. 30 günden eski gönderim kayıtları silinir.
 - Adres https olmalıdır; yerel ağdaki http bir alıcı için `Arma__Webhooks__AllowHttp=true` verilebilir (127.0.0.1 her zaman izinlidir). Yönlendirmeler izlenmez, istek 10 saniyede zaman aşımına uğrar.
 
+## Bağışçı portalı
+
+Bağışçılar `/portal` adresinden parolasız girer: e-postasını yazan kişiye, adres bir kişi kaydında varsa 30 dakika geçerli, tek kullanımlık bir giriş bağlantısı gider (aynı adrese dakikada en fazla bir bağlantı). Adresin kayıtlı olup olmadığı ekranda belli edilmez. Bağlantı açılınca bir düğmeyle onaylanır; böylece bağlantıyı önizleyen e-posta istemcileri onu harcamaz. Oturum 7 gün geçerli, şifreli bir çerezde tutulur.
+
+Portalda kişi yalnızca kendi kayıtlarını görür:
+
+- **Bağışlarım:** toplamlar, tamamlanan bağışlar ve kesilmiş makbuzlar (`/portal/makbuz/{id}`), yıllık bağış özeti (`/portal/yillik/{yıl}`), açık taahhütler.
+- **Üyeliğim:** üyelik durumu ve üye kartı.
+- **Etkinliklerim:** yaklaşan kayıtlar ve bilet bağlantısı.
+- **İletişim tercihlerim:** e-posta ve SMS ile duyuru izni; değişiklik İYS'ye "web" kaynağıyla gider.
+
+Bağlantıların doğru adresi göstermesi için `Comms__PublicUrl` (örneğin `https://crm.kurum.org`) ve e-posta gönderimi ayarlı olmalıdır. Web sitenize "Bağış geçmişim" gibi bir bağlantıyla `https://crm.kurum.org/portal` adresini koyabilirsiniz. Modüller portala kendi bölümlerini `IPortalSection` ile ekler.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`

@@ -1,0 +1,44 @@
+@page "/portal/giris"
+@layout PortalLayout
+@attribute [AllowAnonymous]
+@inject PortalService Portal
+@inject NavigationManager Navigation
+
+<PageTitle>Bağışçı portalı · Giriş</PageTitle>
+
+<Card Class="mx-auto max-w-md">
+    <CardHeader>
+        <CardTitle><h1 class="text-xl">Giriş yap</h1></CardTitle>
+        <CardDescription>@(valid ? "Hesabınıza girmek için onaylayın." : "Bu bağlantı geçersiz, süresi dolmuş veya daha önce kullanılmış.")</CardDescription>
+    </CardHeader>
+    <CardContent>
+        @if (valid)
+        {
+            @* Bağlantı önizleyen e-posta istemcileri tek kullanımlık bağlantıyı harcamasın diye giriş bir düğmeyle onaylanır. *@
+            <form method="post" @formname="portal-confirm" @onsubmit="SignInAsync">
+                <AntiforgeryToken />
+                <input type="hidden" name="Token" value="@(Token ?? T)" />
+                <Button Type="submit">Portala gir</Button>
+            </form>
+        }
+        else
+        {
+            <Button Href="portal">Yeni bağlantı iste</Button>
+        }
+    </CardContent>
+</Card>
+
+@code {
+    private bool valid;
+
+    [SupplyParameterFromQuery] public string? T { get; set; }
+
+    [SupplyParameterFromForm] public string? Token { get; set; }
+
+    protected override void OnInitialized() => valid = Portal.ReadLink(Token ?? T) is not null;
+
+    private async Task SignInAsync()
+    {
+        Navigation.NavigateTo(await Portal.SignInAsync(Token) ? "portal/hesap" : "portal?hata=1");
+    }
+}
