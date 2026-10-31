@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using System.Globalization;
 using System.Net.Mail;
 using System.Text;
@@ -226,7 +227,7 @@ public sealed class FormService(FormsDbContext db, IContactRegistry registry, IC
                 now, SourceModule, submission.Id.ToString()));
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return submission.Id;
     }
 

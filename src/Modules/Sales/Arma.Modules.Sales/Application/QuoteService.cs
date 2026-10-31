@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using Arma.Modules.Activities.Contracts;
 using Arma.Modules.Contacts.Contracts;
 using Arma.Modules.Sales.Domain;
@@ -121,7 +122,7 @@ public sealed class QuoteService(SalesDbContext db, SalesService sales, IContact
                 clock.GetUtcNow(), SalesService.SourceModule, $"quote:{quote.Id}"));
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
 
         if (quote.OpportunityId is { } opportunityId && status is QuoteStatus.Accepted or QuoteStatus.Rejected)
         {

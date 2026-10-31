@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using System.Globalization;
 using Arma.Modules.Activities.Contracts;
 using Arma.Modules.Contacts.Contracts;
@@ -189,7 +190,7 @@ public sealed class SalesService(SalesDbContext db, IContactDirectory contacts, 
 
         outbox.Enroll(db);
         await outbox.PublishAsync(Timeline(item, $"Satış fırsatı: {item.Title}", stage.Name));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return item.Id;
     }
 
@@ -215,7 +216,7 @@ public sealed class SalesService(SalesDbContext db, IContactDirectory contacts, 
         var stage = await db.Stages.AsNoTracking().FirstAsync(s => s.Id == item.StageId, cancellationToken);
         outbox.Enroll(db);
         await outbox.PublishAsync(Timeline(item, Subject(item, stage), stage.Name));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return id;
     }
 
@@ -257,7 +258,7 @@ public sealed class SalesService(SalesDbContext db, IContactDirectory contacts, 
             await outbox.PublishAsync(Timeline(item, Subject(item, stage), stage.Kind == StageKind.Lost ? item.LostReason : stage.Name));
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return id;
     }
 
@@ -272,7 +273,7 @@ public sealed class SalesService(SalesDbContext db, IContactDirectory contacts, 
         db.Opportunities.Remove(item);
         outbox.Enroll(db);
         await outbox.PublishAsync(new RemoveTimelineEntry(SourceModule, item.Id.ToString()));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return id;
     }
 

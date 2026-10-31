@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using Arma.Modules.Comms.Contracts;
 using Arma.Modules.Events.Domain;
 using Arma.Modules.Events.Infrastructure;
@@ -39,7 +40,7 @@ internal sealed class EventReminderJob(EventsDbContext db, IDbContextOutbox outb
                 $"\"{row.e.Title}\" etkinliği yarın.\n\nTarih: {EventService.When(row.e)}{place}\n\nGirişte bilet kodunuzu gösterin: {row.r.Code}"));
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return due.Count;
     }
 }

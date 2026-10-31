@@ -31,6 +31,7 @@ public sealed class ContactsModule : IModule, INavigationContributor
         services.AddScoped<IContactRegistry>(sp => sp.GetRequiredService<ContactService>());
         services.AddScoped<TaxonomyService>();
         services.AddScoped<IContactAudiences, ContactAudiences>();
+        services.AddScoped<IContactSegments>(sp => sp.GetRequiredService<ContactSearchService>());
         services.AddScoped<ContactTransferService>();
         services.AddScoped<ContactSearchService>();
         services.AddScoped<IDashboardContributor, ContactsDashboard>();

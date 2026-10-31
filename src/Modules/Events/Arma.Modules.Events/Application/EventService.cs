@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using System.Globalization;
 using System.Text;
 using Arma.Modules.Activities.Contracts;
@@ -172,7 +173,7 @@ public sealed class EventService(
                 $"{When(item)} tarihindeki \"{item.Title}\" etkinliği iptal edildi.{(string.IsNullOrWhiteSpace(message) ? "" : $"\n\n{message.Trim()}")}"));
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return id;
     }
 
@@ -271,7 +272,7 @@ public sealed class EventService(
         outbox.Enroll(db);
         await outbox.PublishAsync(Timeline(item, registration, waitlisted ? $"Etkinlik yedek listesi: {item.Title}" : $"Etkinliğe kayıt: {item.Title}"));
         await outbox.PublishAsync(Confirmation(item, registration, ticket));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         if (db.Database.CurrentTransaction is not null)
         {
             await transaction.CommitAsync(cancellationToken);
@@ -348,7 +349,7 @@ public sealed class EventService(
             await PromoteWaitlistAsync(item, cancellationToken);
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         if (db.Database.CurrentTransaction is not null)
         {
             await transaction.CommitAsync(cancellationToken);
@@ -389,7 +390,7 @@ public sealed class EventService(
         var item = await db.Events.AsNoTracking().FirstAsync(e => e.Id == eventId, cancellationToken);
         outbox.Enroll(db);
         await outbox.PublishAsync(Timeline(item, registration, $"Etkinliğe katıldı: {item.Title}"));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         var contact = await contacts.FindAsync(registration.ContactId, cancellationToken);
         var ticketName = registration.TicketTypeId is { } t ? await db.TicketTypes.Where(x => x.Id == t).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken) : null;
         return new CheckInResult(registration.Id, contact?.DisplayName ?? "(silinmiş kişi)", ticketName, registration.Payment, registration.Amount);
@@ -407,7 +408,7 @@ public sealed class EventService(
         var item = await db.Events.AsNoTracking().FirstAsync(e => e.Id == registration.EventId, cancellationToken);
         outbox.Enroll(db);
         await outbox.PublishAsync(Timeline(item, registration, $"Etkinliğe kayıt: {item.Title}"));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return id;
     }
 

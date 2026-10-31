@@ -1,3 +1,4 @@
+using Arma.Infrastructure.Messaging;
 using Arma.Modules.Comms.Domain;
 using Arma.Modules.Comms.Infrastructure;
 using Arma.Modules.Contacts.Contracts;
@@ -93,7 +94,7 @@ public sealed class MailingService(CommsDbContext db, IContactAudiences audience
 
         outbox.Enroll(db);
         await outbox.PublishAsync(new ExpandMailing(id));
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
         return id;
     }
 
@@ -145,7 +146,7 @@ public sealed class MailingService(CommsDbContext db, IContactAudiences audience
             await outbox.PublishAsync(new DeliverMessage(message.Id));
         }
 
-        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+        await outbox.SaveChangesAndPublishAsync(cancellationToken);
     }
 
     /// <summary>Bekleyen ileti kalmadıysa gönderimi tamamlandı olarak işaretler.</summary>
