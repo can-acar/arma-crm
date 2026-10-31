@@ -239,6 +239,15 @@ site klasöründe tutulmaz. Güncellemede yeni paketle aynı komut (`-CreateData
 - Bir kural aynı kişiye aynı olay için bir kez uygulanır. Kayıtlı arama kuralı açılırken aramaya zaten uyan kişiler
   istenirse atlanır. Kural ekranında son 100 çalışma görünür.
 
+## Bağış taahhütleri
+
+**Bağışlar → Taahhütler** bağışçının ileride ödemeyi üstlendiği tutarları izler ("12 ay boyunca ayda 1.000 TL"). Taahhüt kişi kartının Bağışlar sekmesinden ya da listeden eklenir: toplam tutar, para birimi, sıklık (tek sefer, aylık, üç ayda bir, yıllık), taksit sayısı, ilk vade ve isteğe bağlı fon.
+
+- Taksitler saklanmaz, tutardan hesaplanır: tutar eşit bölünür, kuruş farkı son taksite eklenir. Taahhüde bağlanan tamamlanmış bağışlar vade sırasıyla taksitleri kapatır; iade edilen bağış ödemeden düşer.
+- Bağış kaydederken bağışçının açık taahhüdü seçilebilir; taahhüt sayfasındaki **Ödeme kaydet** tutarı sıradaki taksitle, fonu taahhüdün fonuyla doldurur. Havale eşleştirmede bağışçının kalan borcu olan en eski taahhüdü varsa havale otomatik olarak ona bağlanır.
+- Vadesi geçmiş taksiti ödenmemiş taahhüt "Gecikmiş" görünür. Panoda "Geciken taahhüt" kutucuğu, gelişmiş aramada "Ödenmemiş taahhüdü var" ve "Taahhüt taksiti gecikmiş" ölçütleri bulunur.
+- İptal edilen taahhüde yeni ödeme bağlanamaz, bağlı ödemeler kalır. Ödemesi olmayan taahhüt silinebilir. Mükerrer birleştirmede taahhütler asıl kişiye taşınır; KVKK dışa aktarması taahhütleri içerir, anonimleştirme notları siler.
+
 ## Havale/EFT eşleştirme ve yıl sonu makbuzları
 
 - Bağışlar > Havale eşleştirme sayfasına internet şubesinden indirilen ekstre yüklenir: Excel (.xlsx), CSV

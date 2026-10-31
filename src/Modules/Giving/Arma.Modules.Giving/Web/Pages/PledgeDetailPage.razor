@@ -1,0 +1,216 @@
+@page "/donations/pledges/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = GivingPermissions.Read)]
+@inject PledgeService Pledges
+@inject IContactDirectory Directory
+@inject ICurrentUser CurrentUser
+@inject NavigationManager Navigation
+
+<PageTitle>Taahhüt · Arma CRM</PageTitle>
+
+@if (detail is null)
+{
+    @if (loaded)
+    {
+        <Alert><AlertTitle>Taahhüt bulunamadı</AlertTitle></Alert>
+    }
+}
+else
+{
+    var pledge = detail.Pledge;
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <p class="text-muted-foreground text-sm"><a class="hover:underline" href="donations/pledges">Taahhütler</a></p>
+                <h1 class="text-2xl font-semibold tracking-tight">@Money.Format(pledge.Amount, pledge.Currency)</h1>
+                <p class="text-sm">
+                    <a class="hover:underline" href="contacts/@pledge.ContactId">@pledge.ContactName</a>
+                    · @GivingLabels.Plan(pledge.Frequency, pledge.InstallmentCount) · @(pledge.FundName ?? "Genel")
+                    <Badge Variant="GivingLabels.StateVariant(pledge.State)" Class="ml-1">@GivingLabels.State(pledge.State)</Badge>
+                </p>
+            </div>
+            @if (canWrite)
+            {
+                <div class="flex flex-wrap gap-2">
+                    @if (pledge.State is PledgeState.Open or PledgeState.Overdue)
+                    {
+                        <Button OnClick="() => paymentOpen = true">Ödeme kaydet</Button>
+                    }
+                    <Button Variant="ButtonVariant.Outline" OnClick="() => editorOpen = true">Düzenle</Button>
+                    @if (pledge.Status == PledgeStatus.Active)
+                    {
+                        <Button Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = true">İptal et</Button>
+                    }
+                    else
+                    {
+                        <Button Variant="ButtonVariant.Outline" OnClick="ReactivateAsync">Yeniden etkinleştir</Button>
+                    }
+                    @if (detail.Payments.Count == 0)
+                    {
+                        <Button Variant="ButtonVariant.Destructive" OnClick="() => deleteOpen = true">Sil</Button>
+                    }
+                </div>
+            }
+        </div>
+
+        <FormAlert Error="@error" />
+
+        <div class="grid gap-4 sm:grid-cols-3">
+            <Card><CardHeader><CardDescription>Ödenen</CardDescription><CardTitle Class="text-lg">@Money.Format(pledge.Paid, pledge.Currency)</CardTitle></CardHeader></Card>
+            <Card><CardHeader><CardDescription>Kalan</CardDescription><CardTitle Class="text-lg">@Money.Format(pledge.Remaining, pledge.Currency)</CardTitle></CardHeader></Card>
+            <Card><CardHeader><CardDescription>Vadesi geçen</CardDescription><CardTitle Class="@(pledge.Overdue > 0 ? "text-destructive text-lg" : "text-lg")">@Money.Format(pledge.Overdue, pledge.Currency)</CardTitle></CardHeader></Card>
+        </div>
+
+        @if (pledge.CancelReason is not null || pledge.Note is not null)
+        {
+            <Card>
+                <CardContent Class="text-sm">
+                    @if (pledge.CancelReason is not null)
+                    {
+                        <p><span class="font-medium">İptal nedeni:</span> @pledge.CancelReason</p>
+                    }
+                    @if (pledge.Note is not null)
+                    {
+                        <p class="whitespace-pre-line">@pledge.Note</p>
+                    }
+                </CardContent>
+            </Card>
+        }
+
+        <div class="grid gap-6 lg:grid-cols-2">
+            <Card>
+                <CardHeader><CardTitle>Taksitler</CardTitle></CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>#</TableHead>
+                                <TableHead>Vade</TableHead>
+                                <TableHead Class="text-right">Tutar</TableHead>
+                                <TableHead Class="text-right">Ödenen</TableHead>
+                                <TableHead></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            @foreach (var item in detail.Schedule)
+                            {
+                                <TableRow>
+                                    <TableCell Class="tabular-nums">@item.Number</TableCell>
+                                    <TableCell>@GivingLabels.Date(item.DueOn)</TableCell>
+                                    <TableCell Class="text-right tabular-nums">@Money.Format(item.Amount, pledge.Currency)</TableCell>
+                                    <TableCell Class="text-right tabular-nums">@(item.Paid > 0 ? Money.Format(item.Paid, pledge.Currency) : "-")</TableCell>
+                                    <TableCell>
+                                        @if (item.IsPaid)
+                                        {
+                                            <Badge Variant="BadgeVariant.Secondary">Ödendi</Badge>
+                                        }
+                                        else if (pledge.Status == PledgeStatus.Active && item.DueOn < today)
+                                        {
+                                            <Badge Variant="BadgeVariant.Destructive">Gecikti</Badge>
+                                        }
+                                    </TableCell>
+                                </TableRow>
+                            }
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Ödemeler</CardTitle>
+                    <CardDescription>Taahhüde bağlanan bağışlar. İade edilenler ödemeden düşer.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    @if (detail.Payments.Count == 0)
+                    {
+                        <p class="text-muted-foreground text-sm">Henüz ödeme yok.</p>
+                    }
+                    else
+                    {
+                        <DonationTable Items="detail.Payments" ShowContact="false" />
+                    }
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+
+    <PledgeEditor @bind-Open="editorOpen" Editing="pledge" OnSaved="_ => LoadAsync()" />
+    <DonationEditor @bind-Open="paymentOpen" Contact="contact" Pledge="pledge" OnSaved="_ => LoadAsync()" />
+
+    <Dialog @bind-Open="cancelOpen" Class="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>Taahhüt iptal edilsin mi?</DialogTitle>
+            <DialogDescription>Bağlanmış ödemeler kalır; yeni ödeme bağlanamaz ve gecikme takibi durur.</DialogDescription>
+        </DialogHeader>
+        <Input @bind-Value="cancelReason" maxlength="300" placeholder="Neden (isteğe bağlı)" aria-label="İptal nedeni" />
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => cancelOpen = false">Vazgeç</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="CancelAsync">İptal et</Button>
+        </DialogFooter>
+    </Dialog>
+
+    <Dialog @bind-Open="deleteOpen" Class="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>Taahhüt silinsin mi?</DialogTitle>
+            <DialogDescription>Ödemesi olmayan taahhüt tamamen kaldırılır.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="() => deleteOpen = false">Vazgeç</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="DeleteAsync">Sil</Button>
+        </DialogFooter>
+    </Dialog>
+}
+
+@code {
+    private PledgeDetail? detail;
+    private ContactSummary? contact;
+    private DateOnly today;
+    private string? error, cancelReason;
+    private bool loaded, canWrite, editorOpen, paymentOpen, cancelOpen, deleteOpen;
+
+    [Parameter] public Guid Id { get; set; }
+
+    [Inject] private TimeProvider Clock { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        canWrite = CurrentUser.HasPermission(GivingPermissions.Write);
+        today = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+        await LoadAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        detail = await Pledges.GetAsync(Id);
+        contact = detail is null ? null : await Directory.FindAsync(detail.Pledge.ContactId);
+    }
+
+    private async Task CancelAsync()
+    {
+        cancelOpen = false;
+        await Apply(await Pledges.CancelAsync(Id, cancelReason));
+    }
+
+    private async Task ReactivateAsync() => await Apply(await Pledges.ReactivateAsync(Id));
+
+    private async Task DeleteAsync()
+    {
+        deleteOpen = false;
+        var result = await Pledges.DeleteAsync(Id);
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo("donations/pledges");
+            return;
+        }
+
+        error = result.Error!.Message;
+    }
+
+    private async Task Apply(Arma.SharedKernel.Domain.Result<Guid> result)
+    {
+        error = result.IsSuccess ? null : result.Error!.Message;
+        await LoadAsync();
+    }
+}

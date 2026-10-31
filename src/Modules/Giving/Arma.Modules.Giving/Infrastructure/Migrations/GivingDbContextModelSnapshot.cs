@@ -326,6 +326,10 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("note");
 
+                    b.Property<Guid?>("PledgeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pledge_id");
+
                     b.Property<string>("Provider")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
@@ -381,6 +385,9 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                     b.HasIndex("FundId")
                         .HasDatabaseName("ix_donations_fund_id");
 
+                    b.HasIndex("PledgeId")
+                        .HasDatabaseName("ix_donations_pledge_id");
+
                     b.HasIndex("TenantId", "ContactId")
                         .HasDatabaseName("ix_donations_tenant_id_contact_id");
 
@@ -388,6 +395,10 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_donations_tenant_id_external_key")
                         .HasFilter("external_key IS NOT NULL AND NOT is_deleted");
+
+                    b.HasIndex("TenantId", "PledgeId")
+                        .HasDatabaseName("ix_donations_tenant_id_pledge_id")
+                        .HasFilter("pledge_id IS NOT NULL");
 
                     b.HasIndex("TenantId", "ReceiptNumber")
                         .IsUnique()
@@ -460,6 +471,98 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasFilter("NOT is_deleted");
 
                     b.ToTable("funds", "giving");
+                });
+
+            modelBuilder.Entity("Arma.Modules.Giving.Domain.Pledge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("cancel_reason");
+
+                    b.Property<Guid>("ContactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contact_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("currency")
+                        .IsFixedLength();
+
+                    b.Property<short>("Frequency")
+                        .HasColumnType("smallint")
+                        .HasColumnName("frequency");
+
+                    b.Property<Guid?>("FundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fund_id");
+
+                    b.Property<int>("InstallmentCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("installment_count");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("note");
+
+                    b.Property<DateOnly>("StartOn")
+                        .HasColumnType("date")
+                        .HasColumnName("start_on");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pledges");
+
+                    b.HasIndex("FundId")
+                        .HasDatabaseName("ix_pledges_fund_id");
+
+                    b.HasIndex("TenantId", "ContactId")
+                        .HasDatabaseName("ix_pledges_tenant_id_contact_id");
+
+                    b.HasIndex("TenantId", "Status")
+                        .HasDatabaseName("ix_pledges_tenant_id_status");
+
+                    b.ToTable("pledges", "giving");
                 });
 
             modelBuilder.Entity("Arma.Modules.Giving.Domain.ReceiptSettings", b =>
@@ -547,6 +650,21 @@ namespace Arma.Modules.Giving.Infrastructure.Migrations
                         .HasForeignKey("FundId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_donations_funds_fund_id");
+
+                    b.HasOne("Arma.Modules.Giving.Domain.Pledge", null)
+                        .WithMany()
+                        .HasForeignKey("PledgeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_donations_pledges_pledge_id");
+                });
+
+            modelBuilder.Entity("Arma.Modules.Giving.Domain.Pledge", b =>
+                {
+                    b.HasOne("Arma.Modules.Giving.Domain.Fund", null)
+                        .WithMany()
+                        .HasForeignKey("FundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pledges_funds_fund_id");
                 });
 #pragma warning restore 612, 618
         }

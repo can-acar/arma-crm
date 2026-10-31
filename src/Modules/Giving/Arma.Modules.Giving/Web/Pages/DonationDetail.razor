@@ -62,6 +62,10 @@ else
                 <dl class="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                     <div><dt class="text-muted-foreground">Durum</dt><dd><Badge Variant="GivingLabels.StatusVariant(donation.Status)">@GivingLabels.Status(donation.Status)</Badge></dd></div>
                     <div><dt class="text-muted-foreground">Fon</dt><dd>@(donation.FundName ?? "Genel")</dd></div>
+                    @if (donation.PledgeId is { } pledgeId)
+                    {
+                        <div><dt class="text-muted-foreground">Taahhüt</dt><dd><a class="hover:underline" href="donations/pledges/@pledgeId">Taahhüt ödemesi</a></dd></div>
+                    }
                     <div><dt class="text-muted-foreground">Ödeme yöntemi</dt><dd>@GivingLabels.Method(donation.Method)</dd></div>
                     <div><dt class="text-muted-foreground">Dekont / işlem no</dt><dd>@(donation.Reference ?? "-")</dd></div>
                     @if (donation.InKindDescription is not null)

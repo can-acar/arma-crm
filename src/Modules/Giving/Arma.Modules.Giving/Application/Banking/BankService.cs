@@ -109,7 +109,10 @@ public sealed class BankService(GivingDbContext db, DonationService donations, I
         }
 
         var note = line.Description is null ? "Havale/EFT" : $"Havale/EFT: {line.Description}";
-        var request = new SaveDonationRequest(contactId, line.Amount, Donation.DefaultCurrency, line.BookedOn, fundId, PaymentMethod.BankTransfer, line.BankReference, note.Length > 1000 ? note[..1000] : note, null);
+        // Bağışçının açık taahhüdü varsa havale onun taksidi sayılır.
+        var pledge = await donations.OpenPledgeForAsync(contactId, Donation.DefaultCurrency, cancellationToken);
+        fundId ??= pledge?.FundId;
+        var request = new SaveDonationRequest(contactId, line.Amount, Donation.DefaultCurrency, line.BookedOn, fundId, PaymentMethod.BankTransfer, line.BankReference, note.Length > 1000 ? note[..1000] : note, null, pledge?.Id);
         return await donations.RecordAsync(request, cancellationToken, donation => line.Match(contactId, donation.Id));
     }
 

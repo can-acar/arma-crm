@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Arma.Modules.Giving.Application;
 
 /// <summary>Gelişmiş aramaya bağış ölçütleri, panoya bağış toplamları ve aylık grafik. Toplamlar yalnızca TL bağışları içerir.</summary>
-internal sealed class GivingInsights(GivingDbContext db, TimeProvider clock) : IContactCriteriaProvider, IDashboardContributor
+internal sealed class GivingInsights(GivingDbContext db, PledgeService pledges, TimeProvider clock) : IContactCriteriaProvider, IDashboardContributor
 {
     private const string Group = "Bağış";
     private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
@@ -23,6 +23,8 @@ internal sealed class GivingInsights(GivingDbContext db, TimeProvider clock) : I
             new("gift_total_gte", Group, "Toplam bağışı en az (TL)", CriterionKind.Number),
             new("gift_fund", Group, "Bu fona bağış yaptı", CriterionKind.Choice, funds),
             new("gift_never", Group, "Hiç bağış yapmadı", CriterionKind.Flag),
+            new("pledge_open", Group, "Ödenmemiş taahhüdü var", CriterionKind.Flag),
+            new("pledge_overdue", Group, "Taahhüt taksiti gecikmiş", CriterionKind.Flag),
         ];
     }
 
@@ -42,6 +44,12 @@ internal sealed class GivingInsights(GivingDbContext db, TimeProvider clock) : I
                     .Where(g => g.Sum(d => d.Amount) >= minimum).Select(g => g.Key).ToListAsync(cancellationToken));
             case "gift_fund" when Guid.TryParse(value, out var fund):
                 return new(await Donors(completed.Where(d => d.FundId == fund), cancellationToken));
+            case "pledge_open":
+                var open = await pledges.ListAsync(PledgeState.Open, cancellationToken: cancellationToken);
+                var late = await pledges.ListAsync(PledgeState.Overdue, cancellationToken: cancellationToken);
+                return new(open.Concat(late).Select(p => p.ContactId).Distinct().ToList());
+            case "pledge_overdue":
+                return new((await pledges.ListAsync(PledgeState.Overdue, cancellationToken: cancellationToken)).Select(p => p.ContactId).Distinct().ToList());
             case "gift_never":
                 return new(await Donors(completed, cancellationToken), Exclude: true);
             default:
@@ -58,8 +66,12 @@ internal sealed class GivingInsights(GivingDbContext db, TimeProvider clock) : I
         var yearTotal = await thisYear.SumAsync(d => (decimal?)d.Amount, cancellationToken) ?? 0;
         var monthTotal = await thisYear.Where(d => d.ReceivedOn >= monthStart).SumAsync(d => (decimal?)d.Amount, cancellationToken) ?? 0;
         var donors = await thisYear.Select(d => d.ContactId).Distinct().CountAsync(cancellationToken);
+        var pledgeTotals = await pledges.TotalsAsync(cancellationToken);
         return
         [
+            new("Geciken taahhüt", pledgeTotals.Overdue.ToString("N0", Turkish),
+                pledgeTotals.Overdue == 0 ? $"Açık {pledgeTotals.Open.ToString("N0", Turkish)} taahhüt" : $"Vadesi geçen {Money.Format(pledgeTotals.OverdueTry, "TRY")}",
+                "donations/pledges?state=overdue", 32, GivingPermissions.Read),
             new($"{today.Year} bağışları", Money.Format(yearTotal, "TRY"), $"Bu ay {Money.Format(monthTotal, "TRY")}", "donations", 30, GivingPermissions.Read),
             new($"{today.Year} bağışçıları", donors.ToString("N0", Turkish), "Bu yıl en az bir bağış yapan", "contacts/search", 31, GivingPermissions.Read),
         ];

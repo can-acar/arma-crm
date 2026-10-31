@@ -1,4 +1,5 @@
 @inject DonationService Donations
+@inject PledgeService Pledges
 @inject IContactDirectory Directory
 @inject ICurrentUser CurrentUser
 @inject NavigationManager Navigation
@@ -29,6 +30,29 @@
         </div>
     }
 
+    @if (pledges.Count > 0 || canWrite)
+    {
+        <Card>
+            <CardHeader>
+                <CardTitle>Taahhütler</CardTitle>
+                @if (canWrite)
+                {
+                    <CardAction><Button Size="ButtonSize.Sm" Variant="ButtonVariant.Outline" OnClick="() => pledgeOpen = true">Taahhüt ekle</Button></CardAction>
+                }
+            </CardHeader>
+            <CardContent>
+                @if (pledges.Count == 0)
+                {
+                    <p class="text-muted-foreground text-sm">Taahhüt yok.</p>
+                }
+                else
+                {
+                    <PledgeTable Items="pledges" ShowContact="false" />
+                }
+            </CardContent>
+        </Card>
+    }
+
     <Card>
         <CardHeader>
             <CardTitle>Bağış geçmişi</CardTitle>
@@ -56,12 +80,14 @@
 </div>
 
 <DonationEditor @bind-Open="editorOpen" Contact="contact" OnSaved="_ => LoadAsync()" />
+<PledgeEditor @bind-Open="pledgeOpen" Contact="contact" OnSaved="_ => LoadAsync()" />
 
 @code {
     private DonorSummary? summary;
     private IReadOnlyList<DonationView> items = [];
     private ContactSummary? contact;
-    private bool canWrite, editorOpen;
+    private IReadOnlyList<PledgeView> pledges = [];
+    private bool canWrite, editorOpen, pledgeOpen;
 
     [Parameter] public Guid ContactId { get; set; }
 
@@ -76,5 +102,6 @@
     {
         summary = await Donations.DonorSummaryAsync(ContactId);
         items = (await Donations.ListAsync(new DonationFilter(ContactId: ContactId, PageSize: 200))).Items;
+        pledges = await Pledges.ListAsync(contactId: ContactId);
     }
 }

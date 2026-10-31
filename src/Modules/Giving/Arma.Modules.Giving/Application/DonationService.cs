@@ -19,7 +19,8 @@ public sealed record DonationFilter(
     DateOnly? To = null,
     string? Search = null,
     int Page = 1,
-    int PageSize = 50);
+    int PageSize = 50,
+    Guid? PledgeId = null);
 
 public sealed record DonationView(
     Guid Id,
@@ -41,7 +42,8 @@ public sealed record DonationView(
     string? Provider,
     string? ProviderPaymentId,
     DateTimeOffset CreatedAt,
-    string? CreatedBy)
+    string? CreatedBy,
+    Guid? PledgeId = null)
 {
     public bool HasReceipt => ReceiptNumber is not null && ReceiptVoidReason is null;
 }
@@ -59,7 +61,8 @@ public sealed record SaveDonationRequest(
     PaymentMethod Method,
     string? Reference,
     string? Note,
-    string? InKindDescription);
+    string? InKindDescription,
+    Guid? PledgeId = null);
 
 /// <summary>Bağışçının bir yıldaki tamamlanmış bağışları; vergi indirimi için yıllık özet.</summary>
 public sealed record AnnualStatement(int Year, IReadOnlyList<DonationView> Donations, IReadOnlyList<CurrencyTotal> Totals);
@@ -112,7 +115,8 @@ public sealed class DonationService(
     /// <param name="beforeSave">Bağışla aynı kayıt işleminde yapılacak değişiklik (banka hareketini eşleşti işaretlemek gibi).</param>
     internal async Task<Result<Guid>> RecordAsync(SaveDonationRequest request, CancellationToken cancellationToken, Func<Donation, Result<bool>>? beforeSave)
     {
-        var check = await ValidateAsync(request.ContactId, request.FundId, null, cancellationToken);
+        var check = await ValidateAsync(request.ContactId, request.FundId, null, cancellationToken)
+            ?? await ValidatePledgeAsync(request, null, cancellationToken);
         if (check is not null)
         {
             return check;
@@ -125,6 +129,7 @@ public sealed class DonationService(
             return created.Error!;
         }
 
+        created.Value!.AssignPledge(request.PledgeId);
         if (beforeSave?.Invoke(created.Value!) is { IsSuccess: false } failed)
         {
             return failed.Error!;
@@ -143,7 +148,8 @@ public sealed class DonationService(
             return DonationErrors.NotFound;
         }
 
-        var check = await ValidateAsync(request.ContactId, request.FundId, donation.FundId, cancellationToken);
+        var check = await ValidateAsync(request.ContactId, request.FundId, donation.FundId, cancellationToken)
+            ?? await ValidatePledgeAsync(request, donation.PledgeId, cancellationToken);
         if (check is not null)
         {
             return check;
@@ -161,6 +167,7 @@ public sealed class DonationService(
         }
 
         donation.ChangeContact(request.ContactId);
+        donation.AssignPledge(request.PledgeId);
         await SaveWithTimelineAsync(donation, cancellationToken);
         return id;
     }
@@ -382,6 +389,11 @@ public sealed class DonationService(
             query = query.Where(d => d.FundId == fundId);
         }
 
+        if (filter.PledgeId is { } pledgeId)
+        {
+            query = query.Where(d => d.PledgeId == pledgeId);
+        }
+
         if (filter.Method is { } method)
         {
             query = query.Where(d => d.Method == method);
@@ -439,6 +451,37 @@ public sealed class DonationService(
         return null;
     }
 
+    /// <summary>Ödeme bağlanabilecek taahhüt: bağışçının, aynı para birimli ve iptal edilmemiş. Mevcut bağlantı iptalden sonra da korunur.</summary>
+    private async Task<Error?> ValidatePledgeAsync(SaveDonationRequest request, Guid? currentPledgeId, CancellationToken cancellationToken)
+    {
+        if (request.PledgeId is not { } pledgeId)
+        {
+            return null;
+        }
+
+        var pledge = await db.Pledges.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pledgeId, cancellationToken);
+        var currency = string.IsNullOrWhiteSpace(request.Currency) ? Donation.DefaultCurrency : request.Currency.Trim().ToUpperInvariant();
+        return pledge switch
+        {
+            null => PledgeErrors.NotFound,
+            _ when pledge.ContactId != request.ContactId => PledgeErrors.NotForContact,
+            _ when pledge.Status != PledgeStatus.Active && pledgeId != currentPledgeId => PledgeErrors.NotActive,
+            _ when pledge.Currency != currency => PledgeErrors.CurrencyMismatch,
+            _ => null,
+        };
+    }
+
+    /// <summary>Havale eşleştirmede ödemenin bağlanacağı taahhüt: bağışçının kalan borcu olan en eski etkin taahhüdü.</summary>
+    internal async Task<Pledge?> OpenPledgeForAsync(Guid contactId, string currency, CancellationToken cancellationToken)
+    {
+        var pledges = await db.Pledges.AsNoTracking()
+            .Where(p => p.ContactId == contactId && p.Status == PledgeStatus.Active && p.Currency == currency)
+            .OrderBy(p => p.StartOn).ThenBy(p => p.CreatedAt)
+            .Select(p => new { Pledge = p, Paid = db.Donations.Where(d => d.PledgeId == p.Id && d.Status == DonationStatus.Completed).Sum(d => (decimal?)d.Amount) ?? 0 })
+            .ToListAsync(cancellationToken);
+        return pledges.FirstOrDefault(p => p.Paid < p.Pledge.Amount)?.Pledge;
+    }
+
     private async Task<IReadOnlyList<DonationView>> ToViewsAsync(IReadOnlyList<Donation> rows, CancellationToken cancellationToken)
     {
         var contactMap = await contacts.FindManyAsync(rows.Select(d => d.ContactId).Distinct().ToList(), cancellationToken);
@@ -448,7 +491,7 @@ public sealed class DonationService(
                 d.Id, d.ContactId, contactMap.TryGetValue(d.ContactId, out var c) ? c.DisplayName : "(silinmiş kayıt)",
                 d.Amount, d.Currency, d.ReceivedOn, d.FundId, d.FundId is { } f ? funds.GetValueOrDefault(f) : null,
                 d.Method, d.Status, d.Reference, d.Note, d.InKindDescription, d.ReceiptNumber, d.ReceiptIssuedAt, d.ReceiptVoidReason,
-                d.Provider, d.ProviderPaymentId, d.CreatedAt, d.CreatedBy))
+                d.Provider, d.ProviderPaymentId, d.CreatedAt, d.CreatedBy, d.PledgeId))
             .ToList();
     }
 
