@@ -109,6 +109,9 @@ public sealed class Member : Entity
     /// <summary>Yenileme hatırlatmasının gönderildiği dönem sonu; aynı dönem için ikinci kez gönderilmez.</summary>
     public DateOnly? ReminderSentFor { get; set; }
 
+    /// <summary>Eski sistemden aktarıldıysa oradaki kimliği ("civicrm:membership-42").</summary>
+    public string? ExternalKey { get; private set; }
+
     public static Member Create(Guid contactId, MembershipType type, long number, DateOnly startOn, string? note) => new()
     {
         ContactId = contactId,
@@ -118,6 +121,22 @@ public sealed class Member : Entity
         StartOn = startOn,
         EndOn = PeriodEnd(type, startOn),
         Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
+    };
+
+    /// <summary>Eski sistemdeki üyelik: tarihler olduğu gibi alınır, dönem hesaplanmaz.</summary>
+    public static Member Imported(Guid contactId, MembershipType type, long number, DateOnly joinedOn, DateOnly startOn, DateOnly? endOn,
+        DateOnly? cancelledOn, string? cancelReason, string? note, string externalKey) => new()
+    {
+        ContactId = contactId,
+        TypeId = type.Id,
+        Number = number,
+        JoinedOn = joinedOn <= startOn ? joinedOn : startOn,
+        StartOn = startOn,
+        EndOn = endOn,
+        CancelledOn = cancelledOn,
+        CancelReason = cancelReason,
+        Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
+        ExternalKey = externalKey,
     };
 
     public static DateOnly? PeriodEnd(MembershipType type, DateOnly start) =>

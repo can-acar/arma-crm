@@ -52,6 +52,9 @@ public sealed class Contact : Entity
     public IReadOnlyDictionary<string, string> CustomFields =>
         System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(CustomFieldsJson) ?? [];
 
+    /// <summary>Eski sistemden aktarıldıysa oradaki kimliği ("civicrm:42"); yeniden aktarımda mükerrer kaydı önler.</summary>
+    public string? ExternalKey { get; private set; }
+
     public List<Address> Addresses { get; private set; } = [];
 
     public List<Tag> Tags { get; private set; } = [];
@@ -234,6 +237,8 @@ public sealed class Contact : Entity
     public string? MaskedNationalId => NationalId is null ? null : TurkishIdentityNumber.Mask(NationalId);
 
     public ContactSummary ToSummary() => new(Id, Type, DisplayName, Email, Phone);
+
+    internal void LinkExternal(string key) => ExternalKey = key;
 
     internal void SetCustomFields(IReadOnlyDictionary<string, string> values) =>
         CustomFieldsJson = System.Text.Json.JsonSerializer.Serialize(values.OrderBy(v => v.Key, StringComparer.Ordinal).ToDictionary(v => v.Key, v => v.Value));

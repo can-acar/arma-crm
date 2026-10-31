@@ -26,6 +26,7 @@ public sealed class MembershipModule : IModule, INavigationContributor
     {
         services.AddModuleDbContext<MembershipDbContext>(configuration, MembershipDbContext.Schema);
         services.AddScoped<MembershipService>();
+        services.AddScoped<IDataImporter, CivicrmMembershipImporter>();
         services.AddScoped<RenewalReminderJob>();
         services.AddScoped<IScheduledJob>(sp => sp.GetRequiredService<RenewalReminderJob>());
         services.AddScoped<IPersonalDataSource, MembershipPersonalData>();

@@ -137,6 +137,11 @@ namespace Arma.Modules.Contacts.Infrastructure.Migrations
                         .HasColumnType("character varying(254)")
                         .HasColumnName("email");
 
+                    b.Property<string>("ExternalKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_key");
+
                     b.Property<string>("FirstName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -210,6 +215,11 @@ namespace Arma.Modules.Contacts.Infrastructure.Migrations
 
                     b.HasIndex("TenantId", "Email")
                         .HasDatabaseName("ix_contacts_tenant_id_email");
+
+                    b.HasIndex("TenantId", "ExternalKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_contacts_tenant_id_external_key")
+                        .HasFilter("external_key IS NOT NULL");
 
                     b.HasIndex("TenantId", "NationalId")
                         .IsUnique()

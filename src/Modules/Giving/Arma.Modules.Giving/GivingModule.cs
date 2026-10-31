@@ -27,6 +27,7 @@ public sealed class GivingModule : IModule, INavigationContributor
         services.AddModuleDbContext<GivingDbContext>(configuration, GivingDbContext.Schema);
         services.AddScoped<DonationService>();
         services.AddScoped<FundService>();
+        services.AddScoped<Arma.SharedKernel.Modules.IDataImporter, CivicrmContributionImporter>();
         services.AddScoped<OnlineGivingService>();
         services.AddScoped<Arma.Modules.Giving.Application.Banking.BankService>();
         services.AddScoped<Arma.SharedKernel.Privacy.IPersonalDataSource, GivingPersonalData>();

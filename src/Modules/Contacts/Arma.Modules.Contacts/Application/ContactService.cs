@@ -427,6 +427,28 @@ public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimePr
         return created.IsSuccess ? new ContactRegistration(created.Value, true, null) : new ContactRegistration(null, false, created.Error!.Message);
     }
 
+    public async Task<IReadOnlyDictionary<string, Guid>> FindByExternalKeysAsync(IReadOnlyCollection<string> keys, CancellationToken cancellationToken = default)
+    {
+        var rows = await db.Contacts.IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.TenantId == db.TenantId && c.ExternalKey != null && keys.Contains(c.ExternalKey))
+            .Select(c => new { Key = c.ExternalKey!, c.Id, c.IsDeleted, c.MergedIntoId })
+            .ToListAsync(cancellationToken);
+        var result = new Dictionary<string, Guid>();
+        foreach (var row in rows)
+        {
+            if (!row.IsDeleted)
+            {
+                result[row.Key] = row.Id;
+            }
+            else if (row.MergedIntoId is not null && await FindAsync(row.Id, cancellationToken) is { } primary)
+            {
+                result[row.Key] = primary.Id;
+            }
+        }
+
+        return result;
+    }
+
     public async Task<IReadOnlyDictionary<Guid, ContactSummary>> FindManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
     {
         var rows = await db.Contacts.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync(cancellationToken);

@@ -252,6 +252,16 @@ cd deploy
 - Değeri olan bir alanın türü değiştirilemez. Alan silinince tüm kişilerdeki değeri de silinir. Mükerrer birleştirmede asıl kaydın değerleri korunur, boş olanlar diğer kayıttan doldurulur.
 - KVKK dışa aktarmasında "Ek bilgiler" bölümü yer alır; anonimleştirme tüm ek alan değerlerini siler.
 
+## CiviCRM'den aktarım
+
+**Yönetim → Veri aktarımı** (`contacts.import` izni) CiviCRM'den "Birincil alanlar" ile dışa aktarılmış CSV dosyalarını sırayla alır:
+
+1. **Kişiler** (Export Contacts): kişi, kurum ve haneler; adres (State → il, City → ilçe), doğum tarihi, etiketler ve gruplar. Çöp kutusundaki kayıtlar atlanır. Arma'da aynı e-postayla kayıtlı kişi varsa yeni kayıt açılmaz, CiviCRM kimliği o kişiye bağlanır. "External Identifier" alanında geçerli bir TCKN varsa alınır.
+2. **Bağışlar** (Export Contributions): yalnızca tamamlanmış ve iade edilmiş katkılar. Mali tür ("Financial Type") yayına kapalı fon olarak açılır; "Donation" fonsuz, "Member Dues" atlanır. Aktarılan bağışların makbuzu CiviCRM'de kesildiği varsayılır; yıl sonu toplu makbuza girmez.
+3. **Üyelikler** (Export Memberships): üyelik türü adıyla eşleşir, yoksa 12 aylık ücretsiz tür açılır (süre ve ücreti sonra düzeltin). Tarihler olduğu gibi alınır, bitiş tarihi boşsa ömür boyu sayılır, Arma kendi üye numarasını verir.
+
+Kayıtlar CiviCRM kimlikleriyle (`external_key`, örn. `civicrm:42`) saklanır; aynı dosya yeniden yüklenirse yalnızca yeni satırlar eklenir. Bağış ve üyelikler kişiyi bu kimlikle bulduğu için önce kişiler aktarılmalıdır; birleştirilmiş kişiler asıl kayda çözülür. Bir dosya en fazla 50 MB / 200.000 satır olabilir. Yeni bir kaynak eklemek için modül `IDataImporter` uygular.
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`
