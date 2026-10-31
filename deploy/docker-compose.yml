@@ -64,6 +64,8 @@ services:
       context: ..
     command: ["migrate"]
     environment: *arma-env
+    volumes:
+      - ./plugins:/app/plugins:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,6 +75,9 @@ services:
     image: arma-crm:${ARMA_VERSION:-latest}
     restart: unless-stopped
     environment: *arma-env
+    # Eklentiler deploy/plugins altına, her biri kendi klasörüne kopyalanır (bkz. docs/eklentiler.md).
+    volumes:
+      - ./plugins:/app/plugins:ro
     ports:
       - "${ARMA_PORT:-8080}:8080"
     depends_on:

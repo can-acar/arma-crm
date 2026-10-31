@@ -49,6 +49,7 @@ public sealed class ArmaAppFactory : WebApplicationFactory<Program>, IAsyncLifet
         builder.UseSetting("Comms:Email:Provider", "test");
         builder.UseSetting("Comms:Sms:Provider", "test");
         builder.UseSetting("Comms:PublicUrl", "https://crm.example.org");
+        builder.UseSetting("Arma:Plugins:Path", Path.Combine(AppContext.BaseDirectory, "plugins"));
     }
 
     public async Task<T> WithScopeAsync<T>(Func<IServiceProvider, Task<T>> action)

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+ArmaModules.LoadPlugins(builder.Configuration, builder.Environment.ContentRootPath);
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ITenantContext, ConfiguredTenantContext>();
@@ -51,6 +52,18 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+foreach (var plugin in ArmaModules.Plugins)
+{
+    if (plugin.State == Arma.Infrastructure.Plugins.PluginState.Failed)
+    {
+        app.Logger.LogError("Eklenti yüklenemedi ({Plugin}): {Error}", plugin.Id, plugin.Error);
+    }
+    else
+    {
+        app.Logger.LogInformation("Eklenti {Plugin} {Version}: {State}", plugin.Id, plugin.Manifest?.Version, plugin.State);
+    }
+}
 
 // Kurulum ve güncellemede şema, uygulama açılışında değil ayrı bir komutla güncellenir:
 //   dotnet Arma.Host.dll migrate

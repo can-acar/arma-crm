@@ -344,6 +344,12 @@ Portalda kişi yalnızca kendi kayıtlarını görür:
 
 Bağlantıların doğru adresi göstermesi için `Comms__PublicUrl` (örneğin `https://crm.kurum.org`) ve e-posta gönderimi ayarlı olmalıdır. Web sitenize "Bağış geçmişim" gibi bir bağlantıyla `https://crm.kurum.org/portal` adresini koyabilirsiniz. Modüller portala kendi bölümlerini `IPortalSection` ile ekler.
 
+## Eklentiler
+
+Kuruma özel ihtiyaçlar Arma'yı değiştirmeden eklentiyle karşılanır. Eklenti; sayfa, menü bağlantısı, izin, kişi kartı sekmesi, pano kutucuğu, gelişmiş arama ölçütü, portal bölümü, API ucu, zamanlanmış iş ya da olay dinleyicisi ekleyebilir. Uygulama klasöründeki `plugins` altına (Docker'da `deploy/plugins`) her eklenti kendi klasörüyle kopyalanır ve uygulama yeniden başlatılınca yüklenir. **Yönetim → Eklentiler** (`plugins.read` izni) yüklü eklentileri ve yüklenemeyenlerin nedenini gösterir.
+
+Geliştirme rehberi: [docs/eklentiler.md](docs/eklentiler.md). Örnek eklenti: [samples/Arma.Plugins.Sample](samples/Arma.Plugins.Sample).
+
 ## Denetim izi
 
 - `Entity` türevlerindeki her ekleme, değişiklik ve silme, aynı veritabanı işleminde `audit.audit_log`

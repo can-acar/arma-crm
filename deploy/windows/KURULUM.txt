@@ -36,6 +36,11 @@ Yeni paketi ayrı bir klasöre açıp aynı komutu -CreateDatabase olmadan çal�
 "Arma CRM güncelleniyor" sayfasını gösterir, veritabanı şeması güncellenir ve site yeniden açılır.
 Şema güncellemesi hata verirse site bakım sayfasında kalır; hatayı giderip betiği yeniden çalıştırın.
 
+Eklentiler
+Eklentiler site klasöründeki plugins klasörüne (örn. C:\inetpub\arma-crm\plugins\kurum.eklenti\), her biri kendi alt
+klasörüne kopyalanır; ardından uygulama havuzu yeniden başlatılır. Güncelleme plugins klasörüne dokunmaz. Yüklü eklentiler
+ve hataları Yönetim > Eklentiler ekranında görünür.
+
 Sorun giderme
 - 500.19 / 500.30 hatası: Hosting Bundle eksik ya da IIS'ten önce kurulmuş; Hosting Bundle'ı onarın ve iisreset çalıştırın.
 - Ekranlar açılıyor ama tıklamalar çalışmıyor: IIS "WebSocket Protokolü" özelliği kapalı.
