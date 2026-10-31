@@ -109,6 +109,8 @@ Servis olarak kaydettiğiniz şu arayüzler uygulamanın ilgili yerinde kendili�
 | `ICampaignSource` | Kampanyaya bağlanabilen kayıt türü |
 | `IPaymentProvider` | Ödeme sağlayıcısı; kaydetmeye gerek yok, sınıf kendiliğinden bulunur ve "Makbuz ve ödeme" ekranında listelenir (bkz. [odeme.md](odeme.md)) |
 | `IPaymentHandler<TContext, TResult>` | Ödeme zincirine işleyici (tutar sınırı, dolandırıcılık kontrolü gibi) |
+| `IEInvoiceProvider` | e-Fatura / e-Arşiv entegratörü; sınıf kendiliğinden bulunur ve "Fatura ayarları" ekranında listelenir (bkz. [efatura.md](efatura.md)) |
+| `IEInvoiceHandler` | Fatura gönderim zincirine işleyici (onay, ek kural, kayıt gibi) |
 
 **Olayları dinlemek:** Modüller olaylarını Wolverine ile yayımlar ve olay tipleri Contracts derlemelerindedir. Eklentide `Handle` metodu olan bir sınıf yeterli; Arma onu kendiliğinden bulur:
 

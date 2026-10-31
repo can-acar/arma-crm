@@ -2,6 +2,7 @@ using Arma.Infrastructure.Messaging;
 using System.Globalization;
 using Arma.Modules.Activities.Contracts;
 using Arma.Modules.Contacts.Contracts;
+using Arma.Modules.Invoicing.Contracts;
 using Arma.Modules.Membership.Domain;
 using Arma.Modules.Membership.Infrastructure;
 using Arma.SharedKernel.Domain;
@@ -386,6 +387,11 @@ public sealed class MembershipService(MembershipDbContext db, IContactDirectory 
         {
             await outbox.PublishAsync(Timeline(member, $"Aidat alındı: {payment.Amount.ToString("N2", Turkish)} TL", PeriodText(payment.PeriodStart, payment.PeriodEnd),
                 payment.PaidOn, $"dues:{payment.Id}"));
+
+            // Fatura modülü ayarlarına göre aidat faturası açar. Alınan tutar KDV dahildir.
+            await outbox.PublishAsync(new InvoiceRequested(InvoiceSources.Dues, payment.Id, $"{member.Number} numaralı üye aidatı", member.ContactId, payment.PaidOn,
+                [new InvoiceRequestLine($"Üyelik aidatı ({PeriodText(payment.PeriodStart, payment.PeriodEnd)})", 1, null, payment.Amount, 0, null) { VatIncluded = true }],
+                null));
         }
     }
 

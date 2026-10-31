@@ -1,0 +1,57 @@
+@* Fatura listesi ve kişi kartındaki faturalar. *@
+<Table>
+    <TableHeader>
+        <TableRow>
+            <TableHead>Numara</TableHead>
+            <TableHead>Tarih</TableHead>
+            @if (ShowBuyer)
+            {
+                <TableHead>Alıcı</TableHead>
+            }
+            <TableHead>Kaynak</TableHead>
+            <TableHead Class="text-right">Tutar</TableHead>
+            <TableHead>Durum</TableHead>
+        </TableRow>
+    </TableHeader>
+    <TableBody>
+        @foreach (var invoice in Items)
+        {
+            <TableRow>
+                <TableCell>
+                    <a class="font-mono font-medium hover:underline" href="@($"invoices/{invoice.Id}")">@(invoice.Number ?? "Taslak")</a>
+                    <div class="text-muted-foreground text-xs">@InvoiceLabels.Profile(invoice.Profile)</div>
+                </TableCell>
+                <TableCell Class="text-sm">@invoice.IssuedOn.ToString("dd.MM.yyyy")</TableCell>
+                @if (ShowBuyer)
+                {
+                    <TableCell><a class="hover:underline" href="@($"contacts/{invoice.ContactId}")">@invoice.BuyerName</a></TableCell>
+                }
+                <TableCell Class="text-sm">
+                    @InvoiceLabels.Source(invoice.SourceKind)
+                    @if (invoice.SourceLabel is not null)
+                    {
+                        <div class="text-muted-foreground text-xs">@invoice.SourceLabel</div>
+                    }
+                </TableCell>
+                <TableCell Class="text-right tabular-nums">@InvoiceService.Money(invoice.Total)</TableCell>
+                <TableCell>
+                    <Badge Variant="InvoiceLabels.StatusVariant(invoice.Status, invoice.Transmitted, invoice.LastError is not null)">@InvoiceLabels.Status(invoice.Status)</Badge>
+                    @if (invoice.Status == InvoiceStatus.Issued && !invoice.Transmitted)
+                    {
+                        <div class="text-muted-foreground text-xs">Portala yüklenmedi</div>
+                    }
+                    else if (invoice.Status == InvoiceStatus.Draft && invoice.LastError is not null)
+                    {
+                        <div class="text-destructive text-xs">Gönderilemedi</div>
+                    }
+                </TableCell>
+            </TableRow>
+        }
+    </TableBody>
+</Table>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<InvoiceListItem> Items { get; set; } = [];
+
+    [Parameter] public bool ShowBuyer { get; set; } = true;
+}

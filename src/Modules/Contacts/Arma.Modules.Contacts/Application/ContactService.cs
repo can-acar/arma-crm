@@ -71,7 +71,7 @@ public sealed record DuplicateCandidate(Guid Id, string DisplayName, string? Ema
 
 public sealed record CreateRelationshipRequest(Guid OtherContactId, RelationshipType Type, bool ThisIsFrom, string? Description, DateOnly? StartDate);
 
-public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimeProvider clock, IDbContextOutbox outbox) : IContactDirectory, IContactRegistry
+public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimeProvider clock, IDbContextOutbox outbox) : IContactDirectory, IContactRegistry, IContactBillingDirectory
 {
     public const int MaxPageSize = 100;
 
@@ -405,6 +405,19 @@ public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimePr
         }
 
         return null;
+    }
+
+    public async Task<ContactBillingInfo?> FindBillingAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        if (await FindAsync(id, cancellationToken) is not { } summary)
+        {
+            return null;
+        }
+
+        var contact = await db.Contacts.AsNoTracking().FirstAsync(c => c.Id == summary.Id, cancellationToken);
+        var address = contact.Addresses.Where(a => !a.IsEmpty).OrderBy(a => a.Kind == AddressKind.Billing ? 0 : a.IsPrimary ? 1 : 2).FirstOrDefault();
+        return new ContactBillingInfo(contact.Id, contact.Type, contact.DisplayName, contact.FirstName, contact.LastName, contact.NationalId, contact.Email, contact.Phone,
+            address?.Line, address?.District, address?.City, address?.PostalCode);
     }
 
     public async Task<ContactRegistration> FindOrCreatePersonAsync(string firstName, string lastName, string? email, string? phone, CancellationToken cancellationToken = default)

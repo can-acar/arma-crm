@@ -1,0 +1,27 @@
+@inject InvoiceService Invoices
+
+@* Kişi kartındaki "Faturalar" sekmesi. *@
+<Card>
+    <CardHeader>
+        <CardTitle>Faturalar</CardTitle>
+        <CardDescription>Bu kişi veya kuruma kesilen e-Arşiv ve e-Fatura belgeleri.</CardDescription>
+    </CardHeader>
+    <CardContent>
+        @if (items.Count == 0)
+        {
+            <p class="text-muted-foreground text-sm">Fatura yok.</p>
+        }
+        else
+        {
+            <InvoiceTable Items="items" ShowBuyer="false" />
+        }
+    </CardContent>
+</Card>
+
+@code {
+    private IReadOnlyList<InvoiceListItem> items = [];
+
+    [Parameter] public Guid ContactId { get; set; }
+
+    protected override async Task OnInitializedAsync() => items = await Invoices.ListAsync(new InvoiceFilter(ContactId: ContactId));
+}

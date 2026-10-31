@@ -38,6 +38,7 @@ src/
     Contacts/             Kişiler modülü (Domain, Application, Infrastructure, Web) + Contracts
     Activities/           Not, arama, toplantı, görev; kişi zaman çizelgesi; Contracts: zaman çizelgesi mesajı
     Giving/               Bağışlar, fonlar, makbuz, çevrim içi bağış formu ve ödeme kuruluşları
+    Invoicing/            e-Fatura ve e-Arşiv: tekliften ve aidattan fatura, UBL-TR, eklenebilir entegratörler
     Privacy/              KVKK: aydınlatma metinleri, açık rıza, ilgili kişi başvuruları, anonimleştirme, veri envanteri
     Comms/                E-posta (SMTP), SMS (Netgsm), toplu ileti, ileti izinleri ve İYS; Contracts: bilgilendirme e-postası
     Identity/             Kullanıcılar, roller, izinler, 2FA, API istemcileri (Identity + OpenIddict); Contracts: kullanıcı listesi
@@ -234,6 +235,24 @@ site klasöründe tutulmaz. Güncellemede yeni paketle aynı komut (`-CreateData
   reddedilince kaybedildi olur. Yazdırma sayfası tarayıcıdan PDF olarak kaydedilebilir.
 - Fırsat ve teklif hareketleri kişinin zaman akışına düşer; gelişmiş aramada "açık fırsatı olan", "şu tarihten
   sonra satış kazanılan" ve "hiç fırsatı olmayan" ölçütleri vardır.
+
+## e-Fatura ve e-Arşiv
+
+- Kabul edilen teklif ve alınan üyelik aidatı **Faturalar** ekranında taslak fatura açar (Yönetim > Fatura
+  ayarları'ndan kapatılabilir; istenirse taslakta bekletmeden gönderilir). Bağış makbuzu fatura değildir ve
+  bu akıştan etkilenmez. Aynı teklif veya aidat için ikinci fatura açılmaz.
+- Alıcı bilgileri kişi kaydından kopyalanır (kişide TCKN, kurumda VKN, önce fatura adresi). Kimliği bilinmeyen
+  kişiye e-Arşiv fatura 11111111111 ile kesilir; alıcı e-Fatura mükellefiyse taslakta senaryo "e-Fatura" seçilir.
+- Fatura gönderilirken GİB biçiminde numaralanır (`ARM2026000000001`: ön ek, yıl, 9 hane sıra). Belge kurallara
+  uymuyorsa numara harcanmaz; entegratör reddederse fatura numarasıyla taslak kalır ve yeniden denemede aynı
+  numara kullanılır. Numaralı fatura silinmez, nedeniyle iptal edilir.
+- Aidat tutarı KDV dahil kabul edilir; aidat KDV oranı ve %0 KDV istisna kodu (varsayılan 351) ayarlardadır.
+- Entegratör yoksa **GİB portalı (dosya)** seçilir: Arma UBL-TR 1.2 XML dosyasını hazırlar, dosya GİB e-Arşiv
+  portalına yüklenip onaylanır ve faturada "GİB'e iletildi" işaretlenir. Özel entegratörler eklentiyle eklenir,
+  ayarlar ekranında kendiliğinden listelenir; ayarları `EInvoicing__Providers__<anahtar>__<alan>` ortam
+  değişkenleriyle verilir (bkz. [docs/efatura.md](docs/efatura.md)).
+- XML imzasızdır; mali mühür entegratörde ya da portalda eklenir. KDV oranı ve istisna kodunu mali müşavirinize
+  danışarak belirleyin.
 
 ## Otomasyon
 

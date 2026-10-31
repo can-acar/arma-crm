@@ -1,6 +1,7 @@
 using Arma.Infrastructure.Messaging;
 using Arma.Modules.Activities.Contracts;
 using Arma.Modules.Contacts.Contracts;
+using Arma.Modules.Invoicing.Contracts;
 using Arma.Modules.Sales.Domain;
 using Arma.Modules.Sales.Infrastructure;
 using Arma.SharedKernel.Domain;
@@ -108,6 +109,7 @@ public sealed class QuoteService(SalesDbContext db, SalesService sales, IContact
             return QuoteErrors.NotFound;
         }
 
+        var wasAccepted = quote.Status == QuoteStatus.Accepted;
         var changed = quote.SetStatus(status);
         if (!changed.IsSuccess)
         {
@@ -120,6 +122,14 @@ public sealed class QuoteService(SalesDbContext db, SalesService sales, IContact
             var verb = status switch { QuoteStatus.Sent => "gönderildi", QuoteStatus.Accepted => "kabul edildi", _ => "reddedildi" };
             await outbox.PublishAsync(new RecordTimelineEntry([quote.ContactId], ActivityKind.System, $"Teklif {verb}: {quote.Number}", SalesService.Money(quote.Total),
                 clock.GetUtcNow(), SalesService.SourceModule, $"quote:{quote.Id}"));
+        }
+
+        if (status == QuoteStatus.Accepted && !wasAccepted)
+        {
+            // Fatura modülü ayarlarına göre taslak fatura açar; aynı teklif için ikinci fatura açılmaz.
+            await outbox.PublishAsync(new InvoiceRequested(InvoiceSources.Quote, quote.Id, quote.Number, quote.ContactId, DateOnly.FromDateTime(clock.GetLocalNow().DateTime),
+                [.. quote.Lines.OrderBy(l => l.Position).Select(l => new InvoiceRequestLine(l.Description, l.Quantity, l.Unit, l.UnitPrice, l.DiscountRate, l.VatRate))],
+                quote.Terms));
         }
 
         await outbox.SaveChangesAndPublishAsync(cancellationToken);

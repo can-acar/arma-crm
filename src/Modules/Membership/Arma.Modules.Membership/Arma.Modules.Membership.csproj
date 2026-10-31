@@ -7,6 +7,7 @@
     <ProjectReference Include="..\..\Activities\Arma.Modules.Activities.Contracts\Arma.Modules.Activities.Contracts.csproj" />
     <ProjectReference Include="..\..\Comms\Arma.Modules.Comms.Contracts\Arma.Modules.Comms.Contracts.csproj" />
     <ProjectReference Include="..\..\Contacts\Arma.Modules.Contacts.Contracts\Arma.Modules.Contacts.Contracts.csproj" />
+    <ProjectReference Include="..\..\Invoicing\Arma.Modules.Invoicing.Contracts\Arma.Modules.Invoicing.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

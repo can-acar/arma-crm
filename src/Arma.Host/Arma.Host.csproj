@@ -25,6 +25,7 @@
     <ProjectReference Include="..\Modules\Membership\Arma.Modules.Membership\Arma.Modules.Membership.csproj" />
     <ProjectReference Include="..\Modules\Events\Arma.Modules.Events\Arma.Modules.Events.csproj" />
     <ProjectReference Include="..\Modules\Sales\Arma.Modules.Sales\Arma.Modules.Sales.csproj" />
+    <ProjectReference Include="..\Modules\Invoicing\Arma.Modules.Invoicing\Arma.Modules.Invoicing.csproj" />
     <ProjectReference Include="..\Modules\Automation\Arma.Modules.Automation\Arma.Modules.Automation.csproj" />
     <ProjectReference Include="..\Modules\Campaigns\Arma.Modules.Campaigns\Arma.Modules.Campaigns.csproj" />
     <ProjectReference Include="..\Modules\Cases\Arma.Modules.Cases\Arma.Modules.Cases.csproj" />

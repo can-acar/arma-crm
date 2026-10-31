@@ -1,0 +1,195 @@
+@page "/admin/invoicing"
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = InvoicingPermissions.Settings)]
+@inject InvoiceService Invoices
+
+<PageTitle>Fatura ayarları · Arma CRM</PageTitle>
+
+<div class="flex max-w-4xl flex-col gap-6">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Fatura ayarları</h1>
+        <p class="text-muted-foreground text-sm">Faturada satıcı olarak görünen kurum bilgileri, faturaları gönderen entegratör ve hangi kayıtlardan fatura açılacağı.</p>
+    </div>
+
+    <FormAlert Error="@error" />
+    @if (saved)
+    {
+        <Alert><AlertDescription>Ayarlar kaydedildi.</AlertDescription></Alert>
+    }
+
+    <form id="invoice-settings" class="flex flex-col gap-6" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <Card>
+            <CardHeader>
+                <CardTitle>Kurum (satıcı)</CardTitle>
+                <CardDescription>Fatura göndermek için kurum adı, VKN, vergi dairesi ve il zorunludur.</CardDescription>
+            </CardHeader>
+            <CardContent Class="grid gap-4 sm:grid-cols-2">
+                <div class="grid gap-2 sm:col-span-2">
+                    <Label for="seller-name">Kurum adı / unvan</Label>
+                    <Input id="seller-name" @bind-Value="settings.SellerName" maxlength="200" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="seller-tax">VKN</Label>
+                    <Input id="seller-tax" @bind-Value="settings.SellerTaxId" inputmode="numeric" maxlength="11" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="seller-office">Vergi dairesi</Label>
+                    <Input id="seller-office" @bind-Value="settings.SellerTaxOffice" maxlength="100" />
+                </div>
+                <div class="grid gap-2 sm:col-span-2">
+                    <Label for="seller-street">Adres</Label>
+                    <Input id="seller-street" @bind-Value="settings.SellerStreet" maxlength="500" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="seller-district">İlçe</Label>
+                    <Input id="seller-district" @bind-Value="settings.SellerDistrict" maxlength="100" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="seller-city">İl</Label>
+                    <Input id="seller-city" @bind-Value="settings.SellerCity" maxlength="100" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="seller-email">E-posta</Label>
+                    <Input id="seller-email" Type="email" @bind-Value="settings.SellerEmail" maxlength="320" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="seller-phone">Telefon</Label>
+                    <Input id="seller-phone" @bind-Value="settings.SellerPhone" maxlength="40" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="seller-web">Web sitesi</Label>
+                    <Input id="seller-web" @bind-Value="settings.SellerWebsite" maxlength="200" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="seller-prefix">Fatura ön eki</Label>
+                    <Input id="seller-prefix" @bind-Value="settings.Prefix" maxlength="3" />
+                    <p class="text-muted-foreground text-xs">3 karakter. Numara @(settings.Prefix)@(DateTime.Today.Year)000000001 biçiminde verilir; entegratörünüzün size verdiği seriyi yazın.</p>
+                </div>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Entegratör</CardTitle>
+                <CardDescription>
+                    Faturaları gönderen sistem. Özel entegratörler eklentiyle eklenir ve burada kendiliğinden listelenir. Ayarları ortam değişkeni
+                    olarak girilir (EInvoicing__Providers__anahtar__Alan); veritabanında tutulmaz.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead></TableHead>
+                            <TableHead>Entegratör</TableHead>
+                            <TableHead>Senaryo</TableHead>
+                            <TableHead>Durum</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        @foreach (var row in providers)
+                        {
+                            var info = row.Info;
+                            <TableRow>
+                                <TableCell>
+                                    <input type="radio" name="einvoice-provider" value="@info.Key" checked="@(selected == info.Key)" disabled="@(!info.IsConfigured)"
+                                           @onchange="() => selected = info.Key" aria-label="@info.Descriptor.DisplayName" />
+                                </TableCell>
+                                <TableCell>
+                                    <div class="font-medium">@info.Descriptor.DisplayName</div>
+                                    @if (info.Descriptor.Description is not null)
+                                    {
+                                        <div class="text-muted-foreground text-xs">@info.Descriptor.Description</div>
+                                    }
+                                </TableCell>
+                                <TableCell Class="text-sm">@InvoiceLabels.Profiles(info.Descriptor.Profiles)</TableCell>
+                                <TableCell>
+                                    @if (info.IsConfigured)
+                                    {
+                                        <Badge Variant="BadgeVariant.Secondary">Hazır</Badge>
+                                    }
+                                    else
+                                    {
+                                        <Badge Variant="BadgeVariant.Outline">Ayar eksik</Badge>
+                                        <div class="text-muted-foreground mt-1 font-mono text-xs">
+                                            @foreach (var field in info.MissingSettings)
+                                            {
+                                                <div>EInvoicing__Providers__@(info.Key)__@field.Key</div>
+                                            }
+                                        </div>
+                                    }
+                                </TableCell>
+                            </TableRow>
+                        }
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Ne zaman fatura açılsın</CardTitle>
+                <CardDescription>Açılan fatura taslak olarak bekler; görevli kontrol edip gönderir. Bağış makbuzları fatura değildir ve buradan etkilenmez.</CardDescription>
+            </CardHeader>
+            <CardContent Class="grid gap-4">
+                <label class="flex items-center gap-2 text-sm"><Checkbox @bind-Checked="settings.FromQuotes" /> Teklif kabul edildiğinde</label>
+                <label class="flex items-center gap-2 text-sm"><Checkbox @bind-Checked="settings.FromDues" /> Üyelik aidatı alındığında</label>
+                <label class="flex items-center gap-2 text-sm"><Checkbox @bind-Checked="settings.AutoSend" /> Taslakta bekletmeden hemen gönder</label>
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <div class="grid gap-2">
+                        <Label for="dues-vat">Aidat KDV oranı (%)</Label>
+                        <Input id="dues-vat" @bind-Value="duesVat" inputmode="numeric" maxlength="3" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="exemption-code">%0 KDV istisna kodu</Label>
+                        <Input id="exemption-code" @bind-Value="settings.ExemptionCode" maxlength="10" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="exemption-reason">İstisna açıklaması</Label>
+                        <Input id="exemption-reason" @bind-Value="settings.ExemptionReason" maxlength="200" />
+                    </div>
+                </div>
+                <p class="text-muted-foreground text-xs">KDV oranı ve istisna kodunu mali müşavirinize danışarak belirleyin.</p>
+            </CardContent>
+            <CardFooter><Button Type="submit">Kaydet</Button></CardFooter>
+        </Card>
+    </form>
+</div>
+
+@code {
+    private InvoiceSettings settings = new();
+    private IReadOnlyList<EInvoiceProviderStatus> providers = [];
+    private string? selected, error, duesVat;
+    private bool saved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        settings = await Invoices.SettingsAsync();
+        duesVat = settings.DuesVatRate.ToString();
+        await LoadProvidersAsync();
+    }
+
+    private async Task LoadProvidersAsync()
+    {
+        providers = await Invoices.ProvidersAsync();
+        selected = providers.FirstOrDefault(p => p.IsSelected)?.Info.Key;
+    }
+
+    private async Task SaveAsync()
+    {
+        saved = false;
+        if (!int.TryParse(duesVat, out var vat))
+        {
+            error = "Aidat KDV oranını tam sayı olarak girin.";
+            return;
+        }
+
+        settings.DuesVatRate = vat;
+        settings.Provider = selected;
+        var result = await Invoices.SaveSettingsAsync(settings);
+        error = result.IsSuccess ? null : result.Error!.Message;
+        saved = result.IsSuccess;
+        settings = await Invoices.SettingsAsync();
+        await LoadProvidersAsync();
+    }
+}
