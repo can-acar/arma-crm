@@ -34,6 +34,7 @@ public sealed class MembershipModule : IModule, INavigationContributor
         services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<MembershipInsights>());
         services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<MembershipInsights>());
         services.AddSingleton<IContactPanel, MembershipPanel>();
+        services.AddSingleton<Arma.SharedKernel.Portal.IPortalSection, MembershipPortalSection>();
         services.AddSingleton<INavigationContributor>(this);
     }
 
@@ -51,6 +52,17 @@ public sealed class MembershipModule : IModule, INavigationContributor
         new("Aidatlar", "memberships/dues", 36, MembershipPermissions.Read),
         new("Üyelik türleri", "memberships/types", 37, MembershipPermissions.Read),
     ];
+
+    private sealed class MembershipPortalSection : Arma.SharedKernel.Portal.IPortalSection
+    {
+        public string Key => "membership";
+
+        public string Title => "Üyeliğim";
+
+        public int Order => 20;
+
+        public Type ComponentType => typeof(Web.Pages.PortalMembership);
+    }
 
     private sealed class MembershipPanel : IContactPanel
     {

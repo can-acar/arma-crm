@@ -34,6 +34,7 @@ public sealed class CommsModule : IModule, INavigationContributor
         services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<CommsInsights>());
         services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<CommsInsights>());
         services.AddSingleton<IContactPanel, CommsPanel>();
+        services.AddSingleton<Arma.SharedKernel.Portal.IPortalSection, PreferencesSection>();
         services.AddScoped<ICampaignSource, MailingCampaignSource>();
         services.AddSingleton<INavigationContributor>(this);
         AddSenders(services, configuration);
@@ -113,6 +114,17 @@ public sealed class CommsModule : IModule, INavigationContributor
 
     private static string Normalize(string? provider) =>
         string.IsNullOrWhiteSpace(provider) ? "none" : provider.Trim().ToLowerInvariant();
+
+    private sealed class PreferencesSection : Arma.SharedKernel.Portal.IPortalSection
+    {
+        public string Key => "comms";
+
+        public string Title => "İletişim tercihlerim";
+
+        public int Order => 50;
+
+        public Type ComponentType => typeof(Web.Pages.PortalPreferences);
+    }
 
     private sealed class CommsPanel : IContactPanel
     {

@@ -1,7 +1,11 @@
 @page "/memberships/{Id:guid}/card"
+@page "/portal/uye-karti/{Id:guid}"
 @layout PlainLayout
-@attribute [Authorize(Policy = MembershipPermissions.Read)]
+@* Bağışçı portalından da açılır; yetki kodla denetlenir: üyelik izni ya da üyeliğin sahibi portal oturumu. *@
+@attribute [AllowAnonymous]
 @inject MembershipService Members
+@inject ICurrentUser CurrentUser
+@inject Arma.SharedKernel.Portal.IPortalSession Portal
 @inject NavigationManager Navigation
 @using QRCoder
 
@@ -48,6 +52,11 @@ else
     protected override async Task OnInitializedAsync()
     {
         member = await Members.GetAsync(Id);
+        if (member is not null && !CurrentUser.HasPermission(MembershipPermissions.Read) && await Portal.ContactIdAsync() != member.ContactId)
+        {
+            member = null;
+        }
+
         if (member is not null)
         {
             // Okutan görevli üyelik kaydına gider; kartta kişisel veri kodlanmaz.

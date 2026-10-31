@@ -36,6 +36,7 @@ public sealed class GivingModule : IModule, INavigationContributor
         services.AddScoped<IContactCriteriaProvider>(sp => sp.GetRequiredService<GivingInsights>());
         services.AddScoped<IDashboardContributor>(sp => sp.GetRequiredService<GivingInsights>());
         services.AddSingleton<IContactPanel, DonationsPanel>();
+        services.AddSingleton<Arma.SharedKernel.Portal.IPortalSection, DonationsPortalSection>();
         services.AddScoped<ICampaignSource, FundCampaignSource>();
         services.AddSingleton<INavigationContributor>(this);
         AddPayments(services, configuration);
@@ -85,6 +86,17 @@ public sealed class GivingModule : IModule, INavigationContributor
             default:
                 throw new InvalidOperationException($"Bilinmeyen ödeme sağlayıcısı: '{provider}'. Geçerli değerler: none, iyzico, paytr.");
         }
+    }
+
+    private sealed class DonationsPortalSection : Arma.SharedKernel.Portal.IPortalSection
+    {
+        public string Key => "donations";
+
+        public string Title => "Bağışlarım";
+
+        public int Order => 10;
+
+        public Type ComponentType => typeof(Web.Pages.PortalDonations);
     }
 
     private sealed class DonationsPanel : IContactPanel

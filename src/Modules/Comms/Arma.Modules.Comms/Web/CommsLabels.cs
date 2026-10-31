@@ -33,6 +33,7 @@ internal static class CommsLabels
         "manual" => "Elle",
         "import" => "İçe aktarma",
         "unsubscribe" => "Abonelik iptali",
+        "portal" => "Bağışçı portalı",
         "api" => "API",
         null or "" => "",
         _ => source,
