@@ -22,8 +22,9 @@ public sealed class SensitiveDataProtector : ISensitiveDataProtector
     private const int NonceSize = 12;
     private const int TagSize = 16;
 
-    // Yalnızca geliştirme ortamında, anahtar verilmemişse kullanılır; üretimde anahtar zorunludur.
-    private const string DevelopmentKey = "ZGV2ZWxvcG1lbnQtb25seS1hcm1hLWZpZWxkLWtleSE=";
+    // Yalnızca geliştirme ortamında, anahtar verilmemişse kullanılır; üretimde anahtar zorunludur. Gizli değildir:
+    // herkesçe bilinen bir metinden türetilir, bu yüzden gerçek veri bu anahtarla şifrelenmemelidir.
+    private const string DevelopmentKeySeed = "arma-crm yalnizca gelistirme ortami icin alan sifreleme anahtari";
 
     private static SensitiveDataProtector? current;
 
@@ -63,7 +64,7 @@ public sealed class SensitiveDataProtector : ISensitiveDataProtector
             }
 
             logger.LogWarning("'{Key}' tanımlı değil; geliştirme anahtarı kullanılıyor. Üretimde bu anahtar kabul edilmez.", ConfigurationKey);
-            configured = DevelopmentKey;
+            return new SensitiveDataProtector(SHA256.HashData(Encoding.UTF8.GetBytes(DevelopmentKeySeed)));
         }
 
         byte[] key;
