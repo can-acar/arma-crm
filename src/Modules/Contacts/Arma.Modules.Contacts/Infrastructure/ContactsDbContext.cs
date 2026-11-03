@@ -1,4 +1,5 @@
 using Arma.Infrastructure.Auditing;
+using Arma.Infrastructure.Persistence;
 using Arma.Modules.Contacts.Domain;
 using Arma.SharedKernel.Tenancy;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +47,7 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
             entity.Property(c => c.Email).HasMaxLength(254);
             entity.Property(c => c.Phone).HasMaxLength(32);
             entity.Property(c => c.NationalId).HasMaxLength(11);
+            entity.Property(c => c.NationalIdHash).HasMaxLength(64);
             entity.Property(c => c.Website).HasMaxLength(300);
             entity.Property(c => c.SearchText).IsRequired();
             entity.Property(c => c.ExternalKey).HasMaxLength(100);
@@ -65,7 +67,7 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
 
             entity.HasIndex(c => new { c.TenantId, c.DisplayName });
             entity.HasIndex(c => new { c.TenantId, c.Email });
-            entity.HasIndex(c => new { c.TenantId, c.NationalId }).IsUnique().HasFilter("national_id IS NOT NULL AND NOT is_deleted");
+            entity.HasIndex(c => new { c.TenantId, c.NationalIdHash }).IsUnique().HasFilter("national_id_hash IS NOT NULL AND NOT is_deleted");
             entity.HasIndex(c => new { c.TenantId, c.ExternalKey }).IsUnique().HasFilter("external_key IS NOT NULL");
             entity.HasIndex(c => c.SearchText).HasMethod("gin").HasOperators("gin_trgm_ops");
 
@@ -120,5 +122,7 @@ public sealed class ContactsDbContext(DbContextOptions<ContactsDbContext> option
             entity.HasIndex(f => new { f.TenantId, f.Label }).IsUnique().HasFilter("NOT is_deleted");
             entity.HasQueryFilter(f => f.TenantId == tenantId && !f.IsDeleted);
         });
+
+        modelBuilder.EncryptSensitiveData();
     }
 }

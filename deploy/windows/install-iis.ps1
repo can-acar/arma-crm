@@ -128,6 +128,7 @@ function Protect-ConfigDir {
 function Initialize-EnvFile {
     if (Test-Path $EnvFile) {
         Write-Step "Mevcut ayarlar kullanılıyor: $EnvFile"
+        Initialize-EncryptionKey
         return
     }
 
@@ -136,7 +137,26 @@ function Initialize-EnvFile {
     Protect-ConfigDir
     Copy-Item -LiteralPath (Join-Path $PackageRoot "arma.env.example") -Destination $EnvFile
     Set-EnvValue $EnvFile "Arma__TenantId" ([guid]::NewGuid().ToString())
-    Write-Host "Bu dosyayı yedekleyin; kurum kimliği ve veritabanı parolası içinde." -ForegroundColor Yellow
+    Initialize-EncryptionKey
+    Write-Host "Bu dosyayı yedekleyin; kurum kimliği, veritabanı parolası ve şifreleme anahtarı içinde." -ForegroundColor Yellow
+}
+
+# Hassas alan şifreleme anahtarı; bu özellikten önce kurulmuş sistemlerde de bir kez üretilir.
+function Initialize-EncryptionKey {
+    $settings = Read-EnvFile $EnvFile
+    if ($settings["Arma__Security__EncryptionKey"]) {
+        return
+    }
+
+    $bytes = New-Object byte[] 32
+    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $key = [Convert]::ToBase64String($bytes)
+    if ((Get-Content -LiteralPath $EnvFile -Encoding UTF8) -match "^\s*Arma__Security__EncryptionKey=") {
+        Set-EnvValue $EnvFile "Arma__Security__EncryptionKey" $key
+    } else {
+        Add-Content -LiteralPath $EnvFile -Value "Arma__Security__EncryptionKey=$key" -Encoding UTF8
+    }
+    Write-Host "Şifreleme anahtarı üretildi. $EnvFile dosyasını yeniden yedekleyin; anahtar kaybolursa kimlik numaraları okunamaz." -ForegroundColor Yellow
 }
 
 function Find-Psql {

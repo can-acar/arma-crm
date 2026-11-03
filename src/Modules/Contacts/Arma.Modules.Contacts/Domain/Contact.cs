@@ -1,6 +1,7 @@
 using System.Globalization;
 using Arma.Modules.Contacts.Contracts;
 using Arma.SharedKernel.Auditing;
+using Arma.SharedKernel.Security;
 using Arma.SharedKernel.Domain;
 
 namespace Arma.Modules.Contacts.Domain;
@@ -31,6 +32,11 @@ public sealed class Contact : Entity
     /// <summary>Kişi için TCKN, kurum için VKN. Ekranda yalnızca maskeli gösterilir.</summary>
     [SensitiveData]
     public string? NationalId { get; private set; }
+
+    /// <summary>Kimlik numarasının anahtarlı özeti; numara şifreli saklandığı için arama ve tekillik bunun üzerinden yapılır.</summary>
+    [NotAudited]
+    [BlindIndex(nameof(NationalId))]
+    public string? NationalIdHash { get; private set; }
 
     public DateOnly? BirthDate { get; private set; }
 

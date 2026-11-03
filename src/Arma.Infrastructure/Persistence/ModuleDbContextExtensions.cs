@@ -1,7 +1,11 @@
 using Arma.Infrastructure.Auditing;
+using Arma.Infrastructure.Security;
+using Arma.SharedKernel.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Arma.Infrastructure.Persistence;
 
@@ -25,10 +29,11 @@ public static class ModuleDbContextExtensions
         services.AddDbContext<TContext>((sp, options) => options
             .UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, schema))
             .UseSnakeCaseNamingConvention()
-            // Sıra önemli: önce damgalar (silme yumuşak silmeye döner), sonra denetim izi.
+            // Sıra önemli: önce damgalar (silme yumuşak silmeye döner), sonra blind index, sonra denetim izi.
             .AddInterceptors(
                 sp.GetRequiredService<TenantConnectionInterceptor>(),
                 sp.GetRequiredService<EntityStampInterceptor>(),
+                sp.GetRequiredService<BlindIndexInterceptor>(),
                 sp.GetRequiredService<AuditInterceptor>()));
 
         return services;
@@ -49,6 +54,17 @@ public static class ModuleDbContextExtensions
             return;
         }
 
+        // Şifreleyici, ilk DbContext oluşturulurken (BlindIndexInterceptor aracılığıyla) kurulur ve
+        // EF değer dönüştürücülerine atanır; anahtar eksikse uygulama ilk veritabanı erişiminde açık bir hatayla durur.
+        services.AddSingleton(sp =>
+        {
+            var protector = SensitiveDataProtector.Create(
+                sp.GetRequiredService<IConfiguration>(), sp.GetRequiredService<IHostEnvironment>(), sp.GetRequiredService<ILoggerFactory>().CreateLogger<SensitiveDataProtector>());
+            SensitiveDataProtector.UseForModel(protector);
+            return protector;
+        });
+        services.AddSingleton<ISensitiveDataProtector>(sp => sp.GetRequiredService<SensitiveDataProtector>());
+        services.AddScoped<BlindIndexInterceptor>();
         services.AddScoped<TenantConnectionInterceptor>();
         services.AddScoped<EntityStampInterceptor>();
         services.AddScoped<AuditInterceptor>();

@@ -4,6 +4,7 @@ using Arma.Modules.Contacts.Domain;
 using Arma.Modules.Contacts.Infrastructure;
 using Arma.SharedKernel.Auditing;
 using Arma.SharedKernel.Domain;
+using Arma.SharedKernel.Security;
 using Microsoft.EntityFrameworkCore;
 using Wolverine.EntityFrameworkCore;
 
@@ -71,7 +72,7 @@ public sealed record DuplicateCandidate(Guid Id, string DisplayName, string? Ema
 
 public sealed record CreateRelationshipRequest(Guid OtherContactId, RelationshipType Type, bool ThisIsFrom, string? Description, DateOnly? StartDate);
 
-public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimeProvider clock, IDbContextOutbox outbox) : IContactDirectory, IContactRegistry, IContactBillingDirectory
+public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimeProvider clock, IDbContextOutbox outbox, ISensitiveDataProtector sensitive) : IContactDirectory, IContactRegistry, IContactBillingDirectory
 {
     public const int MaxPageSize = 100;
 
@@ -269,12 +270,13 @@ public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimePr
     {
         email = string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
         nationalId = string.IsNullOrWhiteSpace(nationalId) ? null : nationalId.Trim();
+        var nationalIdHash = nationalId is null ? null : sensitive.Hash(nationalId);
         var digits = Contact.PhoneDigits(phone);
         var name = string.IsNullOrWhiteSpace(displayName) ? null : Contact.Normalize(displayName);
 
         var candidates = await db.Contacts.AsNoTracking()
             .Where(c => c.Id != excludeId)
-            .Where(c => (nationalId != null && c.NationalId == nationalId)
+            .Where(c => (nationalIdHash != null && c.NationalIdHash == nationalIdHash)
                         || (email != null && c.Email == email)
                         || (digits.Length >= 7 && c.SearchText.Contains(digits))
                         || (name != null && c.SearchText.StartsWith(name + " ")))
@@ -509,8 +511,11 @@ public sealed class ContactService(ContactsDbContext db, IAuditLog audit, TimePr
         return Result<Guid>.Success(created.Value!.Id);
     }
 
-    private Task<bool> NationalIdTakenAsync(string nationalId, Guid? exceptId, CancellationToken cancellationToken) =>
-        db.Contacts.AnyAsync(c => c.NationalId == nationalId && c.Id != exceptId, cancellationToken);
+    private Task<bool> NationalIdTakenAsync(string nationalId, Guid? exceptId, CancellationToken cancellationToken)
+    {
+        var hash = sensitive.Hash(nationalId);
+        return db.Contacts.AnyAsync(c => c.NationalIdHash == hash && c.Id != exceptId, cancellationToken);
+    }
 
     internal static TagDto ToDto(Tag tag) => new(tag.Id, tag.Name, tag.Color);
 
