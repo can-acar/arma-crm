@@ -24,7 +24,14 @@ public sealed record RecordTimelineEntry(
     string? Body,
     DateTimeOffset OccurredAt,
     string SourceModule,
-    string SourceId);
+    string SourceId)
+{
+    /// <summary>
+    /// Mesajın oluşturulduğu an. Aynı kaynağa ait mesajlar arka planda sırasız işlenebilir (yedek listesinden kesin
+    /// kayda geçiş gibi); zaman çizelgesi elindeki kayıttan daha eski bir mesajı yok sayar. Kendiliğinden atanır.
+    /// </summary>
+    public DateTimeOffset Revision { get; init; } = DateTimeOffset.UtcNow;
+}
 
 /// <summary>Kaynağı silinen veya geçersiz olan (ödemesi başarısız bağış gibi) zaman çizelgesi kaydını kaldırır.</summary>
 public sealed record RemoveTimelineEntry(string SourceModule, string SourceId);

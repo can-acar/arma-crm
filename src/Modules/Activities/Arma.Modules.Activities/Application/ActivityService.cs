@@ -220,11 +220,12 @@ public sealed class ActivityService(ActivitiesDbContext db, IContactDirectory co
             .FirstOrDefaultAsync(a => a.SourceModule == entry.SourceModule && a.SourceId == entry.SourceId, cancellationToken);
         if (existing is null)
         {
-            db.Activities.Add(Activity.FromSource(entry.Kind, entry.Subject, entry.Body, entry.OccurredAt, entry.SourceModule, entry.SourceId, entry.ContactIds));
+            db.Activities.Add(Activity.FromSource(entry.Kind, entry.Subject, entry.Body, entry.OccurredAt, entry.SourceModule, entry.SourceId, entry.ContactIds, entry.Revision));
         }
-        else
+        else if (!existing.ApplySource(entry.Subject, entry.Body, entry.OccurredAt, entry.ContactIds, entry.Revision))
         {
-            existing.ApplySource(entry.Subject, entry.Body, entry.OccurredAt, entry.ContactIds);
+            // Daha yeni bir mesaj zaten uygulanmış; geç gelen eski mesaj kaydı geri almaz.
+            return;
         }
 
         await db.SaveChangesAsync(cancellationToken);

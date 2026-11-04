@@ -144,6 +144,10 @@ namespace Arma.Modules.Activities.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("source_module");
 
+                    b.Property<DateTimeOffset?>("SourceRevision")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("source_revision");
+
                     b.Property<short>("Status")
                         .HasColumnType("smallint")
                         .HasColumnName("status");
@@ -183,7 +187,6 @@ namespace Arma.Modules.Activities.Infrastructure.Migrations
             modelBuilder.Entity("Arma.Modules.Activities.Domain.ActivityParticipant", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 

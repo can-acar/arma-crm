@@ -45,6 +45,9 @@ public sealed class Activity : Entity
 
     public string? SourceId { get; private set; }
 
+    /// <summary>Kaynaktan uygulanan son mesajın oluşturulma anı; daha eski mesajlar kaydı geri almaz.</summary>
+    public DateTimeOffset? SourceRevision { get; private set; }
+
     public IReadOnlyList<ActivityParticipant> Participants => participants;
 
     public bool IsTask => Kind == ActivityKind.Task;
@@ -72,7 +75,7 @@ public sealed class Activity : Entity
         return activity;
     }
 
-    public static Activity FromSource(ActivityKind kind, string subject, string? body, DateTimeOffset occurredAt, string sourceModule, string sourceId, IEnumerable<Guid> contactIds)
+    public static Activity FromSource(ActivityKind kind, string subject, string? body, DateTimeOffset occurredAt, string sourceModule, string sourceId, IEnumerable<Guid> contactIds, DateTimeOffset revision)
     {
         var activity = new Activity
         {
@@ -81,16 +84,24 @@ public sealed class Activity : Entity
             SourceModule = sourceModule,
             SourceId = sourceId,
         };
-        activity.ApplySource(subject, body, occurredAt, contactIds);
+        activity.ApplySource(subject, body, occurredAt, contactIds, revision);
         return activity;
     }
 
-    public void ApplySource(string subject, string? body, DateTimeOffset occurredAt, IEnumerable<Guid> contactIds)
+    /// <summary>Kaynaktan gelen içeriği uygular; elindekinden eski bir mesajsa hiçbir şey değiştirmez ve false döner.</summary>
+    public bool ApplySource(string subject, string? body, DateTimeOffset occurredAt, IEnumerable<Guid> contactIds, DateTimeOffset revision)
     {
+        if (SourceRevision > revision)
+        {
+            return false;
+        }
+
+        SourceRevision = revision;
         Subject = Truncate(subject.Trim(), SubjectMaxLength);
         Body = string.IsNullOrWhiteSpace(body) ? null : Truncate(body.Trim(), BodyMaxLength);
         OccurredAt = occurredAt;
         SetContacts(contactIds);
+        return true;
     }
 
     public Result<bool> Update(string subject, string? body, DateTimeOffset? occurredAt, DateTimeOffset? dueAt, Guid? assignedTo, DateTimeOffset now)
