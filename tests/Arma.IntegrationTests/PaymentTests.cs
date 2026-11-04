@@ -157,21 +157,23 @@ public sealed class PaymentTests(ArmaAppFactory factory) : IClassFixture<ArmaApp
         }), ct);
         paid.Headers.Location!.ToString().ShouldContain("/bagis/tesekkurler");
 
-        var plan = (await Recurring(s => s.ListAsync(cancellationToken: ct))).ShouldHaveSingleItem();
+        // Sınıfın veritabanını paylaşan diğer testler de düzenli bağış açar; yalnızca bu bağışçınınkine bakılır.
+        var plan = (await Recurring(s => s.ListAsync(cancellationToken: ct))).Where(p => p.ContactName == "Aylık Bağışçı").ShouldHaveSingleItem();
+        var donor = plan.ContactId;
         plan.Status.ShouldBe(RecurringStatus.Active);
         plan.CardLabel.ShouldBe("TEST **** 4242");
         plan.PaymentCount.ShouldBe(1);
         plan.NextChargeOn.ShouldNotBeNull().ShouldBeGreaterThan(DateOnly.FromDateTime(DateTime.Now));
 
         // Kart jetonu şifreli saklanır.
-        var stored = await factory.WithScopeAsync(sp => sp.GetRequiredService<GivingDbContext>().RecurringDonations.AsNoTracking().Select(r => r.CardToken).SingleAsync(ct));
+        var stored = await factory.WithScopeAsync(sp => sp.GetRequiredService<GivingDbContext>().RecurringDonations.AsNoTracking().Where(r => r.Id == plan.Id).Select(r => r.CardToken).SingleAsync(ct));
         stored.ShouldNotBeNull().ShouldNotContain("test-card-");
 
         // Günü gelince kayıtlı karttan çekilir.
         await MakeDueAsync();
         (await Recurring(s => s.ChargeDueAsync(ct))).ShouldBe(new RecurringRunResult(1, 0, 0));
         (await Recurring(s => s.ChargeDueAsync(ct))).ShouldBe(new RecurringRunResult(0, 0, 0));
-        plan = (await Recurring(s => s.ListAsync(cancellationToken: ct))).Single();
+        plan = (await Recurring(s => s.ListAsync(contactId: donor, cancellationToken: ct))).Single();
         (plan.PaymentCount, plan.PaidTotal).ShouldBe((2, 400m));
 
         // Üst üste üç başarısız tahsilatta durur ve bağışçıya haber verilir.
@@ -190,7 +192,7 @@ public sealed class PaymentTests(ArmaAppFactory factory) : IClassFixture<ArmaApp
             provider.DeclineCharges = false;
         }
 
-        plan = (await Recurring(s => s.ListAsync(cancellationToken: ct))).Single();
+        plan = (await Recurring(s => s.ListAsync(contactId: donor, cancellationToken: ct))).Single();
         plan.Status.ShouldBe(RecurringStatus.Paused);
         plan.LastError.ShouldBe("Test kartı reddedildi");
         var sink = factory.Services.GetRequiredService<TestMessageSink>();
@@ -201,7 +203,7 @@ public sealed class PaymentTests(ArmaAppFactory factory) : IClassFixture<ArmaApp
         (await Recurring(s => s.ChargeDueAsync(ct))).ShouldBe(new RecurringRunResult(1, 0, 0));
         (await Recurring(s => s.CancelAsync(plan.Id, Guid.NewGuid(), ct))).IsSuccess.ShouldBeFalse();
         (await Recurring(s => s.CancelAsync(plan.Id, plan.ContactId, ct))).IsSuccess.ShouldBeTrue();
-        (await factory.WithScopeAsync(sp => sp.GetRequiredService<GivingDbContext>().RecurringDonations.AsNoTracking().Select(r => r.CardToken).SingleAsync(ct))).ShouldBeNull();
+        (await factory.WithScopeAsync(sp => sp.GetRequiredService<GivingDbContext>().RecurringDonations.AsNoTracking().Where(r => r.Id == plan.Id).Select(r => r.CardToken).SingleAsync(ct))).ShouldBeNull();
     }
 
     [Fact]

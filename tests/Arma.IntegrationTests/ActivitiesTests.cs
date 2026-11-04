@@ -91,6 +91,34 @@ public sealed class ActivitiesTests(ArmaAppFactory factory) : IClassFixture<Arma
     }
 
     [Fact]
+    public async Task Late_arriving_older_timeline_message_does_not_overwrite_newer_one()
+    {
+        RequiresDatabase.Check();
+        var contact = await Scoped<ContactService, Guid>(s => s.CreatePersonAsync(new CreatePersonRequest("Yedek", "Liste", null, null, null), ct).Value());
+        var registeredAt = DateTimeOffset.UtcNow;
+        // Yedek listesinden kesin kayda geçiş: iki mesaj aynı kaynağa ait, işlenme sırası ters.
+        var waitlisted = new RecordTimelineEntry([contact], ActivityKind.System, "Etkinlik yedek listesi", null, registeredAt, "Test", "registration-1");
+        var promoted = new RecordTimelineEntry([contact], ActivityKind.System, "Etkinliğe kayıt", null, registeredAt, "Test", "registration-1")
+        {
+            Revision = waitlisted.Revision.AddSeconds(1),
+        };
+
+        await factory.WithScopeAsync(async sp =>
+        {
+            await sp.GetRequiredService<ActivityService>().RecordAsync(promoted, ct);
+            return true;
+        });
+        await factory.WithScopeAsync(async sp =>
+        {
+            await sp.GetRequiredService<ActivityService>().RecordAsync(waitlisted, ct);
+            return true;
+        });
+
+        var history = await Scoped<ActivityService, IReadOnlyList<ActivityView>>(async s => (await s.TimelineAsync(contact, cancellationToken: ct)).History);
+        history.ShouldHaveSingleItem().Subject.ShouldBe("Etkinliğe kayıt");
+    }
+
+    [Fact]
     public async Task Api_requires_authentication()
     {
         RequiresDatabase.Check();

@@ -81,7 +81,9 @@ public sealed class CaseTests(ArmaAppFactory factory) : IClassFixture<ArmaAppFac
 
         var timeline = await EventuallyAsync(
             () => factory.WithScopeAsync(sp => sp.GetRequiredService<ActivityService>().TimelineAsync(contact, cancellationToken: ct)),
-            t => t.History.Any(a => a.Subject.StartsWith("Vaka kapandı")));
+            t => t.History.Any(a => a.Subject.StartsWith("Vaka kapandı"))
+                 && t.History.Any(a => a.Subject.StartsWith("Vaka açıldı"))
+                 && t.History.Any(a => a.Subject.StartsWith("Vaka notu")));
         timeline.History.ShouldContain(a => a.Subject.StartsWith("Vaka açıldı"));
         timeline.History.ShouldContain(a => a.Subject.StartsWith("Vaka notu") && a.Body == "Ev ziyareti yapıldı.");
         timeline.History.ShouldNotContain(a => a.Body != null && a.Body.Contains("kronik"));

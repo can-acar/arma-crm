@@ -62,7 +62,7 @@ public sealed class FormsTests(ArmaAppFactory factory) : IClassFixture<ArmaAppFa
         consent.Single(c => c.NoticeId == notice).Granted.ShouldBe(true);
         var timeline = await EventuallyAsync(
             () => factory.WithScopeAsync(sp => sp.GetRequiredService<ActivityService>().TimelineAsync(contactId, cancellationToken: ct)),
-            t => t.History.Count > 0);
+            t => t.History.Any(a => a.Subject.Contains("Gönüllü olun")));
         timeline.History.ShouldContain(a => a.Subject.Contains("Gönüllü olun"));
 
         // Aynı e-postayla ikinci yanıt yeni kişi açmaz.

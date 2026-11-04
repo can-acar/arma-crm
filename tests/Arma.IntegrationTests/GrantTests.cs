@@ -63,7 +63,9 @@ public sealed class GrantTests(ArmaAppFactory factory) : IClassFixture<ArmaAppFa
 
         var timeline = await EventuallyAsync(
             () => factory.WithScopeAsync(sp => sp.GetRequiredService<ActivityService>().TimelineAsync(funder, cancellationToken: ct)),
-            t => t.History.Any(a => a.Subject.StartsWith("Hibe ödemesi alındı")));
+            t => t.History.Any(a => a.Subject.StartsWith("Hibe ödemesi alındı"))
+                 && t.History.Any(a => a.Subject.StartsWith("Hibe kabul edildi"))
+                 && t.History.Any(a => a.Subject == "Hibe başvurusu: Kırsal okuma atölyeleri"));
         timeline.History.ShouldContain(a => a.Subject.StartsWith("Hibe kabul edildi"));
         timeline.History.ShouldContain(a => a.Subject == "Hibe başvurusu: Kırsal okuma atölyeleri");
 

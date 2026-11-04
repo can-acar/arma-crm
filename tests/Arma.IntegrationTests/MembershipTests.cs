@@ -72,7 +72,9 @@ public sealed class MembershipTests(ArmaAppFactory factory) : IClassFixture<Arma
 
         var timeline = await EventuallyAsync(
             () => factory.WithScopeAsync(sp => sp.GetRequiredService<ActivityService>().TimelineAsync(ayse, cancellationToken: ct)),
-            t => t.History.Count(a => a.Subject.StartsWith("Aidat alındı")) == 2);
+            t => t.History.Count(a => a.Subject.StartsWith("Aidat alındı")) == 2
+                 && t.History.Any(a => a.Subject.StartsWith("Üye oldu: Asıl üye"))
+                 && t.History.Any(a => a.Subject.StartsWith("Üyelik yenilendi")));
         timeline.History.ShouldContain(a => a.Subject.StartsWith("Üye oldu: Asıl üye"));
         timeline.History.ShouldContain(a => a.Subject.StartsWith("Üyelik yenilendi"));
     }

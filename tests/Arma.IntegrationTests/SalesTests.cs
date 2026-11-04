@@ -53,7 +53,8 @@ public sealed class SalesTests(ArmaAppFactory factory) : IClassFixture<ArmaAppFa
 
         var timeline = await EventuallyAsync(
             () => factory.WithScopeAsync(sp => sp.GetRequiredService<ActivityService>().TimelineAsync(customer, cancellationToken: ct)),
-            t => t.History.Any(e => e.Subject.Contains("kaybedildi")));
+            t => t.History.Any(e => e.Subject.Contains("kaybedildi"))
+                 && t.History.Any(e => e.Subject.Contains("Pano A") && e.Subject.Contains("kazanıldı")));
         timeline.History.ShouldContain(e => e.Subject.Contains("Pano A") && e.Subject.Contains("kazanıldı"));
     }
 
